@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LINE Sticker Studio v2</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <main class="app-shell">
+    <section id="welcome" class="welcome card">
+      <div class="brand-mark">✂</div>
+      <h1>LINE Sticker Studio</h1>
+      <p>拖曳圖片進來，快速去背、裁切、檢查安全區，最後一鍵打包 ZIP。</p>
+      <label class="drop-zone" id="dropZone">
+        <input id="fileInput" type="file" accept="image/*" multiple />
+        <span class="drop-icon">＋</span>
+        <strong>拖曳圖片到這裡</strong>
+        <small>或點擊選擇圖片</small>
+      </label>
+      <div class="welcome-actions">
+        <button id="demoBtn" class="ghost-btn" type="button">查看空白工作台</button>
+      </div>
+    </section>
+
+    <section id="studio" class="studio hidden">
+      <header class="topbar card">
+        <div>
+          <strong>LINE Sticker Studio</strong>
+          <span id="statusText">尚未匯入圖片</span>
+        </div>
+        <div class="top-actions">
+          <label class="small-btn">
+            匯入圖片
+            <input id="addInput" type="file" accept="image/*" multiple />
+          </label>
+          <button id="optimizeBtn" class="small-btn" type="button">✨ 一鍵最佳化</button>
+          <button id="downloadBtn" class="primary-btn" type="button">下載 ZIP</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="progress-panel card">
+          <div class="score-row">
+            <span>完成度</span>
+            <strong id="scoreText">0%</strong>
+          </div>
+          <div class="meter"><i id="scoreBar"></i></div>
+          <ul id="issueList" class="issue-list"></ul>
+        </aside>
+
+        <section class="canvas-panel card">
+          <div class="canvas-toolbar">
+            <button id="prevBtn" type="button">← 上一張</button>
+            <strong id="imageCounter">0 / 0</strong>
+            <button id="nextBtn" type="button">下一張 →</button>
+          </div>
+          <div class="preview-stage" id="previewStage">
+            <canvas id="previewCanvas" width="370" height="320"></canvas>
+            <div id="safeGuide" class="safe-guide"></div>
+          </div>
+          <div id="thumbs" class="thumbs"></div>
+        </section>
+
+        <aside class="tool-panel card">
+          <h2>簡單工具</h2>
+          <div class="tool-grid">
+            <button id="reprocessBtn" type="button">🪄 重新分析</button>
+            <button id="centerBtn" type="button">置中</button>
+            <button id="bottomBtn" type="button">靠下</button>
+            <button id="markDoneBtn" type="button">✓ 完成並下一張</button>
+          </div>
+
+          <details class="advanced">
+            <summary>⚙ 進階設定</summary>
+            <label>去背強度 <output id="toleranceOut">30</output>
+              <input id="tolerance" type="range" min="5" max="120" value="30" />
+            </label>
+            <label>安全留白 <output id="marginOut">15px</output>
+              <input id="safeMargin" type="range" min="0" max="50" value="15" />
+            </label>
+            <label>輸出尺寸
+              <select id="sizePreset">
+                <option value="370x320">一般貼圖 370×320</option>
+                <option value="396x660">大貼圖 396×660</option>
+                <option value="320x270">動態貼圖 320×270</option>
+              </select>
+            </label>
+            <label class="checkline"><input id="borderToggle" type="checkbox" /> 自動加白框</label>
+            <label class="checkline"><input id="lineNaming" type="checkbox" checked /> LINE 官方命名</label>
+          </details>
+        </aside>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
