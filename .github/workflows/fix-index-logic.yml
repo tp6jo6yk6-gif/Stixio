@@ -1,8 +1,6 @@
 name: Fix index logic issues
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 permissions:
@@ -13,144 +11,141 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Patch index.html
         run: |
           python3 <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("index.html")
           text = path.read_text(encoding="utf-8")
           original = text
 
-          def replace_once(old, new, label):
+          def sub_once(pattern, repl, label, flags=re.S):
               global text
-              if old not in text:
-                  raise SystemExit(f"Patch target not found: {label}")
-              text = text.replace(old, new, 1)
+              new_text, count = re.subn(pattern, repl, text, count=1, flags=flags)
+              if count == 0:
+                  print(f"SKIP: {label} already patched or target not found")
+              else:
+                  print(f"PATCHED: {label}")
+                  text = new_text
 
-          replace_once("""function getStickerFilename(idx) {
-                  if (state.lineNamingMode) {
-                      if (idx === 0) return 'main.png';
-                      if (idx === 1) return 'tab.png';
-                      return `${String(idx - 1).padStart(2, '0')}.png`;
-                  }
-                  const p = state.filenamePrefix.trim();
-                  const s = state.filenameSuffix.trim();
-                  return `${p ? p + '_' : ''}${idx + 1}${s ? '_' + s : ''}.png`;
+          # 1) filename helper + shared placement helper
+          if "function getStickerPlacement(box)" not in text:
+              sub_once(
+                  r"function getStickerFilename\(idx\) \{\s*if \(state\.lineNamingMode\) \{\s*if \(idx === 0\) return 'main\.png';\s*if \(idx === 1\) return 'tab\.png';\s*return `\$\{String\(idx - 1\)\.padStart\(2, '0'\)\}\.png`;\s*\}\s*const p = state\.filenamePrefix\.trim\(\);\s*const s = state\.filenameSuffix\.trim\(\);\s*return `\$\{p \? p \+ '_' : ''\}\$\{idx \+ 1\}\$\{s \? '_' \+ s : ''\}\.png`;\s*\}",
+                  """function getStickerFilename(idx, orderIdx = idx) {
+              if (state.lineNamingMode) {
+                  if (orderIdx === 0) return 'main.png';
+                  if (orderIdx === 1) return 'tab.png';
+                  return `${String(orderIdx - 1).padStart(2, '0')}.png`;
               }
+              const p = state.filenamePrefix.trim();
+              const s = state.filenameSuffix.trim();
+              return `${p ? p + '_' : ''}${idx + 1}${s ? '_' + s : ''}.png`;
+          }
 
-              """, """function getStickerFilename(idx, orderIdx = idx) {
-                  if (state.lineNamingMode) {
-                      if (orderIdx === 0) return 'main.png';
-                      if (orderIdx === 1) return 'tab.png';
-                      return `${String(orderIdx - 1).padStart(2, '0')}.png`;
-                  }
-                  const p = state.filenamePrefix.trim();
-                  const s = state.filenameSuffix.trim();
-                  return `${p ? p + '_' : ''}${idx + 1}${s ? '_' : ''}${s}.png`;
-              }
-
-              function getStickerPlacement(box) {
-                  const sc = Math.min(
-                      (state.targetW - state.safeMargin * 2) / box.cropW,
-                      (state.targetH - state.safeMargin * 2) / box.cropH
-                  );
-                  const fW = box.cropW * sc;
-                  const fH = box.cropH * sc;
-                  const pX = (state.targetW - fW) / 2 + box.offsetX;
-                  const baseY = state.alignMode === 'bottom'
-                      ? state.targetH - state.safeMargin - fH
-                      : (state.targetH - fH) / 2;
-                  const pY = baseY + box.offsetY;
-                  return { sc, fW, fH, pX, pY };
-              }
-
-              """, "filename helper and placement helper")
-
-          replace_once("""       if (src.layout === '1x1') { src.rows=1; src.cols=1; } 
-             if (state.layout === '1x1') { src.rows=1; src.cols=1; } 
-             if (state.layout === '1x1') { src.rows=1; src.cols=1; } 
-             else if (src.layout === '2x2') { src.rows=2; src.cols=2; } 
-          """, """       if (src.layout === '1x1') { src.rows=1; src.cols=1; } 
-             else if (src.layout === '2x2') { src.rows=2; src.cols=2; } 
-          """, "layout branch cleanup")
-
-          replace_once("""      const exportList = state.stickers.map((s, idx) => ({ s, box: state.allBoxes[idx], idx })).filter(item => item.s && item.box.exportSelected !== false);
-                if (exportList.length === 0) return alert('請至少勾選一張圖片進行打包下載！');
-                
-                const btn = getEl('downloadZipBtn');
-          """, """      const exportList = state.stickers.map((s, idx) => ({ s, box: state.allBoxes[idx], idx })).filter(item => item.s && item.box && item.box.exportSelected !== false);
-                if (exportList.length === 0) return alert('請至少勾選一張圖片進行打包下載！');
-                
-                const btn = getEl('downloadZipBtn');
-                if (!btn) return;
-          """, "zip export null guard")
-
-          replace_once("""      exportList.forEach((item) => { 
-                    zip.file(getStickerFilename(item.idx), item.s.canvas.toDataURL('image/png').replace(/^data:image\\/(png|jpg);base64,/, ""), { base64: true }); 
-                });
-          """, """      exportList.forEach((item, exportIdx) => { 
-                    zip.file(getStickerFilename(item.idx, exportIdx), item.s.canvas.toDataURL('image/png').replace(/^data:image\\/(png|jpg);base64,/, ""), { base64: true }); 
-                });
-          """, "zip export naming order")
-
-          replace_once("""      const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH);
-                const fW=b.cropW*sc, fH=b.cropH*sc, pX=(state.targetW-fW)/2+b.offsetX;
-                
-                let pY = (state.targetH-fH)/2+b.offsetY; 
-                if (state.alignMode === 'bottom') { pY = state.targetH - state.safeMargin - fH + b.offsetY; }
-          """, """      const { sc, fW, fH, pX, pY } = getStickerPlacement(b);
-          """, "step 2 placement")
-
-          replace_once("""      const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH);
-                const fW=b.cropW*sc, fH=b.cropH*sc, pX=(state.targetW-fW)/2+b.offsetX;
-                
-                let pY = (state.targetH-fH)/2+b.offsetY;
-                if (state.alignMode === 'bottom') { pY = state.targetH - state.safeMargin - fH + b.offsetY; }
-          """, """      const { sc, fW, fH, pX, pY } = getStickerPlacement(b);
-          """, "export placement")
-
-          replace_once("""      const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;
-                const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH), pX=(state.targetW-b.cropW*sc)/2+b.offsetX, pY=(state.targetH-b.cropH*sc)/2+b.offsetY;
-                const mX=(lX-pX)/sc, mY=(lY-pY)/sc; if(!b.protectMaskCanvas){ b.protectMaskCanvas=document.createElement('canvas'); b.protectMaskCanvas.width=b.cropW; b.protectMaskCanvas.height=b.cropH; }
-          """, """      const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;
-                const { sc, pX, pY } = getStickerPlacement(b);
-                const mX=(lX-pX)/sc, mY=(lY-pY)/sc; if(!b.protectMaskCanvas){ b.protectMaskCanvas=document.createElement('canvas'); b.protectMaskCanvas.width=b.cropW; b.protectMaskCanvas.height=b.cropH; }
-          """, "brush placement")
-
-          replace_once("""      const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;
-                const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH), pX=(state.targetW-b.cropW*sc)/2+b.offsetX, pY=(state.targetH-b.cropH*sc)/2+b.offsetY;
-                const mX=Math.floor((lX-pX)/sc), mY=Math.floor((lY-pY)/sc); if(mX<0||mX>=b.cropW||mY<0||mY>=b.cropH||!b.parentSrc.img) return;
-          """, """      const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;
-                const { sc, pX, pY } = getStickerPlacement(b);
-                const mX=Math.floor((lX-pX)/sc), mY=Math.floor((lY-pY)/sc); if(mX<0||mX>=b.cropW||mY<0||mY>=b.cropH||!b.parentSrc.img) return;
-          """, "magic erase placement")
-
-          replace_once("""      ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => { if(state.activeSourceIdx===null) return; if(id.startsWith('grid')) getEl(id.replace('grid','').toLowerCase()+'Val'+(id.endsWith('X')?'X':'Y').replace('margin','margin').replace('gap','gap')).textContent=`${e.target.value}px`; applyGridChange(); }));
-          """, """      const gridValueLabels = { gridMarginX: 'marginValX', gridMarginY: 'marginValY', gridGapX: 'gapValX', gridGapY: 'gapValY' };
-                ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => { 
-                    if(state.activeSourceIdx===null) return; 
-                    if(gridValueLabels[id] && getEl(gridValueLabels[id])) getEl(gridValueLabels[id]).textContent=`${e.target.value}px`; 
-                    applyGridChange(); 
-                }));
-          """, "grid value label mapping")
-
-          replace_once("""      ['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'].forEach(id => getEl(id).addEventListener('input', e => { state[id]=+e.target.value; getEl(id+'Val').textContent=`${state[id]}`+(id==='colorTolerance'?'':' px'); updateStep3Guide(); debouncedProcessAndRender(); }));
-          """, """      ['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'].forEach(id => getEl(id).addEventListener('input', e => { 
-                    const stateKey = id === 'colorTolerance' ? 'tolerance' : id;
-                    state[stateKey]=+e.target.value; 
-                    const label = getEl(id+'Val');
-                    if(label) label.textContent=`${state[stateKey]}`+(id==='colorTolerance'?'':' px'); 
-                    updateStep3Guide(); 
-                    debouncedProcessAndRender(); 
-                }));
-          """, "tolerance state mapping")
-
-          if text == original:
-              print("No changes needed")
+          function getStickerPlacement(box) {
+              const sc = Math.min(
+                  (state.targetW - state.safeMargin * 2) / box.cropW,
+                  (state.targetH - state.safeMargin * 2) / box.cropH
+              );
+              const fW = box.cropW * sc;
+              const fH = box.cropH * sc;
+              const pX = (state.targetW - fW) / 2 + box.offsetX;
+              const baseY = state.alignMode === 'bottom'
+                  ? state.targetH - state.safeMargin - fH
+                  : (state.targetH - fH) / 2;
+              const pY = baseY + box.offsetY;
+              return { sc, fW, fH, pX, pY };
+          }""",
+                  "getStickerFilename + getStickerPlacement"
+              )
           else:
+              print("SKIP: placement helper already exists")
+
+          # 2) remove stale state.layout checks
+          text = re.sub(
+              r"\n\s*if \(state\.layout === '1x1'\) \{ src\.rows=1; src\.cols=1; \}\s*\n\s*if \(state\.layout === '1x1'\) \{ src\.rows=1; src\.cols=1; \}\s*",
+              "\n",
+              text,
+              count=1
+          )
+
+          # 3) zip export null guard
+          sub_once(
+              r"const exportList = state\.stickers\.map\(\(s, idx\) => \(\{ s, box: state\.allBoxes\[idx\], idx \}\)\)\.filter\(item => item\.s && item\.box\.exportSelected !== false\);",
+              "const exportList = state.stickers.map((s, idx) => ({ s, box: state.allBoxes[idx], idx })).filter(item => item.s && item.box && item.box.exportSelected !== false);",
+              "zip export null guard"
+          )
+          sub_once(
+              r"const btn = getEl\('downloadZipBtn'\);\s*const ogText = btn\.innerHTML;",
+              "const btn = getEl('downloadZipBtn');\n      if (!btn) return;\n      const ogText = btn.innerHTML;",
+              "download button guard"
+          )
+
+          # 4) zip export order-aware naming
+          sub_once(
+              r"exportList\.forEach\(\(item\) => \{\s*zip\.file\(getStickerFilename\(item\.idx\),",
+              "exportList.forEach((item, exportIdx) => { \n          zip.file(getStickerFilename(item.idx, exportIdx),",
+              "zip LINE naming order"
+          )
+
+          # 5) unify placement in render/generate functions
+          placement_pattern = r"const sc=Math\.min\(\(state\.targetW-state\.safeMargin\*2\)/b\.cropW, \(state\.targetH-state\.safeMargin\*2\)/b\.cropH\);\s*const fW=b\.cropW\*sc, fH=b\.cropH\*sc, pX=\(state\.targetW-fW\)/2\+b\.offsetX;\s*let pY = \(state\.targetH-fH\)/2\+b\.offsetY;\s*if \(state\.alignMode === 'bottom'\) \{ pY = state\.targetH - state\.safeMargin - fH \+ b\.offsetY; \}"
+          text, n = re.subn(placement_pattern, "const { sc, fW, fH, pX, pY } = getStickerPlacement(b);", text, count=2, flags=re.S)
+          print(f"PATCHED placement blocks: {n}")
+
+          # 6) brush/magic placement
+          sub_once(
+              r"const b=state\.allBoxes\[state\.selectedStickerIdx\]; if\(!b\) return;\s*const sc=Math\.min\(\(state\.targetW-state\.safeMargin\*2\)/b\.cropW, \(state\.targetH-state\.safeMargin\*2\)/b\.cropH\), pX=\(state\.targetW-b\.cropW\*sc\)/2\+b\.offsetX, pY=\(state\.targetH-b\.cropH\*sc\)/2\+b\.offsetY;\s*const mX=\(lX-pX\)/sc, mY=\(lY-pY\)/sc;",
+              "const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;\n      const { sc, pX, pY } = getStickerPlacement(b);\n      const mX=(lX-pX)/sc, mY=(lY-pY)/sc;",
+              "brush coordinate placement"
+          )
+          sub_once(
+              r"const b=state\.allBoxes\[state\.selectedStickerIdx\]; if\(!b\) return;\s*const sc=Math\.min\(\(state\.targetW-state\.safeMargin\*2\)/b\.cropW, \(state\.targetH-state\.safeMargin\*2\)/b\.cropH\), pX=\(state\.targetW-b\.cropW\*sc\)/2\+b\.offsetX, pY=\(state\.targetH-b\.cropH\*sc\)/2\+b\.offsetY;\s*const mX=Math\.floor\(\(lX-pX\)/sc\), mY=Math\.floor\(\(lY-pY\)/sc\);",
+              "const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;\n      const { sc, pX, pY } = getStickerPlacement(b);\n      const mX=Math.floor((lX-pX)/sc), mY=Math.floor((lY-pY)/sc);",
+              "magic erase coordinate placement"
+          )
+
+          # 7) grid slider labels
+          if "const gridValueLabels" not in text:
+              sub_once(
+                  r"\['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'\]\.forEach\(id => getEl\(id\)\?\.addEventListener\('input', e => \{ if\(state\.activeSourceIdx===null\) return; if\(id\.startsWith\('grid'\)\) getEl\(id\.replace\('grid',''\)\.toLowerCase\(\)\+'Val'\+\(id\.endsWith\('X'\)\?'X':'Y'\)\.replace\('margin','margin'\)\.replace\('gap','gap'\)\)\.textContent=`\$\{e\.target\.value\}px`; applyGridChange\(\); \}\)\);",
+                  """const gridValueLabels = { gridMarginX: 'marginValX', gridMarginY: 'marginValY', gridGapX: 'gapValX', gridGapY: 'gapValY' };
+          ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => { 
+              if(state.activeSourceIdx===null) return; 
+              if(gridValueLabels[id] && getEl(gridValueLabels[id])) getEl(gridValueLabels[id]).textContent=`${e.target.value}px`; 
+              applyGridChange(); 
+          }));""",
+                  "grid value label mapping"
+              )
+          else:
+              print("SKIP: grid value labels already exist")
+
+          # 8) tolerance state mapping
+          if "const stateKey = id === 'colorTolerance' ? 'tolerance' : id;" not in text:
+              sub_once(
+                  r"\['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'\]\.forEach\(id => getEl\(id\)\.addEventListener\('input', e => \{ state\[id\]=\+e\.target\.value; getEl\(id\+'Val'\)\.textContent=`\$\{state\[id\]\}`\+\(id==='colorTolerance'\?'':' px'\); updateStep3Guide\(\); debouncedProcessAndRender\(\); \}\)\);",
+                  """['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'].forEach(id => getEl(id).addEventListener('input', e => { 
+              const stateKey = id === 'colorTolerance' ? 'tolerance' : id;
+              state[stateKey]=+e.target.value; 
+              const label = getEl(id+'Val');
+              if(label) label.textContent=`${state[stateKey]}`+(id==='colorTolerance'?'':' px'); 
+              updateStep3Guide(); 
+              debouncedProcessAndRender(); 
+          }));""",
+                  "tolerance state mapping"
+              )
+          else:
+              print("SKIP: tolerance mapping already exists")
+
+          if text != original:
               path.write_text(text, encoding="utf-8")
               print("index.html patched")
+          else:
+              print("No index.html changes needed")
           PY
 
       - name: Basic JavaScript syntax check
