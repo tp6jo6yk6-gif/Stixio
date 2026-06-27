@@ -1,0 +1,37 @@
+{
+  "key": "line-sticker",
+  "name": "LINE Sticker",
+  "version": "1.0.0",
+  "canvas": {
+    "width": 370,
+    "height": 320
+  },
+  "formats": ["image/png"],
+  "safeArea": {
+    "top": 15,
+    "right": 15,
+    "bottom": 15,
+    "left": 15
+  },
+  "validation": {
+    "transparentBackground": true,
+    "maxFileSizeBytes": 1000000,
+    "requiredRoles": ["main", "tab"],
+    "minStickerCount": 8,
+    "maxStickerCount": 40
+  },
+  "package": {
+    "type": "zip",
+    "naming": "line-sticker",
+    "extension": "png",
+    "roles": [
+      { "key": "main", "index": 0, "fileName": "main.png" },
+      { "key": "tab", "index": 1, "fileName": "tab.png" }
+    ],
+    "stickerStartIndex": 2,
+    "stickerFilePattern": "{number:02}.png"
+  },
+  "preview": {
+    "type": "line-store"
+  }
+}
