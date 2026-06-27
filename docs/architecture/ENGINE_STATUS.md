@@ -38,12 +38,12 @@ Export Engine
 |---|---:|---|
 | Image Engine | 70% | Import and image processing exist; orientation and metadata still need polish. |
 | Document Engine | 35% | Document and Source Image model added. Needs UI/session integration. |
-| Detection Engine | 40% | Grid detection now returns Frame objects through `detectFrames()`. AI detect reserved. |
-| Frame Engine | 65% | New `src/core/frame/` module added. Legacy `crop/` remains temporarily for compatibility. |
+| Detection Engine | 55% | UI now calls `detectFrames()` for grid detection. AI detect reserved. |
+| Frame Engine | 70% | New `src/core/frame/` module is active in UI. Legacy `crop/` remains temporarily for compatibility. |
 | Command Engine | 35% | Generic command and shared history added. Needs concrete command factories. |
 | Refine Engine | 35% | Background removal exists. White border, shadow, brush still pending. |
-| Render Engine | 45% | Placement and canvas render helpers exist. Needs full frame-based render pipeline. |
-| Review Engine | 25% | Review session model added. Needs validation aggregation and UI integration. |
+| Render Engine | 50% | UI renders from Frames. Needs dedicated frame render pipeline module. |
+| Review Engine | 30% | Review board displays Frames. Needs validation aggregation and review session integration. |
 | Package Engine | 45% | LINE naming and package plan helpers exist. More destinations pending. |
 | Export Engine | 35% | Export job model added. Needs PNG/ZIP execution integration. |
 | Workspace Engine | 55% | Workspace schema, collections, storage adapter, libraries exist. Google Drive pending. |
@@ -53,8 +53,9 @@ Export Engine
 
 1. ✅ Add `frame/` module.
 2. ✅ Detection Engine outputs Frame objects.
-3. ⚠️ Legacy `crop/` still exists for beta compatibility.
-4. ⏳ Connect UI to Detection Engine instead of direct `calculateGridBoxes()` calls.
-5. ⏳ Make Document the session source of truth.
-6. ⏳ Use Command Engine for frame edits.
-7. ⏳ Move ZIP logic from UI into Export Engine.
+3. ✅ Connect UI to Detection Engine instead of direct `calculateGridBoxes()` calls.
+4. ✅ UI preview and export now read from Frames.
+5. ⚠️ Legacy `crop/` still exists for beta compatibility.
+6. ⏳ Make Document the session source of truth.
+7. ⏳ Use Command Engine for frame edits.
+8. ⏳ Move ZIP logic from UI into Export Engine.
