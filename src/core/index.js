@@ -11,6 +11,7 @@ export * from './validation.js';
 export * from './image-processing.js';
 export * from './zip-export.js';
 export * from './workspace/index.js';
+export * from './frame/index.js';
 export * from './crop/index.js';
 export * from './document/index.js';
 export * from './detection/index.js';
