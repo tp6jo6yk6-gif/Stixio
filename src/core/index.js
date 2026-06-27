@@ -7,3 +7,5 @@ export * from './file-naming.js';
 export * from './grid.js';
 export * from './render.js';
 export * from './validation.js';
+export * from './image-processing.js';
+export * from './zip-export.js';
