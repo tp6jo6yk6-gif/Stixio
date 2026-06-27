@@ -1,6 +1,7 @@
 import {
   BRAND,
-  calculateGridBoxes,
+  detectFrames,
+  frameToArtworkSlice,
   getStickerPlacement,
   processStickerImageData,
   getStickerFilename,
@@ -26,28 +27,21 @@ const DEFAULT_SETTINGS = {
   featherRadius: 1,
   lineNamingMode: true,
   selectedId: null,
-  mode: 'free',
-  activeWorkspace: 'layout'
+  mode: 'developer'
 };
 
-const WORKSPACES = [
-  { key: 'artwork', label: 'Artwork', hint: 'Import source' },
-  { key: 'layout', label: 'Layout', hint: 'Split sheet' },
-  { key: 'refine', label: 'Refine', hint: 'Clean edges' },
-  { key: 'review', label: 'Review', hint: 'Check pack' },
-  { key: 'package', label: 'Package', hint: 'Export files' }
-];
+const WORKSPACES = ['Artwork', 'Layout', 'Refine', 'Review', 'Package'];
 
 const state = {
   source: null,
-  artworks: [],
+  frames: [],
   rendered: new Map(),
   settings: { ...DEFAULT_SETTINGS }
 };
 
 export function initStixioApp(root = document.getElementById('app')) {
   if (!root) throw new Error('Stixio root element not found.');
-  document.title = BRAND.name + ' - ' + BRAND.slogan;
+  document.title = `${BRAND.name} - ${BRAND.slogan}`;
   root.innerHTML = renderShell();
   bindEvents(root);
   refresh();
@@ -70,24 +64,23 @@ function renderShell() {
           </div>
 
           <div class="hidden lg:flex items-center gap-2 rounded-2xl border border-slate-900/10 bg-white/70 p-1 shadow-sm">
-            ${WORKSPACES.map((item, index) => `
-              <button data-workspace="${item.key}" class="workspace-tab rounded-xl px-4 py-2 text-left transition ${item.key === DEFAULT_SETTINGS.activeWorkspace ? 'bg-slate-950 text-white shadow' : 'hover:bg-slate-100'}">
-                <span class="block text-[10px] font-black uppercase tracking-widest ${item.key === DEFAULT_SETTINGS.activeWorkspace ? 'text-emerald-300' : 'text-slate-400'}">0${index + 1}</span>
-                <span class="block text-sm font-black">${item.label}</span>
+            ${WORKSPACES.map((label, index) => `
+              <button class="workspace-tab rounded-xl px-4 py-2 text-left transition ${index === 1 ? 'bg-slate-950 text-white shadow' : 'hover:bg-slate-100'}">
+                <span class="block text-[10px] font-black uppercase tracking-widest ${index === 1 ? 'text-emerald-300' : 'text-slate-400'}">0${index + 1}</span>
+                <span class="block text-sm font-black">${label}</span>
               </button>
             `).join('')}
           </div>
 
           <div class="flex items-center gap-2">
-            <button id="quickModeBtn" class="hidden md:inline-flex rounded-xl border border-slate-900/10 bg-white/70 px-3 py-2 text-xs font-black text-slate-700">Quick Start</button>
-            <button id="loginBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white shadow hover:-translate-y-0.5 transition">Login</button>
+            <span class="hidden md:inline-flex rounded-xl border border-slate-900/10 bg-white/70 px-3 py-2 text-xs font-black text-slate-700">Developer mode</span>
+            <button id="loginBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white shadow hover:-translate-y-0.5 transition">Workspace</button>
           </div>
         </div>
       </header>
 
       <main class="mx-auto max-w-[1500px] px-5 py-6 space-y-6">
         ${renderHero()}
-        ${renderMobileTabs()}
         <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr_320px] gap-5 items-start">
           ${renderLeftPanel()}
           ${renderCenterPanel()}
@@ -104,22 +97,22 @@ function renderHero() {
       <div class="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,.55),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,.35),transparent_32%)]"></div>
       <div class="relative grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8 items-center">
         <div>
-          <div class="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-emerald-200">Sticker Production Workspace</div>
+          <div class="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-emerald-200">Frame Engine Connected</div>
           <h2 class="text-4xl md:text-6xl font-black leading-tight tracking-tight">Create once.<br><span class="text-emerald-300">Adapt everywhere.</span></h2>
-          <p class="mt-4 max-w-2xl text-sm md:text-base text-slate-300">Start without login, cut an AI sheet into stickers, refine one for free, then unlock collections and Workspace when the work gets serious.</p>
+          <p class="mt-4 max-w-2xl text-sm md:text-base text-slate-300">Import artwork, detect Frames, refine previews, and export rendered stickers. The UI now reads from Detection + Frame Engine.</p>
           <div class="mt-6 flex flex-wrap gap-3">
             <label class="cursor-pointer rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-black text-slate-950 shadow hover:-translate-y-0.5 transition">
               <input id="heroFileInput" type="file" accept="image/*" class="hidden" />
               Drop / choose artwork
             </label>
-            <button id="workspaceCtaBtn" class="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white hover:bg-white/15 transition">Open Workspace</button>
+            <button id="workspaceCtaBtn" class="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white hover:bg-white/15 transition">Preview Workspace</button>
           </div>
         </div>
         <div class="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
           <div class="grid grid-cols-2 gap-3">
-            ${metricCard('Mode', 'Free', '1 PNG export')}
-            ${metricCard('Collection', state.artworks.length || '0', 'stickers detected')}
-            ${metricCard('Canvas', `${state.settings.targetW}×${state.settings.targetH}`, 'LINE-ready size')}
+            ${metricCard('Mode', 'Developer', 'all features open')}
+            ${metricCard('Frames', state.frames.length || '0', 'detected areas')}
+            ${metricCard('Canvas', `${state.settings.targetW}×${state.settings.targetH}`, 'render target')}
             ${metricCard('Status', state.source ? 'Loaded' : 'Empty', state.source?.fileName || 'waiting for artwork')}
           </div>
         </div>
@@ -138,21 +131,6 @@ function metricCard(label, value, hint) {
   `;
 }
 
-function renderMobileTabs() {
-  return `
-    <div class="lg:hidden overflow-x-auto pb-1">
-      <div class="flex gap-2 min-w-max">
-        ${WORKSPACES.map((item, index) => `
-          <button data-workspace="${item.key}" class="workspace-tab rounded-2xl border border-slate-900/10 bg-white px-4 py-3 text-left shadow-sm ${item.key === DEFAULT_SETTINGS.activeWorkspace ? 'ring-2 ring-slate-950' : ''}">
-            <span class="block text-[10px] font-black text-emerald-600">0${index + 1}</span>
-            <span class="block text-sm font-black">${item.label}</span>
-          </button>
-        `).join('')}
-      </div>
-    </div>
-  `;
-}
-
 function renderLeftPanel() {
   return `
     <aside class="space-y-4">
@@ -160,11 +138,11 @@ function renderLeftPanel() {
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Quick Project</p>
-            <h3 class="mt-1 text-xl font-black">No login required</h3>
+            <h3 class="mt-1 text-xl font-black">Import artwork</h3>
           </div>
-          <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">FREE</span>
+          <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">OPEN</span>
         </div>
-        <p class="mt-3 text-sm text-slate-500">Cut the whole sheet, preview everything, refine and export one selected sticker.</p>
+        <p class="mt-3 text-sm text-slate-500">Upload a sheet. Detection Engine creates Frames, and Frames become the source of truth.</p>
         <label id="dropZone" class="mt-5 block cursor-pointer rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50">
           <input id="fileInput" type="file" accept="image/*" class="hidden" />
           <div class="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-slate-950 text-3xl text-emerald-300">＋</div>
@@ -176,8 +154,8 @@ function renderLeftPanel() {
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Layout</p>
-            <h3 class="text-lg font-black">Grid detection</h3>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Detection</p>
+            <h3 class="text-lg font-black">Grid to Frames</h3>
           </div>
           <button id="preset4x4Btn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">4×4</button>
         </div>
@@ -189,7 +167,7 @@ function renderLeftPanel() {
           ${numberInput('gapXInput', 'Gap X', state.settings.gapX, 0, 500)}
           ${numberInput('gapYInput', 'Gap Y', state.settings.gapY, 0, 500)}
         </div>
-        <button id="applyGridBtn" class="mt-4 w-full rounded-2xl bg-slate-950 py-3 text-sm font-black text-white hover:-translate-y-0.5 transition">Apply layout</button>
+        <button id="applyGridBtn" class="mt-4 w-full rounded-2xl bg-slate-950 py-3 text-sm font-black text-white hover:-translate-y-0.5 transition">Detect Frames</button>
       </section>
 
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
@@ -217,7 +195,7 @@ function renderCenterPanel() {
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Canvas</p>
-            <h3 class="text-xl font-black">Artwork layout preview</h3>
+            <h3 class="text-xl font-black">Source image + Frame overlay</h3>
           </div>
           <div id="statusText" class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-500">No artwork loaded</div>
         </div>
@@ -229,12 +207,12 @@ function renderCenterPanel() {
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Collection</p>
-            <h3 class="text-xl font-black">Sticker review board</h3>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Review</p>
+            <h3 class="text-xl font-black">Frame review board</h3>
           </div>
-          <div id="limitText" class="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-700">Free: export 1 selected PNG</div>
+          <div id="limitText" class="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700">Developer: all exports open</div>
         </div>
-        <div id="artworkGrid" class="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-5 gap-3"></div>
+        <div id="frameGrid" class="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-5 gap-3"></div>
       </section>
     </section>
   `;
@@ -253,9 +231,9 @@ function renderRightPanel() {
           <div class="h-full rounded-full bg-emerald-400" style="width:${calculateHealth()}%"></div>
         </div>
         <div class="mt-4 space-y-2 text-sm">
-          ${healthRow(state.source ? true : false, 'Artwork imported')}
-          ${healthRow(state.artworks.length > 0, `${state.artworks.length || 0} stickers detected`)}
-          ${healthRow(state.settings.selectedId ? true : false, 'One sticker selected')}
+          ${healthRow(Boolean(state.source), 'Source image imported')}
+          ${healthRow(state.frames.length > 0, `${state.frames.length || 0} Frames detected`)}
+          ${healthRow(Boolean(state.settings.selectedId), 'One Frame selected')}
           ${healthRow(state.rendered.size > 0, 'Render cache ready')}
         </div>
       </section>
@@ -263,17 +241,17 @@ function renderRightPanel() {
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-slate-950 p-5 text-white shadow-sm">
         <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Package</p>
         <h3 class="mt-1 text-xl font-black">Export center</h3>
-        <p class="mt-2 text-sm text-slate-400">Free exports one PNG. Starter unlocks one 8-sticker Collection. Creator unlocks Workspace and Google Drive.</p>
+        <p class="mt-2 text-sm text-slate-400">Developer mode keeps all features open. ZIP export uses rendered Frames.</p>
         <div class="mt-5 space-y-3">
           <button id="downloadPngBtn" class="w-full rounded-2xl bg-emerald-300 py-3 text-sm font-black text-slate-950 hover:-translate-y-0.5 transition">Download selected PNG</button>
-          <button id="downloadZipBtn" class="w-full rounded-2xl border border-white/10 bg-white/10 py-3 text-sm font-black text-white hover:bg-white/15 transition">Export collection ZIP</button>
+          <button id="downloadZipBtn" class="w-full rounded-2xl border border-white/10 bg-white/10 py-3 text-sm font-black text-white hover:bg-white/15 transition">Export Frames ZIP</button>
         </div>
       </section>
 
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
         <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Workspace</p>
         <h3 class="mt-1 text-lg font-black">Creator mode</h3>
-        <p class="mt-2 text-sm text-slate-500">Connect your own Google Drive folder later. Stixio manages the workflow, not your storage.</p>
+        <p class="mt-2 text-sm text-slate-500">Workspace will later persist Documents, Source Images, Frames, History, and Package Plans.</p>
         <button id="creatorBtn" class="mt-4 w-full rounded-2xl bg-slate-100 py-3 text-sm font-black hover:bg-slate-200 transition">Preview Workspace</button>
       </section>
     </aside>
@@ -301,7 +279,7 @@ function healthRow(ok, label) {
 function calculateHealth() {
   let score = 0;
   if (state.source) score += 25;
-  if (state.artworks.length) score += 25;
+  if (state.frames.length) score += 25;
   if (state.settings.selectedId) score += 25;
   if (state.rendered.size) score += 25;
   return score;
@@ -311,7 +289,7 @@ function bindEvents(root) {
   bindFileInputs(root);
   root.querySelector('#applyGridBtn').addEventListener('click', () => {
     readSettings(root);
-    createArtworksFromSource();
+    createFramesFromSource();
     renderAll();
     refresh();
   });
@@ -319,23 +297,16 @@ function bindEvents(root) {
     root.querySelector('#rowsInput').value = 4;
     root.querySelector('#colsInput').value = 4;
     readSettings(root);
-    createArtworksFromSource();
+    createFramesFromSource();
     renderAll();
     refresh();
   });
   root.querySelector('#renderBtn').addEventListener('click', () => { readSettings(root); renderSelected(); refresh(); });
   root.querySelector('#downloadPngBtn').addEventListener('click', downloadSelectedPng);
-  root.querySelector('#downloadZipBtn').addEventListener('click', downloadZipOrPromptLogin);
-  root.querySelector('#loginBtn').addEventListener('click', showLoginPrompt);
+  root.querySelector('#downloadZipBtn').addEventListener('click', downloadZip);
+  root.querySelector('#loginBtn').addEventListener('click', showWorkspacePrompt);
   root.querySelector('#workspaceCtaBtn').addEventListener('click', showWorkspacePrompt);
   root.querySelector('#creatorBtn').addEventListener('click', showWorkspacePrompt);
-  root.querySelector('#quickModeBtn')?.addEventListener('click', () => alert('Quick Start is active. Import artwork to begin.'));
-  root.querySelectorAll('.workspace-tab').forEach(button => {
-    button.addEventListener('click', () => {
-      state.settings.activeWorkspace = button.dataset.workspace;
-      highlightTabs(button.dataset.workspace);
-    });
-  });
 }
 
 function bindFileInputs(root) {
@@ -349,17 +320,6 @@ function bindFileInputs(root) {
     event.preventDefault();
     dropZone.classList.remove('border-emerald-400', 'bg-emerald-50');
     loadFile(event.dataTransfer.files?.[0]);
-  });
-}
-
-function highlightTabs(key) {
-  document.querySelectorAll('.workspace-tab').forEach(button => {
-    const active = button.dataset.workspace === key;
-    button.classList.toggle('bg-slate-950', active);
-    button.classList.toggle('text-white', active);
-    button.classList.toggle('shadow', active);
-    button.classList.toggle('ring-2', active);
-    button.classList.toggle('ring-slate-950', active);
   });
 }
 
@@ -386,39 +346,52 @@ async function loadFile(file) {
   if (!file || !file.type.startsWith('image/')) return;
   const dataUrl = await readFileAsDataURL(file);
   const img = await loadImage(dataUrl);
-  state.source = { id: createId('asset'), fileName: file.name, img };
+  state.source = {
+    id: createId('source'),
+    fileName: file.name,
+    name: file.name,
+    provider: 'local',
+    img,
+    width: img.width,
+    height: img.height,
+    mimeType: file.type
+  };
   state.rendered.clear();
-  createArtworksFromSource();
+  createFramesFromSource();
   renderAll();
   refresh();
 }
 
-function createArtworksFromSource() {
+function createFramesFromSource() {
   if (!state.source) return;
-  const boxes = calculateGridBoxes(state.source.img.width, state.source.img.height, state.settings);
-  state.artworks = boxes.map((box, index) => ({
-    id: createId('art'),
-    index,
-    sourceId: state.source.id,
-    slice: box,
-    metadata: {}
-  }));
-  state.settings.selectedId = state.artworks[0]?.id || null;
+  state.frames = detectFrames(state.source, {
+    strategy: 'grid',
+    grid: {
+      rows: state.settings.rows,
+      cols: state.settings.cols,
+      marginX: state.settings.marginX,
+      marginY: state.settings.marginY,
+      gapX: state.settings.gapX,
+      gapY: state.settings.gapY
+    }
+  });
+  state.settings.selectedId = state.frames[0]?.id || null;
 }
 
 function renderAll() {
   state.rendered.clear();
-  state.artworks.forEach(artwork => renderArtwork(artwork));
+  state.frames.forEach(frame => renderFrame(frame));
 }
 
 function renderSelected() {
-  const artwork = getSelectedArtwork();
-  if (artwork) renderArtwork(artwork);
+  const frame = getSelectedFrame();
+  if (frame) renderFrame(frame);
 }
 
-function renderArtwork(artwork) {
+function renderFrame(frame) {
   if (!state.source) return null;
   const { targetW, targetH } = state.settings;
+  const slice = frameToArtworkSlice(frame);
   const canvas = document.createElement('canvas');
   canvas.width = targetW;
   canvas.height = targetH;
@@ -426,19 +399,19 @@ function renderArtwork(artwork) {
   ctx.clearRect(0, 0, targetW, targetH);
 
   const sourceCanvas = document.createElement('canvas');
-  sourceCanvas.width = artwork.slice.width;
-  sourceCanvas.height = artwork.slice.height;
+  sourceCanvas.width = slice.width;
+  sourceCanvas.height = slice.height;
   const sourceCtx = sourceCanvas.getContext('2d');
   sourceCtx.drawImage(
     state.source.img,
-    artwork.slice.x,
-    artwork.slice.y,
-    artwork.slice.width,
-    artwork.slice.height,
+    slice.x,
+    slice.y,
+    slice.width,
+    slice.height,
     0,
     0,
-    artwork.slice.width,
-    artwork.slice.height
+    slice.width,
+    slice.height
   );
 
   const raw = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
@@ -455,27 +428,25 @@ function renderArtwork(artwork) {
   sourceCtx.putImageData(processed, 0, 0);
 
   const placement = getStickerPlacement({
-    width: artwork.slice.width,
-    height: artwork.slice.height,
-    cropW: artwork.slice.width,
-    cropH: artwork.slice.height,
+    width: slice.width,
+    height: slice.height,
+    cropW: slice.width,
+    cropH: slice.height,
     offsetX: 0,
     offsetY: 0
   }, state.settings);
 
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(sourceCanvas, placement.drawX, placement.drawY, placement.drawW, placement.drawH);
-  state.rendered.set(artwork.id, canvas);
+  state.rendered.set(frame.id, canvas);
   return canvas;
 }
 
 function refresh() {
   drawSourcePreview();
-  renderArtworkGrid();
+  renderFrameGrid();
   const status = document.getElementById('statusText');
-  if (status) status.textContent = state.source ? `${state.source.fileName} · ${state.artworks.length} stickers` : 'No artwork loaded';
-  const limit = document.getElementById('limitText');
-  if (limit) limit.textContent = state.settings.mode === 'free' ? 'Free: export 1 selected PNG' : 'Starter: collection ZIP unlocked';
+  if (status) status.textContent = state.source ? `${state.source.fileName} · ${state.frames.length} Frames` : 'No artwork loaded';
 }
 
 function drawSourcePreview() {
@@ -492,31 +463,31 @@ function drawSourcePreview() {
   canvas.height = state.source.img.height;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(state.source.img, 0, 0);
-  state.artworks.forEach(artwork => {
-    const selected = artwork.id === state.settings.selectedId;
+  state.frames.forEach(frame => {
+    const selected = frame.id === state.settings.selectedId;
     ctx.strokeStyle = selected ? '#10b981' : '#ef4444';
     ctx.lineWidth = selected ? Math.max(6, canvas.width / 180) : Math.max(3, canvas.width / 300);
-    ctx.strokeRect(artwork.slice.x, artwork.slice.y, artwork.slice.width, artwork.slice.height);
+    ctx.strokeRect(frame.geometry.x, frame.geometry.y, frame.geometry.width, frame.geometry.height);
   });
 }
 
-function renderArtworkGrid() {
-  const grid = document.getElementById('artworkGrid');
+function renderFrameGrid() {
+  const grid = document.getElementById('frameGrid');
   if (!grid) return;
-  if (!state.artworks.length) {
-    grid.innerHTML = '<div class="col-span-full rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-12 text-center"><p class="text-lg font-black text-slate-700">No artwork yet</p><p class="mt-1 text-sm text-slate-500">Import an AI sheet or a sticker image to start.</p></div>';
+  if (!state.frames.length) {
+    grid.innerHTML = '<div class="col-span-full rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-12 text-center"><p class="text-lg font-black text-slate-700">No Frames yet</p><p class="mt-1 text-sm text-slate-500">Import artwork and run detection to start.</p></div>';
     return;
   }
   grid.innerHTML = '';
-  state.artworks.forEach((artwork, index) => {
-    const canvas = state.rendered.get(artwork.id) || renderArtwork(artwork);
+  state.frames.forEach((frame, index) => {
+    const canvas = state.rendered.get(frame.id) || renderFrame(frame);
     const card = document.createElement('button');
-    card.className = `group rounded-[1.25rem] border p-2 text-left transition hover:-translate-y-0.5 ${artwork.id === state.settings.selectedId ? 'border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-900/10' : 'border-slate-900/10 bg-white hover:shadow-md'}`;
+    card.className = `group rounded-[1.25rem] border p-2 text-left transition hover:-translate-y-0.5 ${frame.id === state.settings.selectedId ? 'border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-900/10' : 'border-slate-900/10 bg-white hover:shadow-md'}`;
     card.innerHTML = `
       <div class="aspect-[370/320] overflow-hidden rounded-2xl border border-slate-900/10 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:14px_14px] grid place-items-center"></div>
       <div class="mt-2 flex items-center justify-between px-1 text-xs">
-        <span class="font-black text-slate-700">#${String(index + 1).padStart(2, '0')}</span>
-        <span class="font-black ${artwork.id === state.settings.selectedId ? 'text-emerald-700' : 'text-slate-400'}">${artwork.id === state.settings.selectedId ? 'Selected' : 'Preview'}</span>
+        <span class="font-black text-slate-700">${frame.name || `Frame ${index + 1}`}</span>
+        <span class="font-black ${frame.id === state.settings.selectedId ? 'text-emerald-700' : 'text-slate-400'}">${frame.id === state.settings.selectedId ? 'Selected' : 'Frame'}</span>
       </div>
     `;
     const holder = card.querySelector('div');
@@ -525,33 +496,30 @@ function renderArtworkGrid() {
     preview.className = 'max-w-full max-h-full object-contain transition group-hover:scale-105';
     holder.appendChild(preview);
     card.addEventListener('click', () => {
-      state.settings.selectedId = artwork.id;
+      state.settings.selectedId = frame.id;
       refresh();
     });
     grid.appendChild(card);
   });
 }
 
-function getSelectedArtwork() {
-  return state.artworks.find(item => item.id === state.settings.selectedId) || state.artworks[0] || null;
+function getSelectedFrame() {
+  return state.frames.find(item => item.id === state.settings.selectedId) || state.frames[0] || null;
 }
 
 function downloadSelectedPng() {
-  const artwork = getSelectedArtwork();
-  if (!artwork) return alert('Please import artwork first.');
-  const canvas = state.rendered.get(artwork.id) || renderArtwork(artwork);
+  const frame = getSelectedFrame();
+  if (!frame) return alert('Please import artwork first.');
+  const canvas = state.rendered.get(frame.id) || renderFrame(frame);
   downloadDataUrl(canvas.toDataURL('image/png'), getStickerFilename(0, { lineNamingMode: false, prefix: 'stixio' }));
 }
 
-async function downloadZipOrPromptLogin() {
-  if (state.settings.mode === 'free') {
-    showLoginPrompt();
-    return;
-  }
+async function downloadZip() {
+  if (!state.frames.length) return alert('Please import artwork first.');
   if (!window.JSZip) return alert('JSZip is not loaded.');
   const zip = new JSZip();
-  state.artworks.forEach((artwork, index) => {
-    const canvas = state.rendered.get(artwork.id) || renderArtwork(artwork);
+  state.frames.forEach((frame, index) => {
+    const canvas = state.rendered.get(frame.id) || renderFrame(frame);
     const fileName = getStickerFilename(index, { lineNamingMode: state.settings.lineNamingMode });
     zip.file(fileName, canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, ''), { base64: true });
   });
@@ -559,19 +527,8 @@ async function downloadZipOrPromptLogin() {
   downloadBlob(blob, createZipFileName({ prefix: 'stixio', targetW: state.settings.targetW, targetH: state.settings.targetH }));
 }
 
-function showLoginPrompt() {
-  const upgrade = confirm('Login unlocks Starter: one Collection, up to 8 stickers, full ZIP export. Continue as Starter demo?');
-  if (upgrade) {
-    state.settings.mode = 'starter';
-    if (state.artworks.length > 8) state.artworks = state.artworks.slice(0, 8);
-    renderAll();
-    refresh();
-    alert('Starter demo unlocked. Collection ZIP export is now available for up to 8 stickers.');
-  }
-}
-
 function showWorkspacePrompt() {
-  alert('Creator Workspace will connect to your own Google Drive folder. Stixio will manage Collections, Assets, Presets, Prompts, and Exports inside that folder.');
+  alert('Creator Workspace will later persist Documents, Source Images, Frames, History, Package Plans, and Exports.');
 }
 
 function downloadDataUrl(dataUrl, fileName) {
