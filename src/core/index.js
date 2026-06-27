@@ -10,3 +10,4 @@ export * from './render.js';
 export * from './validation.js';
 export * from './image-processing.js';
 export * from './zip-export.js';
+export * from './workspace/index.js';
