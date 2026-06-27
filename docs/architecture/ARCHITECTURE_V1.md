@@ -1,8 +1,8 @@
-# Stickio Core Architecture v1.0
+# Stixio Core Architecture v1.0
 
 > Product principle: **Artwork stays original. Outputs are rendered.**
 
-Stickio is designed as a sticker production platform, not a single-purpose image editor. The core architecture separates source artwork, non-destructive operations, destination rules, rendering, packaging, and storage.
+Stixio is designed as a sticker production platform, not a single-purpose image editor. The core architecture separates source artwork, non-destructive operations, destination rules, rendering, packaging, and storage.
 
 ## Core flow
 
