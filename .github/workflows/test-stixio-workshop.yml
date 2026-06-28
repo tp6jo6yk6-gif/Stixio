@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - stixio-workshop
+      - workshop-output-batch
     paths:
       - 'src/core/**'
-      - 'src/ui/stixio-workshop-app.js'
-      - 'workshop.html'
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'index.html'
       - 'tests/**'
       - '.github/workflows/test-stixio-workshop.yml'
   pull_request:
@@ -15,7 +16,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   syntax-and-core:
@@ -27,7 +28,8 @@ jobs:
           node-version: '22'
       - name: Check module syntax
         run: |
-          node --check src/ui/stixio-workshop-app.js
+          node --check src/ui/stixio-workshop-app-v2.js
+          node --check src/core/workshop-output.js
           node --check src/core/sticker-presets.js
           node --check src/core/detection/content-bounds.js
           node --check src/core/detection/projection-grid.js
@@ -36,7 +38,7 @@ jobs:
       - name: Check Workshop naming
         run: node --test tests/workshop-naming.test.js
       - name: Check Workshop integration
-        run: node --test tests/workshop-integration.test.js
+        run: node --test tests/workshop-integration.test.js tests/workshop-output-batch.test.js
       - name: Run project tests
         run: npm test
       - name: Build static site

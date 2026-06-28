@@ -6,7 +6,7 @@ const root = new URL('../', import.meta.url);
 const read = path => readFile(new URL(path, root), 'utf8');
 
 test('Workshop uses architecture stage names instead of numbered steps', async () => {
-  const app = await read('src/ui/stixio-workshop-app.js');
+  const app = await read('src/ui/stixio-workshop-app-v2.js');
   assert.match(app, /Layout · Artwork Engine/);
   assert.match(app, /匯入與版面切割/);
   assert.match(app, /Refine · Manual Tools/);
