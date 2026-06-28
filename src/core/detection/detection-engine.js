@@ -1,4 +1,4 @@
-import { calculateGridBoxes } from '../grid.js';
+import { calculateGridDetectionResult } from '../grid.js';
 import { createFrame, frameFromGridBox } from '../frame/index.js';
 
 export const DetectionStrategies = Object.freeze({
@@ -18,16 +18,27 @@ export function detectFrames(sourceImage, options = {}) {
 }
 
 export function detectGridFrames(sourceImage, options = {}) {
+  return detectGrid(sourceImage, options).frames;
+}
+
+export function detectGrid(sourceImage, options = {}) {
   if (!sourceImage?.width || !sourceImage?.height) throw new Error('Source image width and height are required for grid detection.');
-  const boxes = calculateGridBoxes(sourceImage.width, sourceImage.height, options.grid || options);
-  return boxes.map((box, index) => ({
+  const result = calculateGridDetectionResult(sourceImage.width, sourceImage.height, options.grid || options);
+  const frames = result.boxes.map((box, index) => ({
     ...frameFromGridBox(box, index, sourceImage.id),
     detection: {
       strategy: DetectionStrategies.GRID,
       index,
+      qualityScore: result.quality.score,
+      issues: result.quality.issues,
       createdAt: new Date().toISOString()
     }
   }));
+
+  return {
+    ...result,
+    frames
+  };
 }
 
 export function createManualFrame(sourceImage, geometry, name = 'Manual Frame') {
@@ -37,6 +48,8 @@ export function createManualFrame(sourceImage, geometry, name = 'Manual Frame') 
     geometry,
     detection: {
       strategy: DetectionStrategies.MANUAL,
+      qualityScore: 100,
+      issues: [],
       createdAt: new Date().toISOString()
     }
   });
@@ -50,6 +63,8 @@ function normalizeManualFrames(sourceImage, frames) {
     detection: frame.detection || {
       strategy: DetectionStrategies.MANUAL,
       index,
+      qualityScore: 100,
+      issues: [],
       createdAt: new Date().toISOString()
     }
   }));
