@@ -1,0 +1,47 @@
+name: Apply Workshop output integrity batch
+
+on:
+  push:
+    branches:
+      - workshop-output-integrity-final
+    paths:
+      - 'scripts/apply-output-integrity.mjs'
+      - '.github/workflows/apply-output-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: workshop-output-integrity-final
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply first-batch feature migration
+        run: node scripts/apply-output-integrity.mjs
+      - name: Install dependencies
+        run: npm install
+      - name: Check syntax
+        run: |
+          node --check src/ui/stixio-workshop-app.js
+          node --check src/core/package.js
+          node --check src/core/render.js
+          node --check src/core/review/review-engine.js
+          node --check src/core/workshop-output.js
+      - name: Run tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Commit verified feature batch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src docs tests
+          git diff --cached --quiet && exit 0
+          git commit -m "Add first-batch output integrity features"
+          git push origin HEAD:workshop-output-integrity-final
