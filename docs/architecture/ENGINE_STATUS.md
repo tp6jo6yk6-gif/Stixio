@@ -43,8 +43,8 @@ Export Engine
 | Image Engine | 70% | Import and image processing exist; orientation and metadata still need polish. |
 | Document Engine | 35% | Document and Source Image model added. Needs UI/session integration. |
 | Detection Engine | 72% | Grid Detect v2 has clamp, pixel snap, presets, and quality report. |
-| Frame Engine | 82% | Canvas Frame Editor v1 supports select, drag, resize, keyboard nudge, snap, duplicate, and delete. Legacy `crop/` remains temporarily for compatibility. |
-| Command Engine | 40% | Generic command and shared history added. Frame Editor still needs full Undo/Redo routing. |
+| Frame Engine | 84% | Canvas Frame Editor supports select, drag, resize, keyboard nudge, snap, duplicate, delete, and history integration. Legacy `crop/` remains temporarily for compatibility. |
+| Command Engine | 72% | Frame operations now route through Command History with Undo/Redo buttons and Ctrl/Cmd shortcuts. More non-frame commands pending. |
 | Refine Engine | 62% | Background removal, Trim Transparent, White Border, and Shadow exist. Brush still pending. |
 | Render Engine | 75% | Preview, PNG, ZIP, Review, and Export share `renderFrameToCanvas()`. Queue still pending. |
 | Review Engine | 72% | Review checks rendered Frames, size mismatch, missing renders, hidden/export states, and readiness. |
@@ -67,6 +67,7 @@ Export Engine
 10. ✅ Export Engine owns PNG and ZIP creation helpers.
 11. ✅ UI download actions route through Export Engine.
 12. ✅ Frame Editor v1 supports mouse select, drag, resize handle, arrow-key nudge, snap, duplicate, and delete.
-13. ⚠️ Legacy `crop/` still exists for beta compatibility.
-14. ⏳ Make Document the session source of truth.
-15. ⏳ Use Command Engine for full Undo/Redo routing.
+13. ✅ Frame Editor operations route through Command History.
+14. ✅ Undo / Redo buttons and Ctrl/Cmd shortcuts are connected.
+15. ⚠️ Legacy `crop/` still exists for beta compatibility.
+16. ⏳ Make Document the session source of truth.
