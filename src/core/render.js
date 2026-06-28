@@ -3,6 +3,7 @@
 
 import { frameToArtworkSlice } from './frame/index.js';
 import { processStickerImageData } from './image-processing.js';
+import { applyRefineEffects } from './refine/index.js';
 
 export function getStickerPlacement(box, renderOptions = {}) {
   const {
@@ -69,7 +70,10 @@ export function createRenderOptions(options = {}) {
       exteriorOnly: true,
       autoDespeckle: true,
       shrinkRadius: 0,
-      featherRadius: 1
+      featherRadius: 1,
+      trim: { enabled: false, threshold: 1, padding: 0 },
+      whiteBorder: { enabled: false, size: 6, color: '#ffffff' },
+      shadow: { enabled: false, blur: 8, offsetX: 0, offsetY: 4, color: 'rgba(0,0,0,0.28)' }
     },
     ...options,
     refine: {
@@ -81,6 +85,9 @@ export function createRenderOptions(options = {}) {
       autoDespeckle: true,
       shrinkRadius: 0,
       featherRadius: 1,
+      trim: { enabled: false, threshold: 1, padding: 0 },
+      whiteBorder: { enabled: false, size: 6, color: '#ffffff' },
+      shadow: { enabled: false, blur: 8, offsetX: 0, offsetY: 4, color: 'rgba(0,0,0,0.28)' },
       ...(options.refine || {})
     }
   };
@@ -104,10 +111,10 @@ export function renderFrameToCanvas(sourceImage, frame, options = {}) {
   ctx.imageSmoothingQuality = renderOptions.highQuality ? 'high' : 'medium';
 
   const placement = getStickerPlacement({
-    width: slice.width,
-    height: slice.height,
-    cropW: slice.width,
-    cropH: slice.height,
+    width: refinedCanvas.width,
+    height: refinedCanvas.height,
+    cropW: refinedCanvas.width,
+    cropH: refinedCanvas.height,
     offsetX: 0,
     offsetY: 0
   }, renderOptions);
@@ -117,6 +124,7 @@ export function renderFrameToCanvas(sourceImage, frame, options = {}) {
   return {
     canvas: targetCanvas,
     sourceCanvas,
+    refinedCanvas,
     placement,
     frameId: frame.id,
     renderedAt: new Date().toISOString(),
@@ -195,5 +203,5 @@ function refineSourceCanvas(sourceCanvas, refineOptions = {}) {
     featherRadius: refineOptions.featherRadius
   });
   sourceCtx.putImageData(processed, 0, 0);
-  return sourceCanvas;
+  return applyRefineEffects(sourceCanvas, refineOptions);
 }
