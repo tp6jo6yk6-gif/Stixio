@@ -102,7 +102,10 @@ export function renderFrameToCanvas(sourceImage, frame, options = {}) {
   const sourceCanvas = cropSourceToCanvas(sourceImage.img, slice);
   const refinedCanvas = renderOptions.refine?.enabled === false
     ? sourceCanvas
-    : refineSourceCanvas(sourceCanvas, renderOptions.refine);
+    : refineSourceCanvas(sourceCanvas, {
+      ...renderOptions.refine,
+      protectMaskCanvas: frame.custom?.protectMaskCanvas || null
+    });
 
   const targetCanvas = createCanvas(renderOptions.targetW, renderOptions.targetH);
   const ctx = targetCanvas.getContext('2d');
@@ -200,7 +203,8 @@ function refineSourceCanvas(sourceCanvas, refineOptions = {}) {
     exteriorOnly: refineOptions.exteriorOnly,
     autoDespeckle: refineOptions.autoDespeckle,
     shrinkRadius: refineOptions.shrinkRadius,
-    featherRadius: refineOptions.featherRadius
+    featherRadius: refineOptions.featherRadius,
+    protectMaskCanvas: refineOptions.protectMaskCanvas || null
   });
   sourceCtx.putImageData(processed, 0, 0);
   return applyRefineEffects(sourceCanvas, refineOptions);
