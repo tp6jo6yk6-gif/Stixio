@@ -15,6 +15,19 @@ index.html
 - 舊單檔版本不再存在於正式建置；需要回復時使用 `stable-legacy` 分支或 `v1.0.0-legacy-stable` 標籤。
 - UI 不擁有圖像處理、偵測、命名或打包邏輯。
 
+## 使用者工作流程名稱
+
+`Layout → Refine → Review → Package`
+
+| 階段 | 中文名稱 | 主要工作 |
+|---|---|---|
+| Layout | 匯入與版面切割 | 匯入、多圖管理、智能偵測、網格、Frame 與裁切 |
+| Refine | 細部修補 | 去背、遮罩、保留／刪除筆刷、羽化與外框 |
+| Review | 預覽與檢查 | 預覽、警告、排序、匯出選取 |
+| Package | 角色與輸出打包 | main／tab／sticker 角色、命名、PNG 與 ZIP |
+
+原本的編號式第一階段已正式改名為 **Layout｜匯入與版面切割**。
+
 ## 功能歸屬
 
 | 貼圖功能 | Stixio 模組 |

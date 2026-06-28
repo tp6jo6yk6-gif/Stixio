@@ -24,6 +24,17 @@ Package Engine
 Export
 ```
 
+## Workflow stages
+
+The user-facing workflow uses stage names instead of numbered steps:
+
+1. **Layout｜匯入與版面切割** — imports artwork, detects grids, creates Frames, and adjusts crop geometry. This replaces the former `Step 1` label.
+2. **Refine｜細部修補** — removes backgrounds, repairs masks, feathers edges, and applies borders.
+3. **Review｜預覽與檢查** — reviews rendered results, warnings, order, and export selection.
+4. **Package｜角色與輸出打包** — assigns main/tab/sticker roles, applies destination naming, and exports PNG or ZIP.
+
+These are Workflow Engine stages. Artwork, Detection, Refine, Review, Rules, Render, and Package remain engine responsibilities beneath them.
+
 ## Engines
 
 ### Document Engine
@@ -115,8 +126,11 @@ Responsibilities:
 Does not own:
 - Rendering or validation logic.
 
-## V1 rule
+## Current production rule
 
-V1 should build the core shape without replacing the current working production app until the new architecture is stable.
+The modular Workshop architecture is now the production application.
 
-The old `index.html` remains usable while the new architecture is developed under `src/` and documented under `docs/`.
+- `main/index.html` directly starts `src/ui/stixio-workshop-app.js`.
+- User-facing workflow terminology is `Layout → Refine → Review → Package`.
+- Numbered `Step 1 / Step 2 / Step 3` labels are retired.
+- The stable legacy recovery points remain `stable-legacy` and `v1.0.0-legacy-stable`.

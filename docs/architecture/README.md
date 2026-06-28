@@ -1,37 +1,27 @@
-# Architecture Docs
+# Stixio Architecture Docs
 
-This folder tracks the Stickio architecture migration.
+This folder documents the production Workshop architecture.
 
-## Documents
+## Production entry
+
+`main/index.html` starts the single modular application at `src/ui/stixio-workshop-app.js`.
+
+## User-facing workflow
+
+`Layout → Refine → Review → Package`
+
+- **Layout｜匯入與版面切割** replaces the former numbered first step.
+- **Refine｜細部修補** handles mask and edge repair.
+- **Review｜預覽與檢查** validates rendered results and order.
+- **Package｜角色與輸出打包** handles roles, names, PNG, and ZIP delivery.
+
+## Core documents
 
 - [ARCHITECTURE_V1.md](./ARCHITECTURE_V1.md)
+- [Workshop architecture](../WORKSHOP-ARCHITECTURE.md)
 
-## Current migration rule
+## Core locations
 
-The current production app remains in the root `index.html`.
-
-The new architecture is developed separately under:
-
-```text
-src/core/
-src/destinations/
-docs/architecture/
-```
-
-This lets us build the new engine layer without breaking the working Sticker sticker tool.
-
-## First architecture milestone
-
-- Document Engine skeleton
-- Artwork data model
-- Operation Engine skeleton
-- Rules Engine skeleton
-- Package Engine skeleton
-- Sticker Package destination rules
-
-Next milestone:
-
-- Add Render Engine skeleton
-- Add Storage Adapter interface
-- Add basic validation helpers
-- Add unit-test-ready examples
+`src/core/` — engines and domain models  
+`src/destinations/` — destination profiles  
+`src/ui/stixio-workshop-app.js` — the only production UI
