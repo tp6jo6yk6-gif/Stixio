@@ -44,12 +44,14 @@ Export Engine
 | Document Engine | 35% | Document and Source Image model added. Needs UI/session integration. |
 | Detection Engine | 72% | Grid Detect v2 has clamp, pixel snap, presets, and quality report. |
 | Frame Engine | 84% | Canvas Frame Editor supports select, drag, resize, keyboard nudge, snap, duplicate, delete, and history integration. Legacy `crop/` remains temporarily for compatibility. |
-| Command Engine | 72% | Frame operations now route through Command History with Undo/Redo buttons and Ctrl/Cmd shortcuts. More non-frame commands pending. |
+| Command Engine | 72% | Frame operations route through Command History. Needs grouped keyboard nudge and selection-only history refinement. |
 | Refine Engine | 62% | Background removal, Trim Transparent, White Border, and Shadow exist. Brush still pending. |
 | Render Engine | 75% | Preview, PNG, ZIP, Review, and Export share `renderFrameToCanvas()`. Queue still pending. |
-| Review Engine | 74% | Review checks rendered Frames, size mismatch, missing renders, hidden/export states, readiness, and package validation. |
+| Review Engine | 78% | Review checks render readiness, blocking errors, package validation, and has pixel review helpers for blank/transparent/edge-touch checks. Pixel helper still needs direct `reviewFrames()` integration. |
 | Package Engine | 78% | Package Role v2 supports Main / Tab / Sticker roles, validation, role-first naming, and line package filenames. |
 | Export Engine | 78% | ZIP export now uses Package Plan filenames and blocks package role validation errors. |
+| Recovery Engine | 55% | Local recovery snapshot helpers exist for source metadata, dataUrl, frames, and settings. UI restore prompt still pending. |
+| Test / CI | 60% | Node test scripts and GitHub Actions CI added. Initial tests cover package roles, export blocking, recovery, and pixel review. |
 | Workspace Engine | 55% | Workspace schema, collections, storage adapter, libraries exist. Google Drive deferred after M1. |
 | Feature Engine | 50% | Developer mode opens all features. Production plan restrictions pending. |
 
@@ -72,6 +74,15 @@ Export Engine
 15. ✅ Package Role v2 separates project frame identity from final package filenames.
 16. ✅ Main / Tab / Sticker roles are validated before ZIP export.
 17. ✅ Export Engine uses Package Plan filenames: `main.png`, `tab.png`, `01.png...`.
-18. ⚠️ Legacy `crop/` still exists for beta compatibility.
-19. ⏳ Make Document the session source of truth.
-20. ⏳ Add full UI role switcher for Main / Tab / Sticker in Frame Editor panel.
+18. ✅ Add Node test script and GitHub Actions CI.
+19. ✅ Add tests for Package Role, ZIP blocking, Recovery, and Pixel Review.
+20. ✅ Add Local Recovery Engine snapshot helpers.
+21. ⚠️ Pixel Review helper exists but is not yet called by `reviewFrames()`.
+22. ⚠️ Legacy `crop/` still exists for beta compatibility.
+23. ⏳ Make Document the session source of truth.
+24. ⏳ Add UI restore prompt for local recovery.
+25. ⏳ Replace preview `toDataURL()` usage with object URL or canvas node reuse.
+26. ⏳ Group direction-key nudges and avoid selection-only history noise.
+27. ⏳ Add full UI role switcher for Main / Tab / Sticker in Frame Editor panel.
+28. ⏳ Split large `stixio-app.js` into UI modules.
+29. ⏳ Replace static build shim with a cleaner build tool once UI modules are split.
