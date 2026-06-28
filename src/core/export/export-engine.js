@@ -1,9 +1,10 @@
 // Export Engine
 // Owns file delivery formats such as PNG, ZIP, and future formats.
 
-import { getStickerFilename, createZipFileName } from '../file-naming.js';
+import { createZipFileName } from '../file-naming.js';
 import { renderFrameToCanvas } from '../render.js';
 import { reviewFrames, ReviewIssueSeverity } from '../review/index.js';
+import { createPackagePlan, createPackageItems, validatePackageRoles } from '../package.js';
 
 export const ExportFormats = Object.freeze({
   PNG: 'png',
@@ -35,18 +36,23 @@ export function createExportJob({
 }
 
 export function createStickerExportItems(frames = [], renderedMap = new Map(), options = {}) {
+  const packageItems = options.packagePlan?.items || createPackageItems(frames, options.roleMap || {}, options.packageRules || defaultPackageRules());
+  const itemByFrameId = new Map(packageItems.map(item => [item.artworkId, item]));
+
   return frames
     .filter(frame => frame.state?.visible !== false && frame.state?.exportSelected !== false)
     .map((frame, index) => {
       const canvas = renderedMap.get(frame.id);
+      const packageItem = itemByFrameId.get(frame.id);
       return {
         frameId: frame.id,
         name: frame.name || `Frame ${index + 1}`,
         index,
-        fileName: getStickerFilename(index, {
-          lineNamingMode: options.lineNamingMode !== false,
-          prefix: options.prefix || 'stixio'
-        }),
+        role: packageItem?.role || 'sticker',
+        roleLabel: packageItem?.roleLabel || 'Sticker',
+        packageOrder: packageItem?.order ?? index,
+        stickerIndex: packageItem?.stickerIndex || null,
+        fileName: packageItem?.fileName || `${String(index + 1).padStart(2, '0')}.png`,
         canvas
       };
     });
@@ -62,14 +68,41 @@ export function prepareRenderedExport({ sourceImage, frames = [], renderOptions 
     }
   });
 
+  const packagePlan = exportOptions.packagePlan || createPackagePlan({
+    destinationKey: exportOptions.destinationKey || 'line',
+    artworks: frames,
+    rules: exportOptions.rules || defaultDestinationRules(),
+    roleMap: exportOptions.roleMap || {},
+    order: exportOptions.order || []
+  });
+
   const review = reviewFrames(frames, nextRendered, {
     targetW: renderOptions.targetW,
     targetH: renderOptions.targetH,
     maxFrames: exportOptions.maxFrames || null
   });
 
-  const items = createStickerExportItems(frames, nextRendered, exportOptions);
-  return { renderedMap: nextRendered, review, items };
+  const packageValidationIssues = packagePlan.validation
+    ? [
+      ...packagePlan.validation.errors.map(issue => ({ ...issue, severity: ReviewIssueSeverity.ERROR })),
+      ...packagePlan.validation.warnings.map(issue => ({ ...issue, severity: ReviewIssueSeverity.WARNING }))
+    ]
+    : [];
+
+  const mergedReview = {
+    ...review,
+    issues: [...review.issues, ...packageValidationIssues],
+    summary: summarizeReviewIssues([...review.issues, ...packageValidationIssues]),
+    ready: review.ready && packageValidationIssues.every(issue => issue.severity !== ReviewIssueSeverity.ERROR)
+  };
+
+  const items = createStickerExportItems(frames, nextRendered, {
+    ...exportOptions,
+    packagePlan,
+    packageRules: exportOptions.rules?.package || defaultPackageRules()
+  });
+
+  return { renderedMap: nextRendered, review: mergedReview, items, packagePlan };
 }
 
 export function createPngExport({ sourceImage, frame, renderOptions = {}, fileName = null } = {}) {
@@ -118,6 +151,7 @@ export async function createZipExport({
     }),
     blob,
     items: prepared.items,
+    packagePlan: prepared.packagePlan,
     review: prepared.review,
     renderedMap: prepared.renderedMap
   };
@@ -165,6 +199,35 @@ export function touchExportJob(job) {
   return {
     ...job,
     updatedAt: new Date().toISOString()
+  };
+}
+
+function summarizeReviewIssues(issues = []) {
+  return {
+    total: issues.length,
+    errors: issues.filter(issue => issue.severity === ReviewIssueSeverity.ERROR).length,
+    warnings: issues.filter(issue => issue.severity === ReviewIssueSeverity.WARNING).length,
+    info: issues.filter(issue => issue.severity === ReviewIssueSeverity.INFO).length
+  };
+}
+
+function defaultDestinationRules() {
+  return {
+    key: 'line',
+    name: 'LINE Stickers',
+    version: '1.0.0',
+    canvas: { width: 370, height: 320 },
+    package: defaultPackageRules()
+  };
+}
+
+function defaultPackageRules() {
+  return {
+    naming: 'line-sticker',
+    requiresMain: true,
+    requiresTab: true,
+    minStickers: 1,
+    extension: 'png'
   };
 }
 
