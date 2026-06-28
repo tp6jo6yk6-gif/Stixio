@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/patch-legacy-grid.yml'
+      - 'scripts/patch-legacy-grid.mjs'
 
 permissions:
   contents: write
