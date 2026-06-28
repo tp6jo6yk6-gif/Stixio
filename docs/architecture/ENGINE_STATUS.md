@@ -47,9 +47,9 @@ Export Engine
 | Command Engine | 72% | Frame operations now route through Command History with Undo/Redo buttons and Ctrl/Cmd shortcuts. More non-frame commands pending. |
 | Refine Engine | 62% | Background removal, Trim Transparent, White Border, and Shadow exist. Brush still pending. |
 | Render Engine | 75% | Preview, PNG, ZIP, Review, and Export share `renderFrameToCanvas()`. Queue still pending. |
-| Review Engine | 72% | Review checks rendered Frames, size mismatch, missing renders, hidden/export states, and readiness. |
-| Package Engine | 50% | LINE naming and package helpers exist. More destinations pending after Core Editor. |
-| Export Engine | 72% | PNG and ZIP helpers now own file creation; UI routes download actions through Export Engine. |
+| Review Engine | 74% | Review checks rendered Frames, size mismatch, missing renders, hidden/export states, readiness, and package validation. |
+| Package Engine | 78% | Package Role v2 supports Main / Tab / Sticker roles, validation, role-first naming, and line package filenames. |
+| Export Engine | 78% | ZIP export now uses Package Plan filenames and blocks package role validation errors. |
 | Workspace Engine | 55% | Workspace schema, collections, storage adapter, libraries exist. Google Drive deferred after M1. |
 | Feature Engine | 50% | Developer mode opens all features. Production plan restrictions pending. |
 
@@ -69,5 +69,9 @@ Export Engine
 12. ✅ Frame Editor v1 supports mouse select, drag, resize handle, arrow-key nudge, snap, duplicate, and delete.
 13. ✅ Frame Editor operations route through Command History.
 14. ✅ Undo / Redo buttons and Ctrl/Cmd shortcuts are connected.
-15. ⚠️ Legacy `crop/` still exists for beta compatibility.
-16. ⏳ Make Document the session source of truth.
+15. ✅ Package Role v2 separates project frame identity from final package filenames.
+16. ✅ Main / Tab / Sticker roles are validated before ZIP export.
+17. ✅ Export Engine uses Package Plan filenames: `main.png`, `tab.png`, `01.png...`.
+18. ⚠️ Legacy `crop/` still exists for beta compatibility.
+19. ⏳ Make Document the session source of truth.
+20. ⏳ Add full UI role switcher for Main / Tab / Sticker in Frame Editor panel.
