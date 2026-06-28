@@ -46,10 +46,10 @@ Export Engine
 | Frame Engine | 70% | New `src/core/frame/` module is active in UI. Legacy `crop/` remains temporarily for compatibility. |
 | Command Engine | 35% | Generic command and shared history added. Needs concrete command factories. |
 | Refine Engine | 62% | Background removal, Trim Transparent, White Border, and Shadow exist. Brush still pending. |
-| Render Engine | 72% | UI preview, PNG export, and ZIP export use `renderFrameToCanvas()` with refine effects. Needs queue and deeper export integration. |
-| Review Engine | 40% | Review board displays refined rendered Frames. Needs backgrounds, zoom, compare, and validation aggregation. |
-| Package Engine | 45% | LINE naming and package plan helpers exist. More destinations pending. |
-| Export Engine | 40% | Export job model added. ZIP still partly in UI but uses Render Engine canvases. |
+| Render Engine | 75% | Preview, PNG, ZIP, Review, and Export share `renderFrameToCanvas()`. Queue still pending. |
+| Review Engine | 72% | Review checks rendered Frames, size mismatch, missing renders, hidden/export states, and readiness. |
+| Package Engine | 50% | LINE naming and package helpers exist. More destinations pending after Core Editor. |
+| Export Engine | 72% | PNG and ZIP helpers now own file creation; UI routes download actions through Export Engine. |
 | Workspace Engine | 55% | Workspace schema, collections, storage adapter, libraries exist. Google Drive deferred after M1. |
 | Feature Engine | 50% | Developer mode opens all features. Production plan restrictions pending. |
 
@@ -63,7 +63,9 @@ Export Engine
 6. ✅ UI previews, PNG, and ZIP now route through Render Engine.
 7. ✅ Add Refine Effects Engine: Trim, White Border, Shadow.
 8. ✅ Render Engine applies refine effects before final canvas placement.
-9. ⚠️ Legacy `crop/` still exists for beta compatibility.
-10. ⏳ Make Document the session source of truth.
-11. ⏳ Use Command Engine for frame edits.
-12. ⏳ Move ZIP packaging fully into Export Engine.
+9. ✅ Review Engine checks render readiness and blocking errors.
+10. ✅ Export Engine owns PNG and ZIP creation helpers.
+11. ✅ UI download actions route through Export Engine.
+12. ⚠️ Legacy `crop/` still exists for beta compatibility.
+13. ⏳ Make Document the session source of truth.
+14. ⏳ Use Command Engine for frame edits.
