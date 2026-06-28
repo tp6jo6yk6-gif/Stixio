@@ -1,0 +1,31 @@
+name: Create stable legacy tag
+
+on:
+  push:
+    paths:
+      - '.github/workflows/create-legacy-tag.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create immutable stable tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin stable-legacy
+          if git rev-parse "v1.0.0-legacy-stable" >/dev/null 2>&1; then
+            echo "Tag already exists"
+            exit 0
+          fi
+          git tag -a "v1.0.0-legacy-stable" "origin/stable-legacy" -m "Stixio legacy stable recovery point"
+          git push origin "v1.0.0-legacy-stable"
