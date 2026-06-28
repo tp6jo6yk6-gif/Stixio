@@ -21,7 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node scripts/migrate-to-workshop.mjs
+      - name: Apply Workshop migration
+        run: node scripts/migrate-to-workshop.mjs
       - name: Verify Workshop entry exists
         run: |
           test -f workshop.html
