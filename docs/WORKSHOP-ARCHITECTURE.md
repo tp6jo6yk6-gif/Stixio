@@ -1,12 +1,19 @@
-# Stixio Workshop 架構整合
+# Stixio Workshop 架構
 
-## 原則
+## 唯一正式產品
 
-- Stixio 模組化架構是產品主體。
-- `workshop-legacy.html` 是功能與操作行為的基準，不再作為長期正式架構。
+Stixio 目前只有一套正式應用程式：
+
+```text
+index.html
+└── src/ui/stixio-workshop-app.js
+    └── src/core/*
+```
+
+- `index.html` 是唯一正式入口。
+- `workshop.html` 與 `next.html` 僅保留舊網址相容跳轉，不再載入其他 UI。
+- 舊單檔版本不再存在於正式建置；需要回復時使用 `stable-legacy` 分支或 `v1.0.0-legacy-stable` 標籤。
 - UI 不擁有圖像處理、偵測、命名或打包邏輯。
-- `main` 在功能對等完成前維持目前可用版本。
-- 所有整合先進入 `stixio-workshop`，經驗收後才合併。
 
 ## 功能歸屬
 
@@ -19,7 +26,7 @@
 | 吸色器、色鍵去背、外圍去背 | Refine Engine |
 | 清除雜點、侵蝕、羽化、外框 | Refine / Render Engine |
 | 魔術去背、保留與刪除筆刷 | Refine Mask Engine |
-| 縮放與修補視角 | UI Viewport（不寫入輸出模型） |
+| 縮放與修補視角 | UI Viewport |
 | 一般／動態／大／全螢幕／特效尺寸 | Rules Engine |
 | 拖曳排序與匯出勾選 | Package UI / Frame state |
 | main、tab、01… 命名 | Package Engine |
@@ -28,33 +35,28 @@
 
 ## 已完成
 
-- [x] 建立獨立整合分支
-- [x] 貼圖尺寸與用途預設
+- [x] 多圖匯入與原圖切換
 - [x] 投影谷智能排版偵測
-- [x] 每格內容感知緊緻裁切
+- [x] 網格與自訂切割
+- [x] 內容感知緊緻裁切
 - [x] 手動裁切後 12px 鄰近磁吸
-- [x] Keep／Delete／Magic Mask Engine
-- [x] 遮罩接入共用 Render Engine
-- [x] 多來源 Document ZIP 輸出管線
-- [x] main／tab 改為明確角色，貼圖由 01.png 開始
-- [x] 多圖匯入與原圖切換介面
 - [x] 九點裁切框
-- [x] 吸色器、去背、雜點、侵蝕、羽化、外框控制
-- [x] 魔術、保留與刪除筆刷及筆刷歷史
-- [x] 貼圖規格切換
+- [x] 吸色、色鍵去背、外圍去背
+- [x] 雜點、侵蝕、羽化與外框
+- [x] Keep／Delete／Magic Mask Engine
+- [x] 筆刷歷史
+- [x] 遮罩接入共用 Render Engine
+- [x] 貼圖尺寸與用途預設
 - [x] Review 拖曳排序、匯出勾選與角色設定
+- [x] main／tab 明確角色，貼圖從 01.png 開始
 - [x] 單張 PNG 與多來源 ZIP
-- [x] CI 語法、既有測試、新增測試與靜態建置通過
+- [x] 單一正式入口
+- [x] 語法、整合、既有測試與靜態建置通過
 
-## 尚未允許取代正式版的條件
+## 發版規則
 
-- [ ] 使用原驗收圖片重跑完整瀏覽器功能驗收
-- [ ] 高解析多圖壓力測試
-- [ ] 瀏覽器人工檢查筆刷座標、九點裁切及拖曳排序
-- [ ] 驗收表確認沒有功能倒退
-
-## 入口
-
-整合分支的預覽入口：`workshop.html`
-
-正式 `main/index.html` 在驗收前維持不變。
+- `main/index.html` 必須永遠直接啟動 `initStixioWorkshop`。
+- 不得再建立第二套可執行 UI 入口。
+- 相容網址只能跳轉到 `index.html`。
+- 每次修改須通過 Workshop naming、entry、integration 與既有核心測試。
+- 回復點為 `stable-legacy` 分支與 `v1.0.0-legacy-stable` 標籤。
