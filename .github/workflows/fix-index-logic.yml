@@ -1,174 +1,30 @@
-name: Fix index logic issues
+name: Verify Workshop entry
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix-index:
+  verify-workshop:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Patch index.html
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Workshop files
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path("index.html")
-          text = path.read_text(encoding="utf-8")
-          original = text
-
-          def sub_once(pattern, repl, label, flags=re.S):
-              global text
-              new_text, count = re.subn(pattern, repl, text, count=1, flags=flags)
-              if count == 0:
-                  print(f"SKIP: {label} already patched or target not found")
-              else:
-                  print(f"PATCHED: {label}")
-                  text = new_text
-
-          # 1) filename helper + shared placement helper
-          if "function getStickerPlacement(box)" not in text:
-              sub_once(
-                  r"function getStickerFilename\(idx\) \{\s*if \(state\.lineNamingMode\) \{\s*if \(idx === 0\) return 'main\.png';\s*if \(idx === 1\) return 'tab\.png';\s*return `\$\{String\(idx - 1\)\.padStart\(2, '0'\)\}\.png`;\s*\}\s*const p = state\.filenamePrefix\.trim\(\);\s*const s = state\.filenameSuffix\.trim\(\);\s*return `\$\{p \? p \+ '_' : ''\}\$\{idx \+ 1\}\$\{s \? '_' \+ s : ''\}\.png`;\s*\}",
-                  """function getStickerFilename(idx, orderIdx = idx) {
-              if (state.lineNamingMode) {
-                  if (orderIdx === 0) return 'main.png';
-                  if (orderIdx === 1) return 'tab.png';
-                  return `${String(orderIdx - 1).padStart(2, '0')}.png`;
-              }
-              const p = state.filenamePrefix.trim();
-              const s = state.filenameSuffix.trim();
-              return `${p ? p + '_' : ''}${idx + 1}${s ? '_' + s : ''}.png`;
-          }
-
-          function getStickerPlacement(box) {
-              const sc = Math.min(
-                  (state.targetW - state.safeMargin * 2) / box.cropW,
-                  (state.targetH - state.safeMargin * 2) / box.cropH
-              );
-              const fW = box.cropW * sc;
-              const fH = box.cropH * sc;
-              const pX = (state.targetW - fW) / 2 + box.offsetX;
-              const baseY = state.alignMode === 'bottom'
-                  ? state.targetH - state.safeMargin - fH
-                  : (state.targetH - fH) / 2;
-              const pY = baseY + box.offsetY;
-              return { sc, fW, fH, pX, pY };
-          }""",
-                  "getStickerFilename + getStickerPlacement"
-              )
-          else:
-              print("SKIP: placement helper already exists")
-
-          # 2) remove stale state.layout checks
-          text = re.sub(
-              r"\n\s*if \(state\.layout === '1x1'\) \{ src\.rows=1; src\.cols=1; \}\s*\n\s*if \(state\.layout === '1x1'\) \{ src\.rows=1; src\.cols=1; \}\s*",
-              "\n",
-              text,
-              count=1
-          )
-
-          # 3) zip export null guard
-          sub_once(
-              r"const exportList = state\.stickers\.map\(\(s, idx\) => \(\{ s, box: state\.allBoxes\[idx\], idx \}\)\)\.filter\(item => item\.s && item\.box\.exportSelected !== false\);",
-              "const exportList = state.stickers.map((s, idx) => ({ s, box: state.allBoxes[idx], idx })).filter(item => item.s && item.box && item.box.exportSelected !== false);",
-              "zip export null guard"
-          )
-          sub_once(
-              r"const btn = getEl\('downloadZipBtn'\);\s*const ogText = btn\.innerHTML;",
-              "const btn = getEl('downloadZipBtn');\n      if (!btn) return;\n      const ogText = btn.innerHTML;",
-              "download button guard"
-          )
-
-          # 4) zip export order-aware naming
-          sub_once(
-              r"exportList\.forEach\(\(item\) => \{\s*zip\.file\(getStickerFilename\(item\.idx\),",
-              "exportList.forEach((item, exportIdx) => { \n          zip.file(getStickerFilename(item.idx, exportIdx),",
-              "zip LINE naming order"
-          )
-
-          # 5) unify placement in render/generate functions
-          placement_pattern = r"const sc=Math\.min\(\(state\.targetW-state\.safeMargin\*2\)/b\.cropW, \(state\.targetH-state\.safeMargin\*2\)/b\.cropH\);\s*const fW=b\.cropW\*sc, fH=b\.cropH\*sc, pX=\(state\.targetW-fW\)/2\+b\.offsetX;\s*let pY = \(state\.targetH-fH\)/2\+b\.offsetY;\s*if \(state\.alignMode === 'bottom'\) \{ pY = state\.targetH - state\.safeMargin - fH \+ b\.offsetY; \}"
-          text, n = re.subn(placement_pattern, "const { sc, fW, fH, pX, pY } = getStickerPlacement(b);", text, count=2, flags=re.S)
-          print(f"PATCHED placement blocks: {n}")
-
-          # 6) brush/magic placement
-          sub_once(
-              r"const b=state\.allBoxes\[state\.selectedStickerIdx\]; if\(!b\) return;\s*const sc=Math\.min\(\(state\.targetW-state\.safeMargin\*2\)/b\.cropW, \(state\.targetH-state\.safeMargin\*2\)/b\.cropH\), pX=\(state\.targetW-b\.cropW\*sc\)/2\+b\.offsetX, pY=\(state\.targetH-b\.cropH\*sc\)/2\+b\.offsetY;\s*const mX=\(lX-pX\)/sc, mY=\(lY-pY\)/sc;",
-              "const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;\n      const { sc, pX, pY } = getStickerPlacement(b);\n      const mX=(lX-pX)/sc, mY=(lY-pY)/sc;",
-              "brush coordinate placement"
-          )
-          sub_once(
-              r"const b=state\.allBoxes\[state\.selectedStickerIdx\]; if\(!b\) return;\s*const sc=Math\.min\(\(state\.targetW-state\.safeMargin\*2\)/b\.cropW, \(state\.targetH-state\.safeMargin\*2\)/b\.cropH\), pX=\(state\.targetW-b\.cropW\*sc\)/2\+b\.offsetX, pY=\(state\.targetH-b\.cropH\*sc\)/2\+b\.offsetY;\s*const mX=Math\.floor\(\(lX-pX\)/sc\), mY=Math\.floor\(\(lY-pY\)/sc\);",
-              "const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;\n      const { sc, pX, pY } = getStickerPlacement(b);\n      const mX=Math.floor((lX-pX)/sc), mY=Math.floor((lY-pY)/sc);",
-              "magic erase coordinate placement"
-          )
-
-          # 7) grid slider labels
-          if "const gridValueLabels" not in text:
-              sub_once(
-                  r"\['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'\]\.forEach\(id => getEl\(id\)\?\.addEventListener\('input', e => \{ if\(state\.activeSourceIdx===null\) return; if\(id\.startsWith\('grid'\)\) getEl\(id\.replace\('grid',''\)\.toLowerCase\(\)\+'Val'\+\(id\.endsWith\('X'\)\?'X':'Y'\)\.replace\('margin','margin'\)\.replace\('gap','gap'\)\)\.textContent=`\$\{e\.target\.value\}px`; applyGridChange\(\); \}\)\);",
-                  """const gridValueLabels = { gridMarginX: 'marginValX', gridMarginY: 'marginValY', gridGapX: 'gapValX', gridGapY: 'gapValY' };
-          ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => { 
-              if(state.activeSourceIdx===null) return; 
-              if(gridValueLabels[id] && getEl(gridValueLabels[id])) getEl(gridValueLabels[id]).textContent=`${e.target.value}px`; 
-              applyGridChange(); 
-          }));""",
-                  "grid value label mapping"
-              )
-          else:
-              print("SKIP: grid value labels already exist")
-
-          # 8) tolerance state mapping
-          if "const stateKey = id === 'colorTolerance' ? 'tolerance' : id;" not in text:
-              sub_once(
-                  r"\['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'\]\.forEach\(id => getEl\(id\)\.addEventListener\('input', e => \{ state\[id\]=\+e\.target\.value; getEl\(id\+'Val'\)\.textContent=`\$\{state\[id\]\}`\+\(id==='colorTolerance'\?'':' px'\); updateStep3Guide\(\); debouncedProcessAndRender\(\); \}\)\);",
-                  """['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'].forEach(id => getEl(id).addEventListener('input', e => { 
-              const stateKey = id === 'colorTolerance' ? 'tolerance' : id;
-              state[stateKey]=+e.target.value; 
-              const label = getEl(id+'Val');
-              if(label) label.textContent=`${state[stateKey]}`+(id==='colorTolerance'?'':' px'); 
-              updateStep3Guide(); 
-              debouncedProcessAndRender(); 
-          }));""",
-                  "tolerance state mapping"
-              )
-          else:
-              print("SKIP: tolerance mapping already exists")
-
-          if text != original:
-              path.write_text(text, encoding="utf-8")
-              print("index.html patched")
-          else:
-              print("No index.html changes needed")
-          PY
-
-      - name: Basic JavaScript syntax check
+          test -f workshop.html
+          test -f src/ui/stixio-workshop-app.js
+          test -f src/core/sticker-presets.js
+          test -f docs/WORKSHOP-ARCHITECTURE.md
+      - name: Check module syntax
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-          html = Path("index.html").read_text(encoding="utf-8")
-          m = re.search(r"<script>([\s\S]*)</script>\s*</body>", html)
-          if not m:
-              raise SystemExit("script block not found")
-          Path("/tmp/index.js").write_text(m.group(1), encoding="utf-8")
-          PY
-          node --check /tmp/index.js
-
-      - name: Commit patched index
-        run: |
-          if git diff --quiet -- index.html; then
-            echo "No index.html changes to commit"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "Fix sticker cropper logic issues"
-          git push
+          node --check src/ui/stixio-workshop-app.js
+          node --check src/core/sticker-presets.js
+      - name: Run tests
+        run: npm test
+      - name: Build
+        run: npm run build
