@@ -1,9 +1,7 @@
 import {
   BRAND,
   detectGrid,
-  frameToArtworkSlice,
-  getStickerPlacement,
-  processStickerImageData,
+  renderFrameToCanvas,
   getStickerFilename,
   createZipFileName
 } from '../core/index.js';
@@ -36,6 +34,7 @@ const state = {
   source: null,
   frames: [],
   rendered: new Map(),
+  renderKeys: new Map(),
   detectionReport: null,
   settings: { ...DEFAULT_SETTINGS }
 };
@@ -63,7 +62,6 @@ function renderShell() {
               <p class="text-xs font-semibold text-slate-500">${BRAND.slogan}</p>
             </div>
           </div>
-
           <div class="hidden lg:flex items-center gap-2 rounded-2xl border border-slate-900/10 bg-white/70 p-1 shadow-sm">
             ${WORKSPACES.map((label, index) => `
               <button class="workspace-tab rounded-xl px-4 py-2 text-left transition ${index === 1 ? 'bg-slate-950 text-white shadow' : 'hover:bg-slate-100'}">
@@ -72,10 +70,9 @@ function renderShell() {
               </button>
             `).join('')}
           </div>
-
           <div class="flex items-center gap-2">
             <span class="hidden md:inline-flex rounded-xl border border-slate-900/10 bg-white/70 px-3 py-2 text-xs font-black text-slate-700">Developer mode</span>
-            <button id="loginBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white shadow hover:-translate-y-0.5 transition">Workspace</button>
+            <button id="workspaceCtaBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white shadow hover:-translate-y-0.5 transition">Workspace</button>
           </div>
         </div>
       </header>
@@ -98,15 +95,15 @@ function renderHero() {
       <div class="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,.55),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,.35),transparent_32%)]"></div>
       <div class="relative grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8 items-center">
         <div>
-          <div class="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-emerald-200">Detection Evolution</div>
+          <div class="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-emerald-200">Render Evolution</div>
           <h2 class="text-4xl md:text-6xl font-black leading-tight tracking-tight">Create once.<br><span class="text-emerald-300">Adapt everywhere.</span></h2>
-          <p class="mt-4 max-w-2xl text-sm md:text-base text-slate-300">Grid Detection v2 now clamps invalid values, snaps Frames to pixels, and reports detection quality before export.</p>
+          <p class="mt-4 max-w-2xl text-sm md:text-base text-slate-300">Core Editor now routes previews, PNG export, and ZIP export through the same Render Engine path.</p>
           <div class="mt-6 flex flex-wrap gap-3">
             <label class="cursor-pointer rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-black text-slate-950 shadow hover:-translate-y-0.5 transition">
               <input id="heroFileInput" type="file" accept="image/*" class="hidden" />
               Drop / choose artwork
             </label>
-            <button id="workspaceCtaBtn" class="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white hover:bg-white/15 transition">Preview Workspace</button>
+            <button id="heroRenderBtn" class="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white hover:bg-white/15 transition">Render all Frames</button>
           </div>
         </div>
         <div class="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
@@ -114,7 +111,7 @@ function renderHero() {
             ${metricCard('Mode', 'Developer', 'all features open')}
             ${metricCard('Frames', state.frames.length || '0', 'detected areas')}
             ${metricCard('Quality', getDetectionScoreLabel(), 'grid confidence')}
-            ${metricCard('Status', state.source ? 'Loaded' : 'Empty', state.source?.fileName || 'waiting for artwork')}
+            ${metricCard('Rendered', state.rendered.size || '0', 'cached previews')}
           </div>
         </div>
       </div>
@@ -143,7 +140,7 @@ function renderLeftPanel() {
           </div>
           <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">OPEN</span>
         </div>
-        <p class="mt-3 text-sm text-slate-500">Upload a sheet. Detection Engine creates Frames, and Frames become the source of truth.</p>
+        <p class="mt-3 text-sm text-slate-500">Upload a sheet. Detection creates Frames; Render Engine turns Frames into final sticker canvases.</p>
         <label id="dropZone" class="mt-5 block cursor-pointer rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50">
           <input id="fileInput" type="file" accept="image/*" class="hidden" />
           <div class="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-slate-950 text-3xl text-emerald-300">＋</div>
@@ -213,9 +210,9 @@ function renderCenterPanel() {
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Review</p>
-            <h3 class="text-xl font-black">Frame review board</h3>
+            <h3 class="text-xl font-black">Rendered Frame board</h3>
           </div>
-          <div id="limitText" class="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700">Developer: all exports open</div>
+          <div id="limitText" class="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700">Render Engine active</div>
         </div>
         <div id="frameGrid" class="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-5 gap-3"></div>
       </section>
@@ -251,14 +248,14 @@ function renderRightPanel() {
           ${healthRow(Boolean(state.source), 'Source image imported')}
           ${healthRow(state.frames.length > 0, `${state.frames.length || 0} Frames detected`)}
           ${healthRow(Boolean(state.settings.selectedId), 'One Frame selected')}
-          ${healthRow(state.rendered.size > 0, 'Render cache ready')}
+          ${healthRow(state.rendered.size > 0, `${state.rendered.size || 0} Frames rendered`)}
         </div>
       </section>
 
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-slate-950 p-5 text-white shadow-sm">
         <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Package</p>
         <h3 class="mt-1 text-xl font-black">Export center</h3>
-        <p class="mt-2 text-sm text-slate-400">Developer mode keeps all features open. ZIP export uses rendered Frames.</p>
+        <p class="mt-2 text-sm text-slate-400">PNG and ZIP export now reuse cached canvases from Render Engine.</p>
         <div class="mt-5 space-y-3">
           <button id="downloadPngBtn" class="w-full rounded-2xl bg-emerald-300 py-3 text-sm font-black text-slate-950 hover:-translate-y-0.5 transition">Download selected PNG</button>
           <button id="downloadZipBtn" class="w-full rounded-2xl border border-white/10 bg-white/10 py-3 text-sm font-black text-white hover:bg-white/15 transition">Export Frames ZIP</button>
@@ -331,27 +328,22 @@ function bindEvents(root) {
     renderAll();
     refresh();
   });
-  root.querySelector('#preset4x4Btn').addEventListener('click', () => {
-    root.querySelector('#rowsInput').value = 4;
-    root.querySelector('#colsInput').value = 4;
-    readSettings(root);
-    createFramesFromSource();
-    renderAll();
-    refresh();
-  });
-  root.querySelector('#preset5x8Btn').addEventListener('click', () => {
-    root.querySelector('#rowsInput').value = 5;
-    root.querySelector('#colsInput').value = 8;
-    readSettings(root);
-    createFramesFromSource();
-    renderAll();
-    refresh();
-  });
+  root.querySelector('#preset4x4Btn').addEventListener('click', () => applyPreset(root, 4, 4));
+  root.querySelector('#preset5x8Btn').addEventListener('click', () => applyPreset(root, 5, 8));
   root.querySelector('#renderBtn').addEventListener('click', () => { readSettings(root); renderSelected(); refresh(); });
+  root.querySelector('#heroRenderBtn').addEventListener('click', () => { renderAll(); refresh(); });
   root.querySelector('#downloadPngBtn').addEventListener('click', downloadSelectedPng);
   root.querySelector('#downloadZipBtn').addEventListener('click', downloadZip);
-  root.querySelector('#loginBtn').addEventListener('click', showWorkspacePrompt);
   root.querySelector('#workspaceCtaBtn').addEventListener('click', showWorkspacePrompt);
+}
+
+function applyPreset(root, rows, cols) {
+  root.querySelector('#rowsInput').value = rows;
+  root.querySelector('#colsInput').value = cols;
+  readSettings(root);
+  createFramesFromSource();
+  renderAll();
+  refresh();
 }
 
 function bindFileInputs(root) {
@@ -402,6 +394,7 @@ async function loadFile(file) {
     mimeType: file.type
   };
   state.rendered.clear();
+  state.renderKeys.clear();
   createFramesFromSource();
   renderAll();
   refresh();
@@ -422,71 +415,61 @@ function createFramesFromSource() {
     }
   });
   state.frames = state.detectionReport.frames;
+  state.rendered.clear();
+  state.renderKeys.clear();
   state.settings.selectedId = state.frames[0]?.id || null;
 }
 
+function getRenderOptions() {
+  return {
+    targetW: state.settings.targetW,
+    targetH: state.settings.targetH,
+    safeMargin: state.settings.safeMargin,
+    highQuality: true,
+    refine: {
+      enabled: true,
+      chromaEnabled: state.settings.chromaEnabled,
+      chromaColor: state.settings.chromaColor,
+      tolerance: state.settings.tolerance,
+      exteriorOnly: state.settings.exteriorOnly,
+      autoDespeckle: state.settings.autoDespeckle,
+      shrinkRadius: state.settings.shrinkRadius,
+      featherRadius: state.settings.featherRadius
+    }
+  };
+}
+
 function renderAll() {
-  state.rendered.clear();
+  if (!state.source) return;
   state.frames.forEach(frame => renderFrame(frame));
 }
 
 function renderSelected() {
   const frame = getSelectedFrame();
-  if (frame) renderFrame(frame);
+  if (frame) renderFrame(frame, true);
 }
 
-function renderFrame(frame) {
-  if (!state.source) return null;
-  const { targetW, targetH } = state.settings;
-  const slice = frameToArtworkSlice(frame);
-  const canvas = document.createElement('canvas');
-  canvas.width = targetW;
-  canvas.height = targetH;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, targetW, targetH);
-
-  const sourceCanvas = document.createElement('canvas');
-  sourceCanvas.width = slice.width;
-  sourceCanvas.height = slice.height;
-  const sourceCtx = sourceCanvas.getContext('2d');
-  sourceCtx.drawImage(
-    state.source.img,
-    slice.x,
-    slice.y,
-    slice.width,
-    slice.height,
-    0,
-    0,
-    slice.width,
-    slice.height
-  );
-
-  const raw = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-  const processed = new ImageData(new Uint8ClampedArray(raw.data), raw.width, raw.height);
-  processStickerImageData(processed, {
-    enabled: state.settings.chromaEnabled,
-    chromaColor: state.settings.chromaColor,
-    tolerance: state.settings.tolerance,
-    exteriorOnly: state.settings.exteriorOnly,
-    autoDespeckle: state.settings.autoDespeckle,
-    shrinkRadius: state.settings.shrinkRadius,
-    featherRadius: state.settings.featherRadius
+function renderFrame(frame, force = false) {
+  if (!state.source || !frame) return null;
+  const options = getRenderOptions();
+  const key = JSON.stringify({
+    sourceId: state.source.id,
+    frameId: frame.id,
+    geometry: frame.geometry,
+    targetW: options.targetW,
+    targetH: options.targetH,
+    safeMargin: options.safeMargin,
+    refine: options.refine
   });
-  sourceCtx.putImageData(processed, 0, 0);
 
-  const placement = getStickerPlacement({
-    width: slice.width,
-    height: slice.height,
-    cropW: slice.width,
-    cropH: slice.height,
-    offsetX: 0,
-    offsetY: 0
-  }, state.settings);
+  if (!force && state.rendered.has(frame.id) && state.renderKeys.get(frame.id) === key) {
+    return state.rendered.get(frame.id);
+  }
 
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(sourceCanvas, placement.drawX, placement.drawY, placement.drawW, placement.drawH);
-  state.rendered.set(frame.id, canvas);
-  return canvas;
+  const result = renderFrameToCanvas(state.source, frame, options);
+  state.rendered.set(frame.id, result.canvas);
+  state.renderKeys.set(frame.id, key);
+  return result.canvas;
 }
 
 function refresh() {
@@ -536,7 +519,7 @@ function renderFrameGrid() {
       <div class="aspect-[370/320] overflow-hidden rounded-2xl border border-slate-900/10 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:14px_14px] grid place-items-center"></div>
       <div class="mt-2 flex items-center justify-between px-1 text-xs">
         <span class="font-black text-slate-700">${frame.name || `Frame ${index + 1}`}</span>
-        <span class="font-black ${frame.id === state.settings.selectedId ? 'text-emerald-700' : 'text-slate-400'}">${frame.id === state.settings.selectedId ? 'Selected' : 'Frame'}</span>
+        <span class="font-black ${frame.id === state.settings.selectedId ? 'text-emerald-700' : 'text-slate-400'}">${frame.id === state.settings.selectedId ? 'Selected' : 'Rendered'}</span>
       </div>
     `;
     const holder = card.querySelector('div');
@@ -559,7 +542,7 @@ function getSelectedFrame() {
 function downloadSelectedPng() {
   const frame = getSelectedFrame();
   if (!frame) return alert('Please import artwork first.');
-  const canvas = state.rendered.get(frame.id) || renderFrame(frame);
+  const canvas = renderFrame(frame);
   downloadDataUrl(canvas.toDataURL('image/png'), getStickerFilename(0, { lineNamingMode: false, prefix: 'stixio' }));
 }
 
@@ -568,7 +551,7 @@ async function downloadZip() {
   if (!window.JSZip) return alert('JSZip is not loaded.');
   const zip = new JSZip();
   state.frames.forEach((frame, index) => {
-    const canvas = state.rendered.get(frame.id) || renderFrame(frame);
+    const canvas = renderFrame(frame);
     const fileName = getStickerFilename(index, { lineNamingMode: state.settings.lineNamingMode });
     zip.file(fileName, canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, ''), { base64: true });
   });
@@ -577,7 +560,7 @@ async function downloadZip() {
 }
 
 function showWorkspacePrompt() {
-  alert('Creator Workspace will later persist Documents, Source Images, Frames, History, Package Plans, and Exports.');
+  alert('Core Editor first. Workspace, Google Drive, Login, and Billing stay after M1.');
 }
 
 function downloadDataUrl(dataUrl, fileName) {
