@@ -17,7 +17,7 @@ export const AssetRoles = Object.freeze({
   EFFECT_BACKGROUND: 'effect-background'
 });
 
-export const Sticker_PRESETS = Object.freeze({
+export const STICKER_PRESETS = Object.freeze({
   [StickerCategories.NORMAL]: [
     preset('貼圖圖片', AssetRoles.STICKER, 370, 320, 15),
     preset('主要圖片', AssetRoles.MAIN, 240, 240, 10),
@@ -48,7 +48,7 @@ export const Sticker_PRESETS = Object.freeze({
 });
 
 export function getStickerPresets(category = StickerCategories.NORMAL) {
-  return Sticker_PRESETS[category] || Sticker_PRESETS[StickerCategories.NORMAL];
+  return STICKER_PRESETS[category] || STICKER_PRESETS[StickerCategories.NORMAL];
 }
 
 export function getStickerPreset(category, role = AssetRoles.STICKER) {

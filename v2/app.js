@@ -335,7 +335,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `sticker-packages-${state.targetW}x${state.targetH}.zip`;
+    a.download = `sticker-workshop-${state.targetW}x${state.targetH}.zip`;
     a.click();
     URL.revokeObjectURL(url);
     els.downloadBtn.disabled = false;
