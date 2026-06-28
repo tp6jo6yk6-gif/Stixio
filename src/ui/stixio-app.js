@@ -1,6 +1,6 @@
 import {
   BRAND,
-  detectFrames,
+  detectGrid,
   frameToArtworkSlice,
   getStickerPlacement,
   processStickerImageData,
@@ -36,6 +36,7 @@ const state = {
   source: null,
   frames: [],
   rendered: new Map(),
+  detectionReport: null,
   settings: { ...DEFAULT_SETTINGS }
 };
 
@@ -97,9 +98,9 @@ function renderHero() {
       <div class="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,.55),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,.35),transparent_32%)]"></div>
       <div class="relative grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8 items-center">
         <div>
-          <div class="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-emerald-200">Frame Engine Connected</div>
+          <div class="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-emerald-200">Detection Evolution</div>
           <h2 class="text-4xl md:text-6xl font-black leading-tight tracking-tight">Create once.<br><span class="text-emerald-300">Adapt everywhere.</span></h2>
-          <p class="mt-4 max-w-2xl text-sm md:text-base text-slate-300">Import artwork, detect Frames, refine previews, and export rendered stickers. The UI now reads from Detection + Frame Engine.</p>
+          <p class="mt-4 max-w-2xl text-sm md:text-base text-slate-300">Grid Detection v2 now clamps invalid values, snaps Frames to pixels, and reports detection quality before export.</p>
           <div class="mt-6 flex flex-wrap gap-3">
             <label class="cursor-pointer rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-black text-slate-950 shadow hover:-translate-y-0.5 transition">
               <input id="heroFileInput" type="file" accept="image/*" class="hidden" />
@@ -112,7 +113,7 @@ function renderHero() {
           <div class="grid grid-cols-2 gap-3">
             ${metricCard('Mode', 'Developer', 'all features open')}
             ${metricCard('Frames', state.frames.length || '0', 'detected areas')}
-            ${metricCard('Canvas', `${state.settings.targetW}×${state.settings.targetH}`, 'render target')}
+            ${metricCard('Quality', getDetectionScoreLabel(), 'grid confidence')}
             ${metricCard('Status', state.source ? 'Loaded' : 'Empty', state.source?.fileName || 'waiting for artwork')}
           </div>
         </div>
@@ -155,9 +156,12 @@ function renderLeftPanel() {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Detection</p>
-            <h3 class="text-lg font-black">Grid to Frames</h3>
+            <h3 class="text-lg font-black">Grid Detect v2</h3>
           </div>
-          <button id="preset4x4Btn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">4×4</button>
+          <div class="flex gap-2">
+            <button id="preset4x4Btn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">4×4</button>
+            <button id="preset5x8Btn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">5×8</button>
+          </div>
         </div>
         <div class="mt-4 grid grid-cols-2 gap-3">
           ${numberInput('rowsInput', 'Rows', state.settings.rows, 1, 12)}
@@ -168,6 +172,7 @@ function renderLeftPanel() {
           ${numberInput('gapYInput', 'Gap Y', state.settings.gapY, 0, 500)}
         </div>
         <button id="applyGridBtn" class="mt-4 w-full rounded-2xl bg-slate-950 py-3 text-sm font-black text-white hover:-translate-y-0.5 transition">Detect Frames</button>
+        <div id="detectionMiniReport" class="mt-4">${renderDetectionMiniReport()}</div>
       </section>
 
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
@@ -222,6 +227,18 @@ function renderRightPanel() {
   return `
     <aside class="space-y-4">
       <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Detection Quality</p>
+        <div class="mt-4 flex items-end gap-3">
+          <div class="text-5xl font-black">${getDetectionScoreLabel()}</div>
+          <div class="pb-2 text-sm font-bold text-slate-500">score</div>
+        </div>
+        <div class="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+          <div class="h-full rounded-full ${getDetectionScoreBarClass()}" style="width:${getDetectionScoreNumber()}%"></div>
+        </div>
+        <div class="mt-4 space-y-2 text-sm">${renderDetectionIssues()}</div>
+      </section>
+
+      <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
         <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Project Health</p>
         <div class="mt-4 flex items-end gap-3">
           <div class="text-5xl font-black">${calculateHealth()}%</div>
@@ -247,13 +264,6 @@ function renderRightPanel() {
           <button id="downloadZipBtn" class="w-full rounded-2xl border border-white/10 bg-white/10 py-3 text-sm font-black text-white hover:bg-white/15 transition">Export Frames ZIP</button>
         </div>
       </section>
-
-      <section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm">
-        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Workspace</p>
-        <h3 class="mt-1 text-lg font-black">Creator mode</h3>
-        <p class="mt-2 text-sm text-slate-500">Workspace will later persist Documents, Source Images, Frames, History, and Package Plans.</p>
-        <button id="creatorBtn" class="mt-4 w-full rounded-2xl bg-slate-100 py-3 text-sm font-black hover:bg-slate-200 transition">Preview Workspace</button>
-      </section>
     </aside>
   `;
 }
@@ -267,13 +277,41 @@ function numberInput(id, label, value, min, max) {
   `;
 }
 
+function renderDetectionMiniReport() {
+  if (!state.detectionReport) return '<div class="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-500">Run detection to see quality score.</div>';
+  const quality = state.detectionReport.quality;
+  return `<div class="rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600">${quality.frameCount} Frames · Quality ${quality.score}% · Cell ${Math.round(quality.cellWidth)}×${Math.round(quality.cellHeight)}</div>`;
+}
+
+function renderDetectionIssues() {
+  if (!state.detectionReport) return healthRow(false, 'No detection yet');
+  const issues = state.detectionReport.quality.issues;
+  if (!issues.length) return healthRow(true, 'No detection warnings');
+  return issues.map(item => healthRow(item.severity !== 'error', item.message)).join('');
+}
+
 function healthRow(ok, label) {
   return `
     <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
       <span class="font-bold text-slate-600">${label}</span>
-      <span class="font-black ${ok ? 'text-emerald-600' : 'text-slate-300'}">${ok ? '✓' : '○'}</span>
+      <span class="font-black ${ok ? 'text-emerald-600' : 'text-amber-600'}">${ok ? '✓' : '!'}</span>
     </div>
   `;
+}
+
+function getDetectionScoreNumber() {
+  return state.detectionReport?.quality?.score ?? 0;
+}
+
+function getDetectionScoreLabel() {
+  return state.detectionReport ? `${getDetectionScoreNumber()}%` : '—';
+}
+
+function getDetectionScoreBarClass() {
+  const score = getDetectionScoreNumber();
+  if (score >= 85) return 'bg-emerald-400';
+  if (score >= 60) return 'bg-amber-400';
+  return 'bg-rose-400';
 }
 
 function calculateHealth() {
@@ -301,12 +339,19 @@ function bindEvents(root) {
     renderAll();
     refresh();
   });
+  root.querySelector('#preset5x8Btn').addEventListener('click', () => {
+    root.querySelector('#rowsInput').value = 5;
+    root.querySelector('#colsInput').value = 8;
+    readSettings(root);
+    createFramesFromSource();
+    renderAll();
+    refresh();
+  });
   root.querySelector('#renderBtn').addEventListener('click', () => { readSettings(root); renderSelected(); refresh(); });
   root.querySelector('#downloadPngBtn').addEventListener('click', downloadSelectedPng);
   root.querySelector('#downloadZipBtn').addEventListener('click', downloadZip);
   root.querySelector('#loginBtn').addEventListener('click', showWorkspacePrompt);
   root.querySelector('#workspaceCtaBtn').addEventListener('click', showWorkspacePrompt);
-  root.querySelector('#creatorBtn').addEventListener('click', showWorkspacePrompt);
 }
 
 function bindFileInputs(root) {
@@ -364,17 +409,19 @@ async function loadFile(file) {
 
 function createFramesFromSource() {
   if (!state.source) return;
-  state.frames = detectFrames(state.source, {
-    strategy: 'grid',
+  state.detectionReport = detectGrid(state.source, {
     grid: {
       rows: state.settings.rows,
       cols: state.settings.cols,
       marginX: state.settings.marginX,
       marginY: state.settings.marginY,
       gapX: state.settings.gapX,
-      gapY: state.settings.gapY
+      gapY: state.settings.gapY,
+      snapToPixels: true,
+      minCellSize: 8
     }
   });
+  state.frames = state.detectionReport.frames;
   state.settings.selectedId = state.frames[0]?.id || null;
 }
 
@@ -446,7 +493,9 @@ function refresh() {
   drawSourcePreview();
   renderFrameGrid();
   const status = document.getElementById('statusText');
-  if (status) status.textContent = state.source ? `${state.source.fileName} · ${state.frames.length} Frames` : 'No artwork loaded';
+  if (status) status.textContent = state.source ? `${state.source.fileName} · ${state.frames.length} Frames · Quality ${getDetectionScoreLabel()}` : 'No artwork loaded';
+  const detectionMiniReport = document.getElementById('detectionMiniReport');
+  if (detectionMiniReport) detectionMiniReport.innerHTML = renderDetectionMiniReport();
 }
 
 function drawSourcePreview() {
