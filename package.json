@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "npx serve .",
     "build": "node scripts/build-static.js",
-    "preview": "npx serve dist"
+    "preview": "npx serve dist",
+    "test": "node --test tests/**/*.test.js",
+    "ci": "npm run test && npm run build"
   },
   "keywords": [
     "stixio",
