@@ -17,12 +17,14 @@ jobs:
       - name: Verify Workshop files
         run: |
           test -f index.html
-          test -f src/ui/stixio-workshop-app.js
+          test -f src/ui/stixio-workshop-app-v2.js
+          test -f src/core/workshop-output.js
           test -f src/core/sticker-presets.js
           test -f docs/WORKSHOP-ARCHITECTURE.md
       - name: Check module syntax
         run: |
-          node --check src/ui/stixio-workshop-app.js
+          node --check src/ui/stixio-workshop-app-v2.js
+          node --check src/core/workshop-output.js
           node --check src/core/sticker-presets.js
       - name: Run tests
         run: npm test
