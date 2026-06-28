@@ -1,4 +1,4 @@
-// Sticker sticker output presets and role helpers.
+// Sticker output presets and role helpers.
 // Keep platform rules outside the UI so Review, Render and Package share one source of truth.
 
 export const StickerCategories = Object.freeze({
