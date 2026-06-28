@@ -132,7 +132,8 @@ export function assertExportReviewReady(review, exportOptions = {}) {
   }
 
   const warningIssues = (review?.issues || []).filter(issue => issue.severity === ReviewIssueSeverity.WARNING);
-  if (warningIssues.length && exportOptions.allowWarnings !== true) {
+  const allowsWarnings = exportOptions.allowWarnings === true || exportOptions.allowWarningsOnly === true;
+  if (warningIssues.length && !allowsWarnings) {
     const first = warningIssues[0];
     throw new Error(`ZIP export blocked by warning: ${first.message}`);
   }
