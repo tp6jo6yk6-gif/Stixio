@@ -1,0 +1,39 @@
+name: Test Stixio Workshop
+
+on:
+  push:
+    branches:
+      - stixio-workshop
+    paths:
+      - 'src/core/**'
+      - 'src/ui/stixio-workshop-app.js'
+      - 'workshop.html'
+      - 'tests/**'
+      - '.github/workflows/test-stixio-workshop.yml'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check module syntax
+        run: |
+          node --check src/ui/stixio-workshop-app.js
+          node --check src/core/sticker-presets.js
+          node --check src/core/detection/content-bounds.js
+          node --check src/core/detection/projection-grid.js
+          node --check src/core/refine/mask-engine.js
+          node --check src/core/export/multi-source-export.js
+      - name: Run project tests
+        run: npm test
+      - name: Build static site
+        run: npm run build
