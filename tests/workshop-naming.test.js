@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = new URL('../', import.meta.url);
 const SELF = 'tests/workshop-naming.test.js';
+const REPORT = new URL('../docs/workshop-naming-violations.txt', import.meta.url);
 const TEXT_EXTENSIONS = new Set(['.js', '.mjs', '.json', '.md', '.html', '.yml', '.yaml', '.txt', '.css']);
 const BANNED = [
   /\bLINE\b/,
@@ -26,7 +27,7 @@ test('Workshop product files do not retain the old platform-first naming', async
 
   for (const file of files) {
     const relative = path.relative(new URL('.', ROOT).pathname, file).replaceAll('\\', '/');
-    if (relative === SELF) continue;
+    if (relative === SELF || relative === 'docs/workshop-naming-violations.txt') continue;
     if (!TEXT_EXTENSIONS.has(path.extname(relative))) continue;
     const content = await readFile(file, 'utf8');
     for (const pattern of BANNED) {
@@ -34,6 +35,7 @@ test('Workshop product files do not retain the old platform-first naming', async
     }
   }
 
+  await writeFile(REPORT, violations.join('\n'), 'utf8');
   assert.deepEqual(violations, []);
 });
 
