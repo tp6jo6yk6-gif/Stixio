@@ -1,40 +1,30 @@
-name: Apply Workshop workflow naming
+name: Verify Workshop architecture
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'scripts/rename-workflow-stages.mjs'
-      - '.github/workflows/fix-index-logic.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  rename-and-verify:
+  verify-workshop:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply architecture workflow names
-        run: node scripts/rename-workflow-stages.mjs
-      - name: Install dependencies
-        run: npm install
+      - name: Verify Workshop files
+        run: |
+          test -f index.html
+          test -f src/ui/stixio-workshop-app.js
+          test -f src/core/sticker-presets.js
+          test -f docs/WORKSHOP-ARCHITECTURE.md
+      - name: Check module syntax
+        run: |
+          node --check src/ui/stixio-workshop-app.js
+          node --check src/core/sticker-presets.js
       - name: Run tests
         run: npm test
       - name: Build
         run: npm run build
-      - name: Commit workflow naming update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/ui/stixio-workshop-app.js docs tests/workshop-workflow-naming.test.js
-          git diff --cached --quiet && exit 0
-          git commit -m "Rename first workflow stage to Layout"
-          git push origin HEAD:main
