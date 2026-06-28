@@ -4,6 +4,10 @@
 
 During development, all features are open. Plan restrictions will be added later through the Feature Engine.
 
+## M1 rule
+
+Core Editor comes first. Google Drive, login, billing, cloud sync, and AI are after M1.
+
 ## Engine map
 
 ```text
@@ -38,15 +42,15 @@ Export Engine
 |---|---:|---|
 | Image Engine | 70% | Import and image processing exist; orientation and metadata still need polish. |
 | Document Engine | 35% | Document and Source Image model added. Needs UI/session integration. |
-| Detection Engine | 55% | UI now calls `detectFrames()` for grid detection. AI detect reserved. |
+| Detection Engine | 72% | Grid Detect v2 has clamp, pixel snap, presets, and quality report. |
 | Frame Engine | 70% | New `src/core/frame/` module is active in UI. Legacy `crop/` remains temporarily for compatibility. |
 | Command Engine | 35% | Generic command and shared history added. Needs concrete command factories. |
 | Refine Engine | 35% | Background removal exists. White border, shadow, brush still pending. |
-| Render Engine | 50% | UI renders from Frames. Needs dedicated frame render pipeline module. |
-| Review Engine | 30% | Review board displays Frames. Needs validation aggregation and review session integration. |
+| Render Engine | 68% | UI preview, PNG export, and ZIP export now use `renderFrameToCanvas()`. Needs queue and deeper export integration. |
+| Review Engine | 35% | Review board displays rendered Frames. Needs backgrounds, zoom, compare, and validation aggregation. |
 | Package Engine | 45% | LINE naming and package plan helpers exist. More destinations pending. |
-| Export Engine | 35% | Export job model added. Needs PNG/ZIP execution integration. |
-| Workspace Engine | 55% | Workspace schema, collections, storage adapter, libraries exist. Google Drive pending. |
+| Export Engine | 38% | Export job model added. ZIP still partly in UI but uses Render Engine canvases. |
+| Workspace Engine | 55% | Workspace schema, collections, storage adapter, libraries exist. Google Drive deferred after M1. |
 | Feature Engine | 50% | Developer mode opens all features. Production plan restrictions pending. |
 
 ## Cleanup status
@@ -55,7 +59,9 @@ Export Engine
 2. ✅ Detection Engine outputs Frame objects.
 3. ✅ Connect UI to Detection Engine instead of direct `calculateGridBoxes()` calls.
 4. ✅ UI preview and export now read from Frames.
-5. ⚠️ Legacy `crop/` still exists for beta compatibility.
-6. ⏳ Make Document the session source of truth.
-7. ⏳ Use Command Engine for frame edits.
-8. ⏳ Move ZIP logic from UI into Export Engine.
+5. ✅ Add reusable Render Engine path with `renderFrameToCanvas()`.
+6. ✅ UI previews, PNG, and ZIP now route through Render Engine.
+7. ⚠️ Legacy `crop/` still exists for beta compatibility.
+8. ⏳ Make Document the session source of truth.
+9. ⏳ Use Command Engine for frame edits.
+10. ⏳ Move ZIP packaging fully into Export Engine.
