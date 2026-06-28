@@ -58,3 +58,8 @@ export function buildPackageFilenames(items, options = {}) {
     };
   });
 }
+
+export function createZipFileName({ prefix = '', targetW = 370, targetH = 320, baseName = 'stickers' } = {}) {
+  const safePrefix = String(prefix || '').trim() || baseName;
+  return `${safePrefix}_project_${targetW}x${targetH}.zip`;
+}
