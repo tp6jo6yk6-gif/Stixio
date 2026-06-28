@@ -1,8 +1,12 @@
 // Package filename helpers.
 // These functions are pure and do not depend on DOM or app state.
 
+// Legacy order-based API retained for backwards compatibility.
+// New package flows should use getLineRoleFilename with an explicit role.
 export function getLineStickerFilename(orderIndex) {
-  return `${String(orderIndex + 1).padStart(2, '0')}.png`;
+  if (orderIndex === 0) return 'main.png';
+  if (orderIndex === 1) return 'tab.png';
+  return `${String(orderIndex - 1).padStart(2, '0')}.png`;
 }
 
 export function getLineRoleFilename(role, stickerOrderIndex = 0) {
@@ -10,7 +14,7 @@ export function getLineRoleFilename(role, stickerOrderIndex = 0) {
   if (role === 'tab') return 'tab.png';
   if (role === 'background') return 'background.png';
   if (role === 'effect-background') return 'effect-background.png';
-  return getLineStickerFilename(stickerOrderIndex);
+  return `${String(stickerOrderIndex + 1).padStart(2, '0')}.png`;
 }
 
 export function getSequentialFilename(index, { prefix = '', suffix = '', extension = 'png', pad = 0 } = {}) {
@@ -24,13 +28,17 @@ export function getStickerFilename(index, options = {}) {
   const {
     lineNamingMode = false,
     exportOrderIndex = index,
-    role = 'sticker',
+    role = null,
     prefix = '',
     suffix = '',
     extension = 'png'
   } = options;
 
-  if (lineNamingMode) return getLineRoleFilename(role, exportOrderIndex);
+  if (lineNamingMode) {
+    return role
+      ? getLineRoleFilename(role, exportOrderIndex)
+      : getLineStickerFilename(exportOrderIndex);
+  }
   return getSequentialFilename(index, { prefix, suffix, extension });
 }
 
