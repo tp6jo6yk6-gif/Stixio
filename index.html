@@ -1011,8 +1011,6 @@
        src.layout = activeLayout;
        
        if (src.layout === '1x1') { src.rows=1; src.cols=1; } 
-       if (state.layout === '1x1') { src.rows=1; src.cols=1; } 
-       if (state.layout === '1x1') { src.rows=1; src.cols=1; } 
        else if (src.layout === '2x2') { src.rows=2; src.cols=2; } 
        else if (src.layout === '3x3') { src.rows=3; src.cols=3; } 
        else if (src.layout === 'custom') { src.rows=+getEl('preRows').value; src.cols=+getEl('preCols').value; }
@@ -1625,7 +1623,13 @@
       // 網格設定
       const smartSnapEl = getEl('smartSnapToggle'); if (smartSnapEl) smartSnapEl.addEventListener('change', e => state.smartSnap = e.target.checked);
       document.querySelectorAll('.layout-btn').forEach(btn => btn.addEventListener('click', () => { if(state.activeSourceIdx===null) return; document.querySelectorAll('.layout-btn').forEach(b=>b.className="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"); btn.className="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20"; getEl('preUploadCustomInputs').classList.toggle('hidden', btn.dataset.layout!=='custom'); applyGridChange(); }));
-      ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => { if(state.activeSourceIdx===null) return; if(id.startsWith('grid')) getEl(id.replace('grid','').toLowerCase()+'Val'+(id.endsWith('X')?'X':'Y').replace('margin','margin').replace('gap','gap')).textContent=`${e.target.value}px`; applyGridChange(); }));
+      const gridValueLabels = { gridMarginX: 'marginValX', gridMarginY: 'marginValY', gridGapX: 'gapValX', gridGapY: 'gapValY' };
+      ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => {
+          if(state.activeSourceIdx===null) return;
+          const labelId = gridValueLabels[id];
+          if(labelId) getEl(labelId).textContent = `${e.target.value}px`;
+          applyGridChange();
+      }));
       
       // 尺寸與對齊設定
       getEl('categorySelect').addEventListener('change', e => renderSubOptions(e.target.value));
