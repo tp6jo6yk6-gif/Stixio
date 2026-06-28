@@ -8,7 +8,6 @@ const renames = [
   ['src/ui/stixio-line-app.js', 'src/ui/stixio-workshop-app.js'],
   ['docs/LINE-INTEGRATION.md', 'docs/WORKSHOP-ARCHITECTURE.md'],
   ['tests/line-integration.test.js', 'tests/workshop-integration.test.js'],
-  ['.github/workflows/test-stixio-line-integration.yml', '.github/workflows/test-stixio-workshop.yml'],
   ['src/core/line-presets.js', 'src/core/sticker-presets.js'],
   ['src/destinations/line-sticker.json', 'src/destinations/sticker-package.json']
 ];
@@ -46,7 +45,6 @@ const replacements = [
   ['line.html', 'workshop-legacy.html'],
   ['LINE-INTEGRATION.md', 'WORKSHOP-ARCHITECTURE.md'],
   ['line-integration.test.js', 'workshop-integration.test.js'],
-  ['test-stixio-line-integration.yml', 'test-stixio-workshop.yml'],
   ['stixio-line-integration', 'stixio-workshop'],
   ['line-presets.js', 'sticker-presets.js'],
   ['line-sticker.json', 'sticker-package.json'],
@@ -74,12 +72,13 @@ const replacements = [
   ['stixio-line', 'stixio-workshop']
 ];
 
-const textExtensions = new Set(['.js', '.mjs', '.json', '.md', '.html', '.yml', '.yaml', '.txt', '.css']);
+const textExtensions = new Set(['.js', '.mjs', '.json', '.md', '.html', '.txt', '.css']);
 const files = await walk('.');
 for (const file of files) {
   if (file.includes('/.git/') || file.includes('/node_modules/') || file.includes('/dist/')) continue;
+  if (file.startsWith('.github/workflows/')) continue;
   if (!textExtensions.has(path.extname(file))) continue;
-  let content = await readFile(file, 'utf8');
+  const content = await readFile(file, 'utf8');
   let next = content;
   for (const [from, to] of replacements) next = next.split(from).join(to);
   if (next !== content) await writeFile(file, next, 'utf8');
