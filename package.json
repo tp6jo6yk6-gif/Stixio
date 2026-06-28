@@ -1,0 +1,21 @@
+{
+  "name": "stixio",
+  "version": "0.9.0-beta",
+  "private": true,
+  "description": "Stixio is a fast sticker production workspace for creators.",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "node scripts/build-static.js",
+    "preview": "npx serve dist"
+  },
+  "keywords": [
+    "stixio",
+    "sticker",
+    "sticker-editor",
+    "image-editor",
+    "line-stickers"
+  ],
+  "author": "Stixio",
+  "license": "UNLICENSED"
+}
