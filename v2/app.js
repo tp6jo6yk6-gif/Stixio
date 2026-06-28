@@ -261,7 +261,7 @@
     els.imageCounter.textContent = total ? `${state.active + 1} / ${total}` : '0 / 0';
     els.issueList.innerHTML = '';
     if (!total) {
-      addIssue('匯入圖片後會自動檢查 LINE 安全區。', 'ok');
+      addIssue('匯入圖片後會自動檢查 Sticker 安全區。', 'ok');
       return;
     }
     const issueItems = state.items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.issues.length);
@@ -335,7 +335,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `line-stickers-${state.targetW}x${state.targetH}.zip`;
+    a.download = `sticker-packages-${state.targetW}x${state.targetH}.zip`;
     a.click();
     URL.revokeObjectURL(url);
     els.downloadBtn.disabled = false;

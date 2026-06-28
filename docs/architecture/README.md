@@ -18,7 +18,7 @@ src/destinations/
 docs/architecture/
 ```
 
-This lets us build the new engine layer without breaking the working LINE sticker tool.
+This lets us build the new engine layer without breaking the working Sticker sticker tool.
 
 ## First architecture milestone
 
@@ -27,7 +27,7 @@ This lets us build the new engine layer without breaking the working LINE sticke
 - Operation Engine skeleton
 - Rules Engine skeleton
 - Package Engine skeleton
-- LINE Sticker destination rules
+- Sticker Package destination rules
 
 Next milestone:
 

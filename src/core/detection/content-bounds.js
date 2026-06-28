@@ -1,7 +1,7 @@
 import { cloneFrame } from '../frame/index.js';
 
 // Tighten an existing grid/manual Frame to the visible artwork inside it.
-// This ports LINE Studio's content-aware crop into Detection Engine without coupling it to UI state.
+// This ports Workshop's content-aware crop into Detection Engine without coupling it to UI state.
 export function detectContentBounds(sourceImage, geometry, options = {}) {
   if (!sourceImage?.img) throw new Error('detectContentBounds requires sourceImage.img.');
   const {

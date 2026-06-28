@@ -28,7 +28,7 @@ src/core/crop/
 
 ## Data model
 
-A crop region is platform-neutral. It does not know LINE, Telegram, WhatsApp, or final file names.
+A crop region is platform-neutral. It does not know Sticker, Telegram, WhatsApp, or final file names.
 
 ```js
 {

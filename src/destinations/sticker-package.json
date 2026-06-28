@@ -1,6 +1,6 @@
 {
-  "key": "line-sticker",
-  "name": "LINE Sticker",
+  "key": "sticker-package",
+  "name": "Sticker Package",
   "version": "1.0.0",
   "canvas": {
     "width": 370,
@@ -22,7 +22,7 @@
   },
   "package": {
     "type": "zip",
-    "naming": "line-sticker",
+    "naming": "sticker-package",
     "extension": "png",
     "roles": [
       { "key": "main", "index": 0, "fileName": "main.png" },

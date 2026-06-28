@@ -28,7 +28,7 @@ export function prepareMultiSourceExport({
   );
   const order = exportOptions.order || frames.map(frame => frame.id);
   const packagePlan = exportOptions.packagePlan || createPackagePlan({
-    destinationKey: exportOptions.destinationKey || 'line',
+    destinationKey: exportOptions.destinationKey || 'workshop',
     artworks: frames,
     rules: exportOptions.rules || defaultDestinationRules(renderOptions),
     roleMap,
@@ -91,8 +91,8 @@ export function createSourceResolver(sourceImages) {
 
 function defaultDestinationRules(renderOptions = {}) {
   return {
-    key: 'line',
-    name: 'LINE Stickers',
+    key: 'workshop',
+    name: 'Sticker Package',
     version: '1.0.0',
     canvas: {
       width: renderOptions.targetW || 370,

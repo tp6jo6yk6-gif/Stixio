@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LINE Sticker Studio v2</title>
+  <title>Stixio Workshop</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
   <script src="./app.js" defer></script>
@@ -12,7 +12,7 @@
   <main class="app-shell">
     <section id="welcome" class="welcome card">
       <div class="brand-mark">✂</div>
-      <h1>LINE Sticker Studio</h1>
+      <h1>Stixio Workshop</h1>
       <p>拖曳圖片進來，快速去背、裁切、檢查安全區，最後一鍵打包 ZIP。</p>
       <label class="drop-zone" id="dropZone">
         <input id="fileInput" type="file" accept="image/*" multiple />
@@ -28,7 +28,7 @@
     <section id="studio" class="studio hidden">
       <header class="topbar card">
         <div>
-          <strong>LINE Sticker Studio</strong>
+          <strong>Stixio Workshop</strong>
           <span id="statusText">尚未匯入圖片</span>
         </div>
         <div class="top-actions">
@@ -89,7 +89,7 @@
               </select>
             </label>
             <label class="checkline"><input id="borderToggle" type="checkbox" /> 自動加白框</label>
-            <label class="checkline"><input id="lineNaming" type="checkbox" checked /> LINE 官方命名</label>
+            <label class="checkline"><input id="lineNaming" type="checkbox" checked /> Sticker 官方命名</label>
           </details>
         </aside>
       </section>

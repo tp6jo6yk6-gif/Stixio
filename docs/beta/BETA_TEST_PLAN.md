@@ -26,8 +26,8 @@ Validate that the new modular Stixio UI can complete the basic Quick Project flo
 - Creator Workspace persistence.
 - Brush repair.
 - Manual crop handle editing.
-- Full LINE upload validation.
-- Multi-platform rules beyond current LINE-sized render.
+- Full Sticker upload validation.
+- Multi-platform rules beyond current Sticker-sized render.
 
 ## Test environment
 
@@ -102,7 +102,7 @@ Steps:
 Expected:
 - Collection is limited to max 8 stickers.
 - ZIP downloads.
-- ZIP contains LINE-style names.
+- ZIP contains Sticker-style names.
 
 ### T07 — Layout after import
 

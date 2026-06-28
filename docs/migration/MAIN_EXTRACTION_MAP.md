@@ -15,7 +15,7 @@ Low risk. These modules should not depend on DOM.
 | Current feature | Current area | Target module | Target engine |
 |---|---|---|---|
 | Sticker filename generation | `getStickerFilename()` | `src/core/file-naming.js` | Package Engine |
-| LINE package order | `downloadAllAsZip()` naming logic | `src/core/package.js` + `src/core/file-naming.js` | Package Engine |
+| Sticker package order | `downloadAllAsZip()` naming logic | `src/core/package.js` + `src/core/file-naming.js` | Package Engine |
 | Grid rows / cols / margins / gaps | `recalculateSourceGrid()` / `applyGridChange()` | `src/core/grid.js` | Artwork + Operation Engine |
 | Sticker placement | repeated scale / pX / pY logic | `src/core/render.js` | Render Engine |
 | Safe area math | `updateStep3Guide()` and preview | `src/core/validation.js` | Rules Engine |

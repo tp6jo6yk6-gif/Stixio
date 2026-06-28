@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LINE 貼圖安全區域自動裁切與去背工具</title>
+  <title>Sticker 貼圖安全區域自動裁切與去背工具</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -48,7 +48,7 @@
         <i data-lucide="scissors" class="w-5 h-5"></i>
       </div>
       <div>
-        <h1 class="text-base font-bold tracking-tight">LINE Sticker Safe-Area Cropper</h1>
+        <h1 class="text-base font-bold tracking-tight">Sticker Package Safe-Area Cropper</h1>
         <p class="text-xs text-slate-500 dark:text-slate-400">專業貼圖處理：直覺編輯與精密控管</p>
       </div>
     </div>
@@ -551,7 +551,7 @@
             
             <label class="flex items-center gap-2 cursor-pointer mb-2">
               <input type="checkbox" id="lineNamingToggle" class="rounded text-emerald-500 focus:ring-emerald-500 w-4 h-4 cursor-pointer">
-              <span class="text-sm font-bold text-slate-700 dark:text-slate-200">套用 LINE 官方命名規範</span>
+              <span class="text-sm font-bold text-slate-700 dark:text-slate-200">套用 Sticker 官方命名規範</span>
             </label>
             
             <div id="customNameInputs" class="space-y-3 transition-opacity duration-200">
@@ -600,7 +600,7 @@
       safeMargin: 15, isChromaEnabled: true, chromaColor: [255, 255, 255], tolerance: 30, exteriorOnlyChroma: true, autoDespeckle: true,
       isBorderEnabled: false, borderThickness: 8, borderColor: '#ffffff', fillStickerInside: true, featherRadius: 1, shrinkRadius: 0, 
       targetW: 370, targetH: 320, filenamePrefix: '', filenameSuffix: '', step3Bg: 'checkerboard', showSafeGuide: false,
-      alignMode: 'center', lineNamingMode: false,
+      alignMode: 'center', packageNamingMode: false,
       brush: { mode: 'none', size: 15, isDrawing: false, lastPos: null },
       dragState: { isDragging: false, globalBoxIdx: null, handle: null, startX: 0, startY: 0, origCropX: 0, origCropY: 0, origCropW: 0, origCropH: 0 },
       smartSnap: true, view: { zoom: 1, panX: 0, panY: 0, isPanning: false, isSpaceDown: false, startX: 0, startY: 0 }, currentTab: 1,
@@ -676,7 +676,7 @@
     }
 
     function getStickerFilename(idx) {
-        if (state.lineNamingMode) {
+        if (state.packageNamingMode) {
             if (idx === 0) return 'main.png';
             if (idx === 1) return 'tab.png';
             return `${String(idx - 1).padStart(2, '0')}.png`;
@@ -1511,7 +1511,7 @@
               <div class="step3-preview-container w-full aspect-square checkerboard-bg rounded-lg border border-slate-200 flex items-center justify-center p-1 bg-white">
                   <img src="${dataUrl}" class="max-w-full max-h-full object-contain pointer-events-none">
               </div>
-              <div class="text-[10px] text-center ${state.lineNamingMode ? 'text-emerald-600 font-bold' : 'text-slate-500'} font-mono truncate w-full px-1" title="${fN}">${fN}</div>
+              <div class="text-[10px] text-center ${state.packageNamingMode ? 'text-emerald-600 font-bold' : 'text-slate-500'} font-mono truncate w-full px-1" title="${fN}">${fN}</div>
               <button onclick="window.downloadSingle(${idx})" class="w-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 dark:bg-slate-700 py-1 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 text-slate-600 mt-0.5"><i data-lucide="download" class="w-3 h-3"></i></button>
           `;
           g.appendChild(cd);
@@ -1668,9 +1668,9 @@
       
       // 輸出與打包設定
       getEl('lineNamingToggle')?.addEventListener('change', e => { 
-          state.lineNamingMode = e.target.checked; 
-          getEl('customNameInputs').style.opacity = state.lineNamingMode ? '0.3' : '1';
-          getEl('customNameInputs').style.pointerEvents = state.lineNamingMode ? 'none' : 'auto';
+          state.packageNamingMode = e.target.checked; 
+          getEl('customNameInputs').style.opacity = state.packageNamingMode ? '0.3' : '1';
+          getEl('customNameInputs').style.pointerEvents = state.packageNamingMode ? 'none' : 'auto';
           if(state.currentTab === 3) renderStep3(); 
       });
       const dlBtn = getEl('downloadZipBtn'); if(dlBtn) dlBtn.addEventListener('click', window.downloadAllAsZip);

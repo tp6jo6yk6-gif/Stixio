@@ -69,7 +69,7 @@ export function prepareRenderedExport({ sourceImage, frames = [], renderOptions 
   });
 
   const packagePlan = exportOptions.packagePlan || createPackagePlan({
-    destinationKey: exportOptions.destinationKey || 'line',
+    destinationKey: exportOptions.destinationKey || 'workshop',
     artworks: frames,
     rules: exportOptions.rules || defaultDestinationRules(),
     roleMap: exportOptions.roleMap || {},
@@ -213,8 +213,8 @@ function summarizeReviewIssues(issues = []) {
 
 function defaultDestinationRules() {
   return {
-    key: 'line',
-    name: 'LINE Stickers',
+    key: 'workshop',
+    name: 'Sticker Package',
     version: '1.0.0',
     canvas: { width: 370, height: 320 },
     package: defaultPackageRules()
@@ -223,7 +223,7 @@ function defaultDestinationRules() {
 
 function defaultPackageRules() {
   return {
-    naming: 'line-sticker',
+    naming: 'sticker-package',
     requiresMain: true,
     requiresTab: true,
     minStickers: 1,

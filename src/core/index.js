@@ -3,7 +3,7 @@ export * from './types.js';
 export * from './project.js';
 export * from './operations.js';
 export * from './rules.js';
-export * from './line-presets.js';
+export * from './sticker-presets.js';
 export * from './package.js';
 export * from './file-naming.js';
 export * from './grid.js';

@@ -6,7 +6,7 @@ export const ReviewBackgrounds = Object.freeze({
   WHITE: 'white',
   BLACK: 'black',
   CHECKER: 'checker',
-  LINE: 'line-preview'
+  Sticker: 'sticker-preview'
 });
 
 export const ReviewIssueSeverity = Object.freeze({
@@ -160,7 +160,7 @@ export function createIssue({ code, message, severity = ReviewIssueSeverity.WARN
 export function getReviewBackgroundStyle(background) {
   if (background === ReviewBackgrounds.WHITE) return { background: '#ffffff' };
   if (background === ReviewBackgrounds.BLACK) return { background: '#020617' };
-  if (background === ReviewBackgrounds.LINE) return { background: '#06c755' };
+  if (background === ReviewBackgrounds.Sticker) return { background: '#06c755' };
   if (background === ReviewBackgrounds.TRANSPARENT) return { background: 'transparent' };
   return {
     background: 'linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%)',

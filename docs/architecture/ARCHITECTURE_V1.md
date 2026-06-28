@@ -88,7 +88,7 @@ Owns image generation.
 
 Responsibilities:
 - Combine Artwork + Operations + Destination Rules into final image outputs.
-- Render different outputs from the same artwork for LINE, Telegram, WhatsApp, Discord, or custom destinations.
+- Render different outputs from the same artwork for Sticker, Telegram, WhatsApp, Discord, or custom destinations.
 
 Does not own:
 - ZIP structure or package ordering.
@@ -98,7 +98,7 @@ Owns delivery format.
 
 Responsibilities:
 - Generate destination-specific package plans.
-- Support LINE `main.png`, `tab.png`, `01.png` naming, sticker order, ZIP output, and future manifest formats.
+- Support Sticker `main.png`, `tab.png`, `01.png` naming, sticker order, ZIP output, and future manifest formats.
 - Keep package order editable by the user.
 
 Does not own:

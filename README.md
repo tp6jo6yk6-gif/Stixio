@@ -35,7 +35,7 @@ Export
 - Shadow
 - PNG export
 - ZIP export
-- LINE-style naming helpers
+- Sticker-style naming helpers
 
 ## Deferred until after M1
 

@@ -141,7 +141,7 @@ export function getPackageFileName(itemOrIndex, roleOrRules, maybeRules) {
 }
 
 export function getRoleFileName(item, packageRules = {}) {
-  if (packageRules.naming === 'line-sticker') {
+  if (packageRules.naming === 'sticker-package') {
     if (item.role === PackageRoles.MAIN) return 'main.png';
     if (item.role === PackageRoles.TAB) return 'tab.png';
     return `${String(item.stickerIndex || 1).padStart(2, '0')}.png`;

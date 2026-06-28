@@ -8,7 +8,7 @@
 | B-002 | Medium | Refine | Brush repair is not in the redesigned UI yet. | Known limitation |
 | B-003 | Medium | Account | Starter login is currently a demo prompt. | Planned |
 | B-004 | Medium | Workspace | Creator Workspace is currently a preview prompt. | Planned |
-| B-005 | Low | Destinations | Multi-platform UI is conceptual; only LINE-sized render is active. | Planned |
+| B-005 | Low | Destinations | Multi-platform UI is conceptual; only Sticker-sized render is active. | Planned |
 
 ## Fixed
 

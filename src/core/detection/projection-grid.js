@@ -3,7 +3,7 @@ import { DetectionStrategies } from './detection-engine.js';
 import { tightenFramesToContent } from './content-bounds.js';
 
 // Detect rows and columns by finding low-density projection valleys between artwork groups.
-// Ported from the original LINE tool's automatic layout mode.
+// Ported from the original Sticker tool's automatic layout mode.
 export function detectProjectionGrid(sourceImage, options = {}) {
   if (!sourceImage?.img) throw new Error('detectProjectionGrid requires sourceImage.img.');
   const {

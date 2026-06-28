@@ -11,11 +11,11 @@ import {
   renderFrameToCanvas,
   reviewFrames,
   createMultiSourceZipExport,
-  getLineRoleFilename,
-  applyLinePreset,
-  getLinePresets,
-  LineStickerCategories,
-  LineAssetRoles,
+  getRolePackageFilename,
+  applyStickerPreset,
+  getStickerPresets,
+  StickerCategories,
+  AssetRoles,
   createMaskCanvas,
   resizeMaskCanvas,
   paintMaskStroke,
@@ -35,9 +35,9 @@ import {
 
 const HANDLE_SIZE = 14;
 const MIN_FRAME_SIZE = 8;
-const ROLE_OPTIONS = [LineAssetRoles.STICKER, LineAssetRoles.MAIN, LineAssetRoles.TAB];
+const ROLE_OPTIONS = [AssetRoles.STICKER, AssetRoles.MAIN, AssetRoles.TAB];
 
-const DEFAULT_SETTINGS = applyLinePreset({
+const DEFAULT_SETTINGS = applyStickerPreset({
   layoutMode: 'auto',
   rows: 1,
   cols: 1,
@@ -55,16 +55,16 @@ const DEFAULT_SETTINGS = applyLinePreset({
   featherRadius: 1,
   whiteBorderEnabled: false,
   whiteBorderSize: 8,
-  lineCategory: LineStickerCategories.NORMAL,
-  outputRole: LineAssetRoles.STICKER,
+  stickerCategory: StickerCategories.NORMAL,
+  outputRole: AssetRoles.STICKER,
   reviewBackground: 'checker',
   refineZoom: 1,
   maskTool: 'view',
   maskSize: 15
-}, LineStickerCategories.NORMAL, LineAssetRoles.STICKER);
+}, StickerCategories.NORMAL, AssetRoles.STICKER);
 
 const state = {
-  document: createDocument({ name: 'LINE Sticker Project' }),
+  document: createDocument({ name: 'Sticker Package Project' }),
   sources: new Map(),
   activeSourceId: null,
   selectedFrameId: null,
@@ -79,9 +79,9 @@ const state = {
   frameHistory: createHistory({ frames: [], selectedFrameId: null })
 };
 
-export function initStixioLineApp(root = document.getElementById('app')) {
+export function initStixioWorkshop(root = document.getElementById('app')) {
   if (!root) throw new Error('Stixio root element not found.');
-  document.title = `${BRAND.name} LINE Studio`;
+  document.title = `${BRAND.name} Workshop`;
   root.innerHTML = renderShell();
   bindStaticEvents(root);
   refresh();
@@ -94,7 +94,7 @@ function renderShell() {
         <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-5 py-4">
           <div class="flex items-center gap-3">
             <div class="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-xl font-black text-emerald-300">S</div>
-            <div><h1 class="text-xl font-black">${BRAND.name} <span class="text-emerald-600">LINE Studio</span></h1><p class="text-xs font-bold text-slate-500">Stixio architecture · LINE workflow parity</p></div>
+            <div><h1 class="text-xl font-black">${BRAND.name} <span class="text-emerald-600">Workshop</span></h1><p class="text-xs font-bold text-slate-500">Stixio architecture · Sticker production workspace</p></div>
           </div>
           <div class="flex items-center gap-2"><button id="undoBtn" class="rounded-xl bg-white px-3 py-2 text-xs font-black">Undo</button><button id="redoBtn" class="rounded-xl bg-white px-3 py-2 text-xs font-black">Redo</button><button id="exportZipBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white">Export ZIP</button></div>
         </div>
@@ -116,8 +116,8 @@ function renderDetectionPanel() {
 }
 
 function renderOutputPanel() {
-  const presets = getLinePresets(state.settings.lineCategory);
-  return `<section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Rules Engine</p><h2 class="mt-1 text-xl font-black">LINE 尺寸規格</h2><label class="mt-4 block text-xs font-black text-slate-500">貼圖類型<select id="categoryInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${Object.values(LineStickerCategories).map(value=>`<option value="${value}" ${value===state.settings.lineCategory?'selected':''}>${categoryLabel(value)}</option>`).join('')}</select></label><label class="mt-3 block text-xs font-black text-slate-500">輸出用途<select id="presetRoleInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${presets.map(item=>`<option value="${item.role}" ${item.role===state.settings.outputRole?'selected':''}>${item.name} · ${item.width}×${item.height}</option>`).join('')}</select></label><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${state.settings.targetW} × ${state.settings.targetH}px · safe ${state.settings.safeMargin}px</div></section>`;
+  const presets = getStickerPresets(state.settings.stickerCategory);
+  return `<section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Rules Engine</p><h2 class="mt-1 text-xl font-black">貼圖輸出規格</h2><label class="mt-4 block text-xs font-black text-slate-500">貼圖類型<select id="categoryInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${Object.values(StickerCategories).map(value=>`<option value="${value}" ${value===state.settings.stickerCategory?'selected':''}>${categoryLabel(value)}</option>`).join('')}</select></label><label class="mt-3 block text-xs font-black text-slate-500">輸出用途<select id="presetRoleInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${presets.map(item=>`<option value="${item.role}" ${item.role===state.settings.outputRole?'selected':''}>${item.name} · ${item.width}×${item.height}</option>`).join('')}</select></label><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${state.settings.targetW} × ${state.settings.targetH}px · safe ${state.settings.safeMargin}px</div></section>`;
 }
 
 function renderRefinePanel() {
@@ -154,8 +154,8 @@ function bindStaticEvents(root) {
   root.querySelector('#detectBtn').addEventListener('click', detectActiveSource);
   ['rowsInput','colsInput','marginXInput','marginYInput','gapXInput','gapYInput'].forEach(id => root.querySelector(`#${id}`).addEventListener('input', readGridSettings));
   root.querySelector('#smartSnapInput').addEventListener('change', event => state.settings.smartSnap = event.target.checked);
-  root.querySelector('#categoryInput').addEventListener('change', event => { state.settings.lineCategory = event.target.value; const role = getLinePresets(event.target.value)[0].role; state.settings = applyLinePreset(state.settings,event.target.value,role); rerenderShell(); });
-  root.querySelector('#presetRoleInput').addEventListener('change', event => { state.settings = applyLinePreset(state.settings,state.settings.lineCategory,event.target.value); clearRenderCache(); renderAll(); refresh(); });
+  root.querySelector('#categoryInput').addEventListener('change', event => { state.settings.stickerCategory = event.target.value; const role = getStickerPresets(event.target.value)[0].role; state.settings = applyStickerPreset(state.settings,event.target.value,role); rerenderShell(); });
+  root.querySelector('#presetRoleInput').addEventListener('change', event => { state.settings = applyStickerPreset(state.settings,state.settings.stickerCategory,event.target.value); clearRenderCache(); renderAll(); refresh(); });
   root.querySelector('#chromaEnabledInput').addEventListener('change', event => updateRefineSetting('chromaEnabled',event.target.checked));
   root.querySelector('#chromaColorInput').addEventListener('input', event => updateRefineSetting('chromaColor',hexToRgb(event.target.value)));
   root.querySelector('#pickerBtn').addEventListener('click', () => { state.settings.maskTool = 'picker'; refreshMaskToolButtons(); });
@@ -214,7 +214,7 @@ function detectSource(sourceId) {
     report.frames=tightenFramesToContent(source,report.frames,{padding:4,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance});
   }
   const oldFrames=frames().filter(frame=>frame.sourceImageId!==sourceId);
-  const newFrames=report.frames.map((frame,index)=>({...frame,name:`${stripExtension(source.name)} ${String(index+1).padStart(2,'0')}`,custom:{...(frame.custom||{}),outputRole:LineAssetRoles.STICKER,maskVersion:0},state:{...(frame.state||{}),exportSelected:true,packageRole:'sticker'}}));
+  const newFrames=report.frames.map((frame,index)=>({...frame,name:`${stripExtension(source.name)} ${String(index+1).padStart(2,'0')}`,custom:{...(frame.custom||{}),outputRole:AssetRoles.STICKER,maskVersion:0},state:{...(frame.state||{}),exportSelected:true,packageRole:'sticker'}}));
   setFrames([...oldFrames,...newFrames]); state.selectedFrameId=newFrames[0]?.id||state.selectedFrameId; resetFrameHistory(); clearRenderCache(); renderAll();
 }
 
@@ -287,8 +287,8 @@ function redoFrames(){if(!canRedo(state.frameHistory))return;state.frameHistory=
 function applyFrameListChange(label,nextFrames,nextSelected){const before=frameSnapshot();setFrames(nextFrames);state.selectedFrameId=nextSelected;const after=frameSnapshot();commitFrameChange(label,before,after);clearRenderCache();renderAll();refresh();}
 
 function downloadSelectedPng(){const frame=selectedFrame();if(frame)downloadFramePng(frame);}
-function downloadFramePng(frame){const canvas=renderFrame(frame,true),role=packageRole(frame),stickerFrames=frames().filter(item=>packageRole(item)==='sticker'&&item.state?.exportSelected!==false),stickerIndex=Math.max(0,stickerFrames.findIndex(item=>item.id===frame.id));downloadDataUrl(canvas.toDataURL('image/png'),getLineRoleFilename(role,stickerIndex));}
-async function downloadZip(){if(!frames().length)return alert('請先匯入圖片。');try{const roleMap=Object.fromEntries(frames().map(frame=>[frame.id,packageRole(frame)]));const result=await createMultiSourceZipExport({sourceImages:state.sources,frames:frames(),renderOptions:getRenderOptions(),renderedMap:state.rendered,exportOptions:{prefix:'stixio-line',allowWarnings:true,roleMap,order:frames().map(frame=>frame.id),rules:{key:'line',name:'LINE',version:'1.0.0',canvas:{width:state.settings.targetW,height:state.settings.targetH},package:{naming:'line-sticker',roles:[],requiresMain:false,requiresTab:false,minStickers:1}}},JSZipClass:window.JSZip});state.rendered=result.renderedMap;downloadBlob(result.blob,result.fileName);refresh();}catch(error){alert(error.message||'ZIP 匯出失敗');}}
+function downloadFramePng(frame){const canvas=renderFrame(frame,true),role=packageRole(frame),stickerFrames=frames().filter(item=>packageRole(item)==='sticker'&&item.state?.exportSelected!==false),stickerIndex=Math.max(0,stickerFrames.findIndex(item=>item.id===frame.id));downloadDataUrl(canvas.toDataURL('image/png'),getRolePackageFilename(role,stickerIndex));}
+async function downloadZip(){if(!frames().length)return alert('請先匯入圖片。');try{const roleMap=Object.fromEntries(frames().map(frame=>[frame.id,packageRole(frame)]));const result=await createMultiSourceZipExport({sourceImages:state.sources,frames:frames(),renderOptions:getRenderOptions(),renderedMap:state.rendered,exportOptions:{prefix:'stixio-workshop',allowWarnings:true,roleMap,order:frames().map(frame=>frame.id),rules:{key:'line',name:'Sticker',version:'1.0.0',canvas:{width:state.settings.targetW,height:state.settings.targetH},package:{naming:'sticker-package',roles:[],requiresMain:false,requiresTab:false,minStickers:1}}},JSZipClass:window.JSZip});state.rendered=result.renderedMap;downloadBlob(result.blob,result.fileName);refresh();}catch(error){alert(error.message||'ZIP 匯出失敗');}}
 function downloadDataUrl(url,name){const link=document.createElement('a');link.href=url;link.download=name;link.click();}
 function downloadBlob(blob,name){const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);}
 

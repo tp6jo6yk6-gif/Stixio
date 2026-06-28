@@ -1,16 +1,16 @@
-# LINE 功能整合到 Stixio 架構
+# Stixio Workshop 架構整合
 
 ## 原則
 
 - Stixio 模組化架構是產品主體。
-- `line.html` 是功能與操作行為的基準，不再作為長期正式架構。
+- `workshop-legacy.html` 是功能與操作行為的基準，不再作為長期正式架構。
 - UI 不擁有圖像處理、偵測、命名或打包邏輯。
 - `main` 在功能對等完成前維持目前可用版本。
-- 所有整合先進入 `stixio-line-integration`，經驗收後才合併。
+- 所有整合先進入 `stixio-workshop`，經驗收後才合併。
 
 ## 功能歸屬
 
-| LINE 功能 | Stixio 模組 |
+| 貼圖功能 | Stixio 模組 |
 |---|---|
 | 多張原圖、追加、切換 | Document Engine / Source Image |
 | 智能偵測、網格、自訂切割 | Detection Engine |
@@ -29,7 +29,7 @@
 ## 已完成
 
 - [x] 建立獨立整合分支
-- [x] LINE 五類尺寸與用途預設
+- [x] 貼圖尺寸與用途預設
 - [x] 投影谷智能排版偵測
 - [x] 每格內容感知緊緻裁切
 - [x] 手動裁切後 12px 鄰近磁吸
@@ -41,7 +41,7 @@
 - [x] 九點裁切框
 - [x] 吸色器、去背、雜點、侵蝕、羽化、外框控制
 - [x] 魔術、保留與刪除筆刷及筆刷歷史
-- [x] LINE 規格切換
+- [x] 貼圖規格切換
 - [x] Review 拖曳排序、匯出勾選與角色設定
 - [x] 單張 PNG 與多來源 ZIP
 - [x] CI 語法、既有測試、新增測試與靜態建置通過
@@ -55,6 +55,6 @@
 
 ## 入口
 
-整合分支的預覽入口：`stixio-line.html`
+整合分支的預覽入口：`workshop.html`
 
 正式 `main/index.html` 在驗收前維持不變。
