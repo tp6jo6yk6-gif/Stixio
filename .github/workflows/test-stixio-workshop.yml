@@ -33,7 +33,11 @@ jobs:
           node --check src/core/detection/projection-grid.js
           node --check src/core/refine/mask-engine.js
           node --check src/core/export/multi-source-export.js
-      - name: Run project tests
+      - name: Check Workshop naming
+        run: node --test tests/workshop-naming.test.js
+      - name: Check Workshop integration
+        run: node --test tests/workshop-integration.test.js
+      - name: Run remaining project tests
         run: npm test
       - name: Build static site
         run: npm run build
