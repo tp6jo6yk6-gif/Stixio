@@ -1,0 +1,35 @@
+name: Diagnose LINE integration tests
+
+on:
+  push:
+    branches:
+      - stixio-line-integration
+    paths:
+      - '.github/workflows/diagnose-line-tests.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stixio-line-integration
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - name: Capture complete test output
+        run: |
+          mkdir -p docs/diagnostics
+          npm test > docs/diagnostics/line-integration-tests.txt 2>&1 || true
+      - name: Commit diagnostic output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/diagnostics/line-integration-tests.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Capture LINE integration test diagnostics"
+          git push origin HEAD:stixio-line-integration
