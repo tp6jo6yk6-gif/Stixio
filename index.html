@@ -1,20 +1,1844 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stixio｜LINE 貼圖安全區域自動裁切與去背工具</title>
-  <meta name="description" content="Stixio 貼圖完整工作流程：多圖匯入、智能裁切、細部去背修補、預覽排序與 ZIP 匯出。" />
-  <meta name="robots" content="noindex,nofollow" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LINE 貼圖安全區域自動裁切與去背工具</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
-    html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#f8fafc;color:#0f172a;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.loading{text-align:center}.spinner{width:36px;height:36px;margin:0 auto 16px;border:4px solid #d1fae5;border-top-color:#10b981;border-radius:999px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+    /* 棋盤格透明背景預覽 */
+    .checkerboard-bg {
+      background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+                        linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+                        linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      background-color: #f9fafb;
+    }
+    .dark .checkerboard-bg {
+      background-image: linear-gradient(45deg, #374151 25%, transparent 25%),
+                        linear-gradient(-45deg, #374151 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #374151 75%),
+                        linear-gradient(-45deg, transparent 75%, #374151 75%);
+      background-color: #1f2937;
+    }
+    /* 隱藏滾動條但保持功能 */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body>
-  <div class="loading" role="status" aria-live="polite">
-    <div class="spinner"></div>
-    <strong>正在恢復 Stixio 完整功能…</strong>
-  </div>
-  <script type="module" src="./src/legacy/restore.js"></script>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 h-screen flex flex-col transition-colors duration-200 overflow-hidden">
+
+  <!-- 導覽列 -->
+  <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 py-3 px-6 flex items-center justify-between shadow-sm z-20 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="bg-emerald-500 text-white p-2 rounded-xl shadow-md">
+        <i data-lucide="scissors" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight">LINE Sticker Safe-Area Cropper</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400">專業貼圖處理：直覺編輯與精密控管</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center space-x-3">
+      <button id="themeToggle" class="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="切換深淺色主題">
+        <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+        <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+      </button>
+      <a href="https://creator.line.me/zh-hant/guideline/sticker/" target="_blank" class="text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
+        <i data-lucide="external-link" class="w-4 h-4"></i> 官方規範
+      </a>
+    </div>
+  </header>
+
+  <!-- 分頁導航列 -->
+  <nav class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 flex justify-center shrink-0 shadow-sm z-10 relative">
+    <div class="flex space-x-1 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-xl my-2 border border-slate-200 dark:border-slate-700 w-full max-w-3xl overflow-x-auto">
+      <button id="tab1Btn" class="flex-1 px-4 py-2 rounded-lg text-sm font-bold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
+        Step 1: 匯入與全域設定
+      </button>
+      <button id="tab2Btn" disabled class="flex-1 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 transition whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
+        Step 2: 單張細部修補
+      </button>
+      <button id="tab3Btn" disabled class="flex-1 px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 transition whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed">
+        Step 3: 預覽與輸出打包
+      </button>
+    </div>
+  </nav>
+
+  <!-- 主要工作區 -->
+  <main class="flex-1 w-full 2xl:max-w-[2400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden relative">
+    
+    <!-- 左側主視圖區 (統一視角框架) -->
+    <section class="lg:col-span-8 xl:col-span-9 bg-slate-100 dark:bg-slate-900 h-full overflow-y-auto custom-scrollbar p-4 md:p-6 flex flex-col order-2 lg:order-1 relative">
+      
+      <div class="w-full max-w-[1400px] mx-auto flex flex-col z-10">
+        
+        <!-- ================= Step 1: 匯入與全域視圖 ================= -->
+        <div id="step1Card" class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 lg:p-6 flex-col hidden mb-6">
+          <!-- 標題與狀態 -->
+          <div class="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3 gap-2 shrink-0">
+            <h2 class="text-base md:text-lg font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+              <span class="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-md text-sm">Step 1</span> 匯入圖片與全域網格設定
+            </h2>
+            <div id="fileInfoBanner" class="hidden items-center gap-2 text-sm bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+              <span class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 whitespace-nowrap"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 已載入</span>
+              <span id="originalResolution" class="text-slate-600 dark:text-slate-300 font-mono font-bold whitespace-nowrap">0x0 px</span>
+              
+              <div class="w-px h-4 bg-slate-300 dark:bg-slate-600 shrink-0 mx-1"></div>
+              <button id="addMoreBtn" class="text-blue-500 hover:text-blue-600 font-bold flex items-center gap-1 transition-colors whitespace-nowrap"><i data-lucide="plus-circle" class="w-4 h-4"></i> 追加</button>
+              
+              <div class="w-px h-4 bg-slate-300 dark:bg-slate-600 shrink-0 mx-1"></div>
+              <button id="clearAllBtn" class="text-rose-500 hover:text-rose-600 font-bold flex items-center gap-1 transition-colors whitespace-nowrap"><i data-lucide="trash-2" class="w-4 h-4"></i> 清除</button>
+            </div>
+          </div>
+          
+          <!-- 初始拖曳區 -->
+          <div id="dropZone" class="border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-emerald-500 hover:bg-emerald-50/10 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 bg-slate-50 dark:bg-slate-900/50 min-h-[400px] mt-4">
+            <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
+            <i data-lucide="upload-cloud" class="w-16 h-16 text-emerald-500 mb-4 transition-transform duration-200 hover:scale-110"></i>
+            <h3 class="font-bold text-lg mb-2 text-slate-700 dark:text-slate-200">拖曳或點擊上傳圖片以開始</h3>
+            <p class="text-sm text-slate-500">支援單張貼圖或多張去背排版，並可無限追加上傳</p>
+          </div>
+
+          <!-- 工作區 (含畫布與縮圖) -->
+          <div id="step1Workspace" class="hidden flex-col pt-4">
+             <!-- 提示列 -->
+             <div class="flex items-center bg-blue-50 dark:bg-blue-900/20 px-4 py-3 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm mb-4 shrink-0">
+                <p class="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1.5 font-medium">
+                  <i data-lucide="info" class="w-5 h-5"></i> 拖曳畫布上框線的綠點，可手動微調裁切範圍
+                </p>
+             </div>
+             
+             <!-- ★ 統一大型畫布區 ★ -->
+             <div id="step1CanvasArea" class="relative overflow-hidden rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex justify-center items-center p-2 w-full shadow-inner h-[50vh] min-h-[400px] shrink-0">
+                <canvas id="sourceCanvas" class="max-w-full max-h-full object-contain cursor-crosshair drop-shadow-sm"></canvas>
+             </div>
+
+             <!-- 底部清單區 (已移除固定的 h-[120px]，讓它自然適應高度) -->
+             <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col mt-4 shrink-0">
+                <div class="text-sm font-bold text-slate-500 mb-2 flex items-center gap-1.5"><i data-lucide="images" class="w-4 h-4"></i> 原圖清單 (點擊切換編輯)</div>
+                <div id="sourceThumbnails" class="flex gap-3 overflow-x-auto custom-scrollbar px-1 pb-3 items-start min-h-[85px]"></div>
+             </div>
+          </div>
+        </div>
+
+        <!-- ================= Step 2: 單圖修補視圖 ================= -->
+        <div id="step2Area" class="hidden bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 lg:p-6 flex-col mb-6">
+          <!-- 標題與狀態 -->
+          <div class="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3 gap-2 shrink-0">
+            <h2 class="text-base md:text-lg font-bold flex items-center gap-1.5 text-rose-500 dark:text-rose-400">
+              <span class="bg-rose-100 dark:bg-rose-900 px-2 py-0.5 rounded-md text-sm">Step 2</span> 單張細部修補
+            </h2>
+            <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+              <span class="w-4 h-4 rounded-full bg-rose-500/60 border border-rose-500 block"></span>
+              <span class="text-sm font-bold text-slate-600 dark:text-slate-300">紅色區域 = 準備刪除的背景</span>
+            </div>
+          </div>
+
+          <!-- 畫布區 -->
+          <div class="flex flex-col pt-4">
+             <!-- ★ 統一大型畫布區 ★ -->
+             <div id="step5CanvasWrapper" class="relative checkerboard-bg border border-slate-200 dark:border-slate-700 rounded-xl mx-auto overflow-hidden shadow-inner bg-white step3-preview-container transition-colors w-full h-[50vh] min-h-[400px] shrink-0 flex items-center justify-center p-4" style="cursor: grab;">
+                
+                <!-- Transform Layer -->
+                <div id="step5TransformLayer" class="w-full h-full flex justify-center items-center origin-center transition-transform duration-75">
+                   <div id="step5Inner" class="relative flex shrink-0 max-w-full max-h-full overflow-hidden" style="aspect-ratio: 370 / 320;">
+                       <canvas id="step5Canvas" class="w-full h-full object-contain cursor-none drop-shadow-sm"></canvas>
+                   </div>
+                </div>
+
+                <div class="absolute top-4 left-4 bg-white/95 dark:bg-slate-800/95 text-slate-600 dark:text-slate-300 text-xs px-3 py-2 rounded-xl pointer-events-none backdrop-blur-md shadow-sm flex items-center gap-2 font-medium z-20 border border-slate-200 dark:border-slate-700 transition-all">
+                   <i data-lucide="move" class="w-4 h-4 text-blue-500"></i> 
+                   <span>滾輪縮放，拖曳平移 (或按住 <kbd id="spaceKeyHint" class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded text-xs font-mono">空白鍵</kbd>)</span>
+                </div>
+                
+                <div class="absolute bottom-4 right-4 flex items-center gap-1 bg-white/95 dark:bg-slate-800/95 p-1.5 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 z-20 backdrop-blur-md">
+                  <button type="button" id="zoomOutBtn" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
+                  <button type="button" id="zoomResetBtn" class="px-3 py-1 text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300">100%</button>
+                  <button type="button" id="zoomInBtn" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
+                </div>
+             </div>
+
+             <!-- 底部清單區 (已移除固定的 h-[120px]，讓它自然適應高度) -->
+             <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col mt-4 shrink-0">
+                <div class="text-sm font-bold text-slate-500 mb-2 flex items-center gap-1.5"><i data-lucide="layout-template" class="w-4 h-4"></i> 單張貼圖清單 (點擊切換修補對象)</div>
+                <div id="stickersSlider" class="flex gap-3 overflow-x-auto custom-scrollbar px-1 pb-3 min-h-[85px] items-start"></div>
+             </div>
+          </div>
+        </div>
+
+        <!-- ================= ★ Step 3: 預覽與輸出視圖 ★ ================= -->
+        <div id="step3Area" class="hidden bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 lg:p-6 flex-col mb-6">
+           <!-- 標題與狀態 -->
+           <div class="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3 gap-2 shrink-0">
+             <h2 class="text-base md:text-lg font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+               <span class="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-md text-sm">Step 3</span> 預覽與輸出打包
+             </h2>
+             <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                <span class="w-4 h-4 rounded-full bg-blue-500/60 border border-blue-500 block"></span>
+                <span class="text-sm font-bold text-slate-600 dark:text-slate-300">最終特效展示</span>
+             </div>
+           </div>
+           
+           <div class="flex flex-col pt-4 gap-4">
+               <!-- ★ 核心對比預覽區 (包含深淺色切換開關) ★ -->
+               <div id="step3MainPreviewWrapper" class="relative checkerboard-bg border border-slate-200 dark:border-slate-700 rounded-xl mx-auto overflow-hidden shadow-inner bg-white step3-preview-container transition-colors w-full h-[50vh] min-h-[400px] shrink-0 flex items-center justify-center p-4">
+                  
+                  <!-- 精準長寬比內層與出血區遮罩 -->
+                  <div id="step3Inner" class="relative flex shrink-0 max-w-full max-h-full overflow-hidden pointer-events-none" style="aspect-ratio: 370 / 320;">
+                     <img id="step3MainImage" src="" class="w-full h-full object-contain drop-shadow-md transition-opacity duration-200">
+                     <!-- 加上紅色外層陰影，把留白的空間蓋住 -->
+                     <div id="step3SafeGuide" class="absolute border-2 border-red-500 shadow-[0_0_0_9999px_rgba(244,63,94,0.25)] pointer-events-none rounded transition-opacity opacity-0 hidden"></div>
+                  </div>
+                  
+                  <!-- 左上：輔助線 -->
+                  <div class="absolute top-4 left-4">
+                     <button id="toggleGuideBtn" class="bg-white/95 dark:bg-slate-800/95 hover:bg-slate-100 text-slate-600 dark:text-slate-300 text-xs px-3 py-2 rounded-xl shadow-sm font-bold border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5">
+                       <i data-lucide="scan" class="w-4 h-4 text-rose-500"></i> <span id="guideBtnText">顯示輔助留白區</span>
+                     </button>
+                  </div>
+
+                  <!-- 右上：對比檢視模式快速切換 -->
+                  <div class="absolute top-4 right-4 flex bg-white/95 dark:bg-slate-800/95 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-1.5 z-10 backdrop-blur-md">
+                      <button class="step3-bg-btn w-6 h-6 rounded-md border border-slate-300 bg-white" data-bg="#ffffff" title="純白背景"></button>
+                      <button class="step3-bg-btn w-6 h-6 rounded-md border border-slate-700 bg-[#111111] ml-1.5" data-bg="#111111" title="純黑背景"></button>
+                      <button class="step3-bg-btn w-6 h-6 rounded-md border border-transparent ring-2 ring-emerald-500 checkerboard-bg ml-1.5" data-bg="checkerboard" title="透明方格"></button>
+                  </div>
+
+                  <div class="absolute bottom-4 right-4 bg-white/95 dark:bg-slate-800/95 text-slate-600 dark:text-slate-300 text-xs px-3 py-2 rounded-xl pointer-events-none backdrop-blur-md shadow-sm font-bold border border-slate-200 dark:border-slate-700" id="step3MainSizeLabel">370 x 320 px</div>
+               </div>
+
+               <!-- 縮圖排序清單 -->
+               <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col shrink-0">
+                  <div class="text-sm font-bold text-slate-500 mb-4 flex items-center justify-between">
+                     <div class="flex items-center gap-1.5"><i data-lucide="move" class="w-4 h-4"></i> 拖曳排序與匯出設定</div>
+                     <div class="text-xs font-normal text-slate-400">點擊下方卡片切換上方預覽</div>
+                  </div>
+                  <!-- Grid 排版區 -->
+                  <div id="step3Grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-1 items-start">
+                      <!-- Rendered via JS -->
+                  </div>
+               </div>
+           </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 【右側參數設定區】 -->
+    <!-- ========================================== -->
+    <aside class="lg:col-span-4 xl:col-span-3 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 h-full overflow-y-auto custom-scrollbar p-5 shadow-[-2px_0_10px_-5px_rgba(0,0,0,0.1)] z-10 order-1 lg:order-2 flex flex-col relative">
+      
+      <div class="flex-1 space-y-7">
+        
+        <!-- 【Step 1 專屬】 -->
+        <div id="gridSettingsArea" class="space-y-4 hidden">
+          <!-- ★ 智能貼合邊緣開關 -->
+          <div class="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600 dark:text-emerald-400 shadow-inner">
+                <i data-lucide="magnet" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="text-sm font-bold text-slate-700 dark:text-slate-200">智能貼合邊緣</div>
+                <div class="text-xs text-slate-500 mt-0.5">拖曳框線後自動磁吸圖案邊緣</div>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input type="checkbox" id="smartSnapToggle" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+
+          <hr class="border-slate-100 dark:border-slate-700 mt-2 mb-4">
+
+          <h2 class="text-base font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+            <i data-lucide="layout-grid" class="w-5 h-5 text-blue-500"></i> 排版切割模式
+          </h2>
+          
+          <div class="space-y-3">
+            <label class="text-sm font-bold text-slate-500">選擇切分規則</label>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              <button type="button" data-layout="auto" class="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20">
+                <i data-lucide="sparkles" class="w-4 h-4"></i> 智能偵測
+              </button>
+              <button type="button" data-layout="1x1" class="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200">
+                <i data-lucide="square" class="w-4 h-4"></i> 單圖
+              </button>
+              <button type="button" data-layout="2x2" class="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200">
+                <i data-lucide="grid" class="w-4 h-4"></i> 2x2
+              </button>
+              <button type="button" data-layout="3x3" class="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200">
+                <i data-lucide="table" class="w-4 h-4"></i> 3x3
+              </button>
+              <button type="button" data-layout="custom" class="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200">
+                <i data-lucide="settings-2" class="w-4 h-4"></i> 自訂
+              </button>
+            </div>
+            
+            <div id="preUploadCustomInputs" class="hidden grid grid-cols-2 gap-3 mt-3">
+              <div class="flex items-center border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm">
+                <span class="text-slate-400 mr-2">列數</span>
+                <input type="number" id="preRows" min="1" max="10" value="2" class="w-full text-right bg-transparent font-bold outline-none">
+              </div>
+              <div class="flex items-center border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm">
+                <span class="text-slate-400 mr-2">欄數</span>
+                <input type="number" id="preCols" min="1" max="10" value="4" class="w-full text-right bg-transparent font-bold outline-none">
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <h4 class="text-sm font-bold text-slate-500 flex items-center justify-between">
+              <span>手動微調等距切割</span>
+              <button id="resetGridSpacingBtn" class="text-emerald-500 hover:text-emerald-600 p-1" title="重設歸零"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></button>
+            </h4>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div>
+                <div class="flex justify-between text-xs mb-1.5"><span>邊距 X:</span><strong id="marginValX" class="text-emerald-500">0px</strong></div>
+                <input type="range" id="gridMarginX" min="0" max="150" value="0" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1.5"><span>邊距 Y:</span><strong id="marginValY" class="text-emerald-500">0px</strong></div>
+                <input type="range" id="gridMarginY" min="0" max="150" value="0" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1.5"><span>欄間距:</span><strong id="gapValX" class="text-emerald-500">0px</strong></div>
+                <input type="range" id="gridGapX" min="0" max="80" value="0" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1.5"><span>列間距:</span><strong id="gapValY" class="text-emerald-500">0px</strong></div>
+                <input type="range" id="gridGapY" min="0" max="80" value="0" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+              </div>
+            </div>
+          </div>
+          <hr class="border-slate-100 dark:border-slate-700 mt-7">
+        </div>
+
+        <!-- 【Step 2 專屬：AI去背設定】 -->
+        <div id="chromaSettingsCard" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+              <i data-lucide="eraser" class="w-5 h-5 text-rose-500"></i> AI 自動去背設定
+            </h2>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="enableChroma" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+          
+          <div id="chromaSettings" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div>
+                <label class="block text-sm font-bold text-slate-500 mb-2">欲去除的背景色</label>
+                <div class="flex items-center space-x-2">
+                  <input type="color" id="bgColorInput" value="#ffffff" class="w-8 h-8 rounded border-0 cursor-pointer p-0">
+                  <button id="pickColorBtn" class="flex-1 bg-white border border-slate-200 text-xs py-2 rounded-lg font-bold flex items-center justify-center gap-1">
+                    <i data-lucide="pipette" class="w-4 h-4"></i> 吸色器
+                  </button>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-2 text-sm">
+                  <label class="font-bold text-slate-500">色差容忍度</label>
+                  <span id="toleranceVal" class="font-bold text-emerald-500">30</span>
+                </div>
+                <input type="range" id="colorTolerance" min="5" max="120" value="30" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500 mt-2">
+              </div>
+            </div>
+
+            <!-- 自動清除雜點 (Despeckle) -->
+            <div class="flex items-center justify-between p-2 mt-2 bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div>
+                <span class="text-sm font-bold block">自動清除透明孤島 (防雜訊)</span>
+                <p class="text-xs text-slate-400 mt-0.5">預防殘留微小色塊導致檔案過大</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="autoDespeckleToggle" checked class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
+
+            <div class="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+              <div class="flex justify-between items-center text-sm mb-1">
+                <label class="font-bold text-slate-500">邊緣侵蝕去白邊 (Defringe)</label>
+                <span id="shrinkRadiusVal" class="font-bold text-emerald-500">0 px</span>
+              </div>
+              <input type="range" id="shrinkRadius" min="0" max="5" value="0" step="1" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+            </div>
+
+            <div class="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+              <div class="flex justify-between items-center text-sm mb-1">
+                <label class="font-bold text-slate-500">平滑羽化強度 (Feathering)</label>
+                <span id="featherRadiusVal" class="font-bold text-emerald-500">1 px</span>
+              </div>
+              <input type="range" id="featherRadius" min="0" max="10" value="1" step="1" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+            </div>
+
+            <div class="flex items-center justify-between p-2 mt-2 bg-slate-50 dark:bg-slate-900/30 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div>
+                <span class="text-sm font-bold block">僅對「外圍邊緣」去背</span>
+                <p class="text-xs text-slate-400 mt-0.5">防內部純色被誤刪</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="exteriorOnlyChroma" checked class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 【Step 2 專屬：細部修補工具】 -->
+        <div id="brushSettingsCard" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+              <i data-lucide="pen-tool" class="w-5 h-5 text-indigo-500"></i> 細部修補工具
+            </h2>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4">
+            
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <button type="button" id="brushViewBtn" class="px-2 py-2.5 rounded-lg font-bold transition-all bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20 flex items-center justify-center gap-1.5" title="切換後可直接拖曳畫布">
+                <i data-lucide="mouse-pointer" class="w-4 h-4"></i> 檢視
+              </button>
+              <button type="button" id="brushMagicBtn" class="px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 flex items-center justify-center gap-1.5" title="點擊圖案內部的背景，自動擴散去背">
+                <i data-lucide="wand-2" class="w-4 h-4 text-purple-500"></i> 魔術去背
+              </button>
+              <button type="button" id="brushProtectBtn" class="px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 flex items-center justify-center gap-1.5" title="畫抹之處將不被去背">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i> 保留(擦出)
+              </button>
+              <button type="button" id="brushRemoveBtn" class="px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 flex items-center justify-center gap-1.5" title="畫抹之處將被強制去背">
+                <i data-lucide="eraser" class="w-4 h-4 text-rose-500"></i> 強制去背
+              </button>
+            </div>
+
+            <div class="space-y-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+              <div class="flex justify-between items-center text-sm mb-1">
+                <label class="font-bold text-slate-500">筆刷大小</label>
+              </div>
+              <input type="range" id="brushSize" min="5" max="80" value="15" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700 text-sm">
+               <button type="button" id="undoBtn" class="px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 disabled:opacity-30 flex items-center justify-center gap-1" disabled>
+                <i data-lucide="undo" class="w-4 h-4"></i> 復原
+              </button>
+              <button type="button" id="redoBtn" class="px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 disabled:opacity-30 flex items-center justify-center gap-1" disabled>
+                <i data-lucide="redo" class="w-4 h-4"></i> 重做
+              </button>
+              <button type="button" id="resetPosBtn" class="col-span-2 px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 flex items-center justify-center gap-1.5" title="濾除雜點並移回畫布正中央">
+                <i data-lucide="focus" class="w-4 h-4 text-blue-500"></i> 圖案置中最大化
+              </button>
+              <button type="button" id="brushClearBtn" class="col-span-2 px-2 py-2.5 rounded-lg font-bold transition-all bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center gap-1.5">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 一鍵清除手動修補
+              </button>
+            </div>
+
+            <div class="pt-3">
+                <button type="button" id="applyProtectBtn" class="w-full px-4 py-3 rounded-lg font-bold transition-all bg-blue-500 hover:bg-blue-600 text-white shadow-sm flex items-center justify-center gap-1.5 text-sm">
+                  <i data-lucide="check-circle" class="w-5 h-5"></i> 套用修補結果
+                </button>
+            </div>
+          </div>
+          <hr class="border-slate-100 dark:border-slate-700 mt-7">
+        </div>
+
+        <!-- 【Step 3 專屬：尺寸與對齊設定】 -->
+        <div id="sizeSettingsCard" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+              <i data-lucide="ruler" class="w-5 h-5 text-emerald-500"></i> 輸出尺寸設定
+            </h2>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-bold text-slate-500 mb-2">上架規格類型</label>
+            <select id="categorySelect" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-lg p-2.5 outline-none cursor-pointer shadow-sm">
+              <option value="normal" selected>一般貼圖 (370x320)</option>
+              <option value="animated">動態貼圖 (320x270)</option>
+              <option value="big">大貼圖 (396x660)</option>
+              <option value="fullscreen">全螢幕貼圖 (370x320)</option>
+              <option value="effect">特效貼圖 (370x320)</option>
+            </select>
+          </div>
+
+          <div id="subOptionsContainer" class="grid grid-cols-1 gap-2"></div>
+
+          <div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl space-y-3 mt-2">
+             <div class="grid grid-cols-2 gap-4">
+               <div>
+                 <label class="block text-sm font-bold text-slate-500 mb-1">自訂寬度 (px)</label>
+                 <input type="number" id="customTargetW" value="370" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 font-bold outline-none">
+               </div>
+               <div>
+                 <label class="block text-sm font-bold text-slate-500 mb-1">自訂高度 (px)</label>
+                 <input type="number" id="customTargetH" value="320" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 font-bold outline-none">
+               </div>
+             </div>
+
+             <!-- 對齊基準點選擇 -->
+             <div class="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+               <label class="font-bold text-slate-500 text-sm mb-1 block">圖案對齊基準</label>
+               <div class="grid grid-cols-2 gap-2 text-sm">
+                 <button type="button" id="alignCenterBtn" class="px-2 py-2 rounded-lg font-bold transition-all bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20">絕對置中</button>
+                 <button type="button" id="alignBottomBtn" class="px-2 py-2 rounded-lg font-bold transition-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100">靠下貼齊</button>
+               </div>
+             </div>
+
+             <div class="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+               <div class="flex justify-between items-center text-sm mb-1">
+                 <label class="font-bold text-slate-500">邊緣安全留白</label>
+                 <span id="safeMarginVal" class="font-bold text-emerald-500">15 px</span>
+               </div>
+               <input type="range" id="safeMargin" min="0" max="50" value="15" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500">
+               <p class="text-xs text-slate-400">官方建議四周保留約 10px 透明空間防擠壓</p>
+             </div>
+          </div>
+          <hr class="border-slate-100 dark:border-slate-700 mt-7">
+        </div>
+
+        <div id="effectSettingsCard" class="space-y-4 pb-8 hidden">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+              <i data-lucide="sparkles" class="w-5 h-5 text-amber-500"></i> 特效設定
+            </h2>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input type="checkbox" id="enableBorder" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+          <div class="text-sm text-slate-500 font-bold mb-2">自動套用貼紙外白框</div>
+          <div id="borderSettings" class="grid grid-cols-2 gap-4 hidden bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div>
+              <label class="block text-sm font-bold text-slate-500 mb-1.5">外框顏色</label>
+              <input type="color" id="borderColorInput" value="#ffffff" class="w-full h-8 rounded border-0 cursor-pointer p-0">
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1.5 text-sm">
+                <label class="font-bold text-slate-500">粗細</label>
+                <span id="borderThicknessVal" class="font-bold text-emerald-500">8 px</span>
+              </div>
+              <input type="range" id="borderThickness" min="2" max="25" value="8" class="w-full h-1.5 bg-slate-200 rounded-lg accent-emerald-500 mt-1">
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ Step 3 專屬：匯出與打包設定 ★ -->
+        <div id="exportSettingsCard" class="space-y-4 hidden">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+              <i data-lucide="download-cloud" class="w-5 h-5 text-blue-500"></i> 匯出與打包設定
+            </h2>
+          </div>
+          
+          <div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl space-y-4">
+            
+            <label class="flex items-center gap-2 cursor-pointer mb-2">
+              <input type="checkbox" id="lineNamingToggle" class="rounded text-emerald-500 focus:ring-emerald-500 w-4 h-4 cursor-pointer">
+              <span class="text-sm font-bold text-slate-700 dark:text-slate-200">套用 LINE 官方命名規範</span>
+            </label>
+            
+            <div id="customNameInputs" class="space-y-3 transition-opacity duration-200">
+              <div>
+                <label class="block text-sm font-bold text-slate-500 mb-1">檔名前綴 (Prefix)</label>
+                <input type="text" id="filenamePrefix" placeholder="(可留空)" value="" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-bold focus:ring-1 focus:ring-emerald-500 outline-none transition placeholder-slate-400">
+              </div>
+              <div>
+                <label class="block text-sm font-bold text-slate-500 mb-1">檔名後綴 (Suffix)</label>
+                <input type="text" id="filenameSuffix" placeholder="(可留空)" value="" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-bold focus:ring-1 focus:ring-emerald-500 outline-none transition placeholder-slate-400">
+              </div>
+            </div>
+            <p class="text-xs text-slate-500">官方規範：第1張 main.png，第2張 tab.png，其餘 01.png, 02.png 依序遞增</p>
+          </div>
+          <hr class="border-slate-100 dark:border-slate-700 mt-7">
+        </div>
+
+      </div>
+      
+      <!-- 底部引導按鈕 -->
+      <div id="executeBtnWrapper" class="pt-4 pb-6 mt-auto hidden">
+         <button id="executeProcessBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+            <i data-lucide="arrow-right-circle" class="w-5 h-5"></i> 執行並進入 Step 2
+         </button>
+      </div>
+      <div id="step2To3BtnWrapper" class="pt-4 pb-6 mt-auto hidden">
+         <button id="step2To3Btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+            <i data-lucide="layout-template" class="w-5 h-5"></i> 前往 Step 3 預覽與打包
+         </button>
+      </div>
+      <div id="step3ExportBtnWrapper" class="pt-4 pb-6 mt-auto hidden">
+         <button id="downloadZipBtn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i data-lucide="archive" class="w-5 h-5"></i> 一鍵打包下載 ZIP
+         </button>
+      </div>
+
+    </aside>
+  </main>
+
+  <script>
+    // ======================================================================
+    // 1. 全域變數與狀態管理 (Global State)
+    // ======================================================================
+    const state = {
+      sources: [], activeSourceIdx: null, allBoxes: [], selectedStickerIdx: null, stickers: [],      
+      safeMargin: 15, isChromaEnabled: true, chromaColor: [255, 255, 255], tolerance: 30, exteriorOnlyChroma: true, autoDespeckle: true,
+      isBorderEnabled: false, borderThickness: 8, borderColor: '#ffffff', fillStickerInside: true, featherRadius: 1, shrinkRadius: 0, 
+      targetW: 370, targetH: 320, filenamePrefix: '', filenameSuffix: '', step3Bg: 'checkerboard', showSafeGuide: false,
+      alignMode: 'center', lineNamingMode: false,
+      brush: { mode: 'none', size: 15, isDrawing: false, lastPos: null },
+      dragState: { isDragging: false, globalBoxIdx: null, handle: null, startX: 0, startY: 0, origCropX: 0, origCropY: 0, origCropW: 0, origCropH: 0 },
+      smartSnap: true, view: { zoom: 1, panX: 0, panY: 0, isPanning: false, isSpaceDown: false, startX: 0, startY: 0 }, currentTab: 1,
+      scrollPos: { 1: 0, 2: 0, 3: 0 } 
+    };
+
+    let processingId = 0;
+    let draggedItemIdx = null;
+
+    const stickerCategories = {
+      normal: [{ name: '貼圖圖片', w: 370, h: 320, desc: '寬370 × 高320', margin: 15 }, { name: '主要圖片', w: 240, h: 240, desc: '寬240 × 高240', margin: 10 }, { name: '標籤圖片', w: 96, h: 74, desc: '寬96 × 高74', margin: 5 }],
+      animated: [{ name: '動態圖片', w: 320, h: 270, desc: '寬320 × 高270', margin: 10 }, { name: '主要圖片', w: 240, h: 240, desc: '寬240 × 高240', margin: 10 }, { name: '標籤圖片', w: 96, h: 74, desc: '寬96 × 高74', margin: 5 }],
+      big: [{ name: '大貼圖', w: 396, h: 660, desc: '寬396 × 高660', margin: 20 }, { name: '主要圖片', w: 240, h: 240, desc: '寬240 × 高240', margin: 10 }, { name: '標籤圖片', w: 96, h: 74, desc: '寬96 × 高74', margin: 5 }],
+      fullscreen: [{ name: '貼圖圖片', w: 370, h: 320, desc: '寬370 × 高320', margin: 15 }, { name: '全螢幕背景', w: 480, h: 480, desc: '寬480 × 高480', margin: 20 }, { name: '主要圖片', w: 240, h: 240, desc: '寬240 × 高240', margin: 10 }, { name: '標籤圖片', w: 96, h: 74, desc: '寬96 × 高74', margin: 5 }],
+      effect: [{ name: '貼圖圖片', w: 370, h: 320, desc: '寬370 × 高320', margin: 15 }, { name: '特效背景', w: 480, h: 480, desc: '寬480 × 高480', margin: 20 }, { name: '主要圖片', w: 240, h: 240, desc: '寬240 × 高240', margin: 10 }, { name: '標籤圖片', w: 96, h: 74, desc: '寬96 × 高74', margin: 5 }]
+    };
+
+    const els = {};
+
+    const ALL_PANELS = [
+      'step1Card', 'step1Workspace', 'fileInfoBanner', 'step2Area', 'step3Area', 
+      'gridSettingsArea', 'chromaSettingsCard', 'brushSettingsCard', 
+      'sizeSettingsCard', 'effectSettingsCard', 'exportSettingsCard',
+      'executeBtnWrapper', 'step2To3BtnWrapper', 'step3ExportBtnWrapper'
+    ];
+
+    // ======================================================================
+    // 2. 輔助函式與全域函數
+    // ======================================================================
+    function getEl(id) { 
+        return document.getElementById(id); 
+    }
+    
+    function yieldToMain() { 
+        return new Promise(r => setTimeout(r, 0)); 
+    }
+    
+    function hexToRgb(h) { 
+        const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h); 
+        return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : [255,255,255]; 
+    }
+    
+    function debounce(func, wait) { 
+        let timeout; 
+        return function(...args) { 
+            clearTimeout(timeout); 
+            timeout = setTimeout(() => func.apply(this, args), wait); 
+        }; 
+    }
+
+    const debouncedProcessAndRender = debounce(() => {
+      if(state.currentTab === 2) renderStep5Canvas();
+      processAllStickersAsync();
+    }, 150);
+
+    function updateCursorStyle() {
+       if (state.view.isPanning) {
+           if(els.step5Wrapper) els.step5Wrapper.style.cursor = 'grabbing';
+           if(els.step5Canvas) els.step5Canvas.style.cursor = 'grabbing';
+       } else if (state.view.isSpaceDown || state.brush.mode === 'none') {
+           if(els.step5Wrapper) els.step5Wrapper.style.cursor = 'grab';
+           if(els.step5Canvas) els.step5Canvas.style.cursor = 'grab';
+       } else {
+           if(els.step5Wrapper) els.step5Wrapper.style.cursor = 'none';
+           if(els.step5Canvas) els.step5Canvas.style.cursor = 'none';
+       }
+    }
+
+    function updateViewTransform() {
+      if(els.step5Layer) els.step5Layer.style.transform = `translate(${state.view.panX}px, ${state.view.panY}px) scale(${state.view.zoom})`;
+      const zBtn = getEl('zoomResetBtn');
+      if(zBtn) zBtn.textContent = Math.round(state.view.zoom * 100) + '%';
+    }
+
+    function getStickerFilename(idx) {
+        if (state.lineNamingMode) {
+            if (idx === 0) return 'main.png';
+            if (idx === 1) return 'tab.png';
+            return `${String(idx - 1).padStart(2, '0')}.png`;
+        }
+        const p = state.filenamePrefix.trim();
+        const s = state.filenameSuffix.trim();
+        return `${p ? p + '_' : ''}${idx + 1}${s ? '_' + s : ''}.png`;
+    }
+
+    function scrollToThumbSafe(containerId, thumbId) {
+        const container = getEl(containerId);
+        const thumb = getEl(thumbId);
+        if (container && thumb) {
+            const thumbOffset = thumb.offsetLeft;
+            const containerCenter = container.clientWidth / 2;
+            const thumbCenter = thumb.clientWidth / 2;
+            container.scrollTo({
+                left: thumbOffset - containerCenter + thumbCenter,
+                behavior: 'smooth'
+            });
+        }
+    }
+
+    // 將下載功能綁定到 Window 全域，以供 HTML 中的 onclick 呼叫
+    window.toggleExport = function(idx, isChecked) { 
+        if(state.allBoxes[idx]) {
+            state.allBoxes[idx].exportSelected = isChecked; 
+        }
+    };
+    
+    window.downloadSingle = function(idx) {
+        const sticker = state.stickers[idx]; 
+        if(!sticker) return;
+        const link = document.createElement('a'); 
+        link.download = getStickerFilename(idx); 
+        link.href = sticker.canvas.toDataURL(); 
+        link.click();
+    };
+
+    window.downloadAllAsZip = function() {
+      const exportList = state.stickers.map((s, idx) => ({ s, box: state.allBoxes[idx], idx })).filter(item => item.s && item.box.exportSelected !== false);
+      if (exportList.length === 0) return alert('請至少勾選一張圖片進行打包下載！');
+      
+      const btn = getEl('downloadZipBtn');
+      const ogText = btn.innerHTML; 
+      btn.innerHTML = `<i data-lucide="loader" class="w-5 h-5 animate-spin"></i> 打包中...`;
+      if(window.lucide) window.lucide.createIcons();
+      
+      const zip = new JSZip(); 
+      exportList.forEach((item) => { 
+          zip.file(getStickerFilename(item.idx), item.s.canvas.toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, ""), { base64: true }); 
+      });
+      
+      zip.generateAsync({ type: "blob" }).then((content) => { 
+        const link = document.createElement('a'); 
+        link.download = `${state.filenamePrefix || 'stickers'}_project_${state.targetW}x${state.targetH}.zip`; 
+        link.href = URL.createObjectURL(content); 
+        link.click(); 
+        btn.innerHTML = ogText; 
+        if(window.lucide) window.lucide.createIcons();
+      });
+    };
+
+    // ======================================================================
+    // 3. 生命週期初始化 (Initialization)
+    // ======================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      if(window.lucide) lucide.createIcons(); 
+      els.sourceCanvas = getEl('sourceCanvas'); 
+      els.step5Canvas = getEl('step5Canvas'); 
+      els.step5Wrapper = getEl('step5CanvasWrapper');
+      els.step5Layer = getEl('step5TransformLayer'); 
+      els.stickersSlider = getEl('stickersSlider'); 
+      els.step3Grid = getEl('step3Grid');
+      els.undoBtn = getEl('undoBtn'); 
+      els.redoBtn = getEl('redoBtn');
+      setupEventListeners(); 
+      renderSubOptions('normal'); 
+      switchTab(1);
+    });
+
+    // ======================================================================
+    // 4. UI 介面與排版控制
+    // ======================================================================
+    function switchTab(n) {
+      const mainSection = document.querySelector('section.overflow-y-auto');
+      
+      if (mainSection) {
+          state.scrollPos[state.currentTab] = mainSection.scrollTop;
+      }
+
+      state.currentTab = n;
+      ['tab1Btn', 'tab2Btn', 'tab3Btn'].forEach((id, i) => { 
+          const el = getEl(id); 
+          if(el) el.className = `flex-1 px-4 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${i+1===n ? 'bg-white text-emerald-600 shadow-sm dark:bg-slate-700 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`; 
+      });
+      
+      const views = { 
+        1: ['step1Card', 'gridSettingsArea', 'chromaSettingsCard', 'executeBtnWrapper'], 
+        2: ['step2Area', 'brushSettingsCard', 'step2To3BtnWrapper'], 
+        3: ['step3Area', 'sizeSettingsCard', 'effectSettingsCard', 'exportSettingsCard', 'step3ExportBtnWrapper'] 
+      };
+      
+      ALL_PANELS.forEach(id => { 
+          const el = getEl(id); 
+          if(el) { el.classList.add('hidden'); el.classList.remove('flex'); } 
+      });
+      
+      views[n].forEach(id => { 
+          const el = getEl(id); 
+          if (el && (state.sources.length > 0 || id === 'step1Card')) el.classList.remove('hidden'); 
+      });
+      
+      if(n===1 && state.sources.length > 0) { getEl('step1Workspace').classList.remove('hidden'); getEl('step1Workspace').classList.add('flex'); getEl('fileInfoBanner').classList.remove('hidden'); getEl('fileInfoBanner').classList.add('flex'); }
+      if(n===2 && state.sources.length > 0) getEl('step2Area').classList.add('flex');
+      if(n===3 && state.sources.length > 0) getEl('step3Area').classList.add('flex');
+      
+      if(n===1) setTimeout(() => drawSourceCanvas(), 50);
+      if(n===2) setTimeout(() => { 
+          renderStep5Canvas(); 
+          scrollToThumbSafe('stickersSlider', `sticker-thumb-${state.selectedStickerIdx}`);
+      }, 50);
+      if(n===3 && state.sources.length > 0) { 
+          if (getEl('step3Grid').children.length === 0) setTimeout(() => renderStep3(), 50); 
+          else updateStep3Preview(state.selectedStickerIdx !== null ? state.selectedStickerIdx : 0); 
+      }
+      
+      if (mainSection) {
+          setTimeout(() => {
+              mainSection.scrollTop = state.scrollPos[n] || 0;
+          }, 60);
+      }
+    }
+
+    function renderSubOptions(category) {
+       const container = getEl('subOptionsContainer'); 
+       if(!container) return; 
+       container.innerHTML = '';
+       const options = stickerCategories[category];
+       
+       options.forEach((opt, index) => {
+         const btn = document.createElement('button'); 
+         btn.type = 'button'; 
+         const isActive = index === 0; 
+         btn.className = `text-left px-3 py-2 rounded-lg border transition-all flex justify-between items-center ${isActive ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-300'}`;
+         btn.innerHTML = `<span class="text-sm font-bold ${isActive ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}">${opt.name}</span><span class="text-xs ${isActive ? 'text-emerald-600 dark:text-emerald-500' : 'text-slate-500'}">${opt.desc}</span>`;
+         btn.onclick = () => {
+            Array.from(container.children).forEach(c => { 
+                c.className = 'text-left px-3 py-2 rounded-lg border transition-all flex justify-between items-center bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-300'; 
+                c.querySelector('span:first-child').className = 'text-sm font-bold text-slate-700 dark:text-slate-200'; 
+                c.querySelector('span:last-child').className = 'text-xs text-slate-500'; 
+            });
+            btn.className = 'text-left px-3 py-2 rounded-lg border transition-all flex justify-between items-center bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 dark:bg-emerald-900/30'; 
+            btn.querySelector('span:first-child').className = 'text-sm font-bold text-emerald-700 dark:text-emerald-400'; 
+            btn.querySelector('span:last-child').className = 'text-xs text-emerald-600 dark:text-emerald-500';
+            applySizePreset(opt);
+         };
+         container.appendChild(btn); 
+         if (isActive) applySizePreset(opt);
+       });
+    }
+
+    function applySizePreset(opt) {
+      state.targetW = opt.w; 
+      state.targetH = opt.h; 
+      state.safeMargin = opt.margin;
+      getEl('customTargetW').value = opt.w; 
+      getEl('customTargetH').value = opt.h; 
+      getEl('safeMargin').value = opt.margin; 
+      getEl('safeMarginVal').textContent = `${opt.margin} px`;
+      updateCanvasRatio(); 
+      updateStep3Guide(); 
+      processAllStickersAsync();
+    }
+
+    function updateCanvasRatio() {
+      const s5 = getEl('step5Inner'); 
+      if(s5) s5.style.aspectRatio = `${state.targetW} / ${state.targetH}`; 
+      const s3 = getEl('step3Inner'); 
+      if(s3) s3.style.aspectRatio = `${state.targetW} / ${state.targetH}`;
+    }
+
+    function applyStep3Bg() {
+        document.querySelectorAll('.step3-preview-container, #step5CanvasWrapper, #step3MainPreviewWrapper').forEach(container => {
+            if (state.step3Bg === 'checkerboard') { 
+                container.classList.add('checkerboard-bg'); 
+                container.style.backgroundColor = ''; 
+                container.style.backgroundImage = ''; 
+            } else { 
+                container.classList.remove('checkerboard-bg'); 
+                container.style.backgroundColor = state.step3Bg; 
+                container.style.backgroundImage = 'none'; 
+            }
+        });
+    }
+    
+    function updateStep3Guide() {
+      // 僅更新 Step 3 的輔助線遮罩
+      const guide3 = getEl('step3SafeGuide');
+      if(guide3) {
+          const pt = (state.safeMargin / state.targetH) * 100; 
+          const pr = (state.safeMargin / state.targetW) * 100;
+          guide3.style.top = `${pt}%`; 
+          guide3.style.bottom = `${pt}%`; 
+          guide3.style.left = `${pr}%`; 
+          guide3.style.right = `${pr}%`;
+      }
+    }
+
+    // ======================================================================
+    // 5. 檔案與網格邏輯
+    // ======================================================================
+    async function appendMultipleFiles(files) {
+      const imgFiles = files.filter(f => f.type.startsWith('image/')); 
+      if (!imgFiles.length) return;
+      
+      processingId++; 
+      getEl('dropZone').classList.add('hidden');
+      ['fileInfoBanner', 'step1Workspace'].forEach(id => { getEl(id).classList.remove('hidden'); getEl(id).classList.add('flex'); });
+      ['gridSettingsArea', 'executeBtnWrapper'].forEach(id => getEl(id).classList.remove('hidden'));
+      
+      getEl('tab2Btn').disabled = false;
+      getEl('tab3Btn').disabled = false;
+
+      getEl('originalResolution').textContent = `載入中...`;
+
+      for (const file of imgFiles) {
+        const img = await new Promise(res => { 
+            const r = new FileReader(); 
+            r.onload = e => { const im = new Image(); im.onload = () => res(im); im.src = e.target.result; }; 
+            r.readAsDataURL(file); 
+        });
+        if (img) { 
+            state.sources.push({ 
+                id: Date.now(), img, name: file.name.replace(/\.[^/.]+$/, ""), 
+                layout: 'auto', rows: 1, cols: 1, marginX: 0, marginY: 0, gapX: 0, gapY: 0, 
+                vCuts: [], hCuts: [], boxes: [] 
+            }); 
+            recalculateSourceGrid(state.sources.length - 1); 
+        }
+      }
+      syncAllBoxes(); 
+      selectSourceImage(state.sources.length - 1); 
+      els.stickersSlider.innerHTML = '';
+      for(let i=0; i<state.allBoxes.length; i++) addStickerPlaceholder(i); 
+      processAllStickersAsync();
+    }
+
+    function clearWorkspace() {
+      processingId++; 
+      state.sources = []; 
+      state.allBoxes = []; 
+      state.activeSourceIdx = null;
+      state.selectedStickerIdx = null; 
+      state.stickers = [];
+      state.scrollPos = { 1: 0, 2: 0, 3: 0 }; 
+      
+      getEl('tab2Btn').disabled = true;
+      getEl('tab3Btn').disabled = true;
+      
+      getEl('dropZone').classList.remove('hidden');
+      ALL_PANELS.forEach(id => { const el = getEl(id); if(el) { el.classList.add('hidden'); el.classList.remove('flex'); } });
+      
+      getEl('sourceThumbnails').innerHTML = ''; 
+      els.stickersSlider.innerHTML = ''; 
+      els.step3Grid.innerHTML = ''; 
+      getEl('fileInput').value = ''; 
+      switchTab(1); 
+    }
+
+    function selectSourceImage(idx) {
+        state.activeSourceIdx = idx; 
+        updateGridUIFromSource(); 
+        renderSourceThumbnails();
+        const src = state.sources[idx];
+        if (src && src.boxes.length > 0) { 
+            const firstBoxOfSrc = src.boxes[0]; 
+            const globalIdx = state.allBoxes.indexOf(firstBoxOfSrc); 
+            if (globalIdx !== -1) { 
+                selectSticker(globalIdx, true); 
+            } else { 
+                drawSourceCanvas(); 
+            } 
+        } else { 
+            drawSourceCanvas(); 
+        }
+    }
+
+    function renderSourceThumbnails() {
+      const container = getEl('sourceThumbnails'); 
+      if(!container) return; 
+      container.innerHTML = '';
+      
+      state.sources.forEach((src, idx) => {
+        const btn = document.createElement('button'); 
+        btn.id = `source-thumb-${idx}`; 
+        const isSelected = state.activeSourceIdx === idx;
+        btn.className = `shrink-0 w-[60px] h-[60px] rounded-lg border-2 transition-all overflow-hidden relative checkerboard-bg flex items-center justify-center ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/30 shadow-md' : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'}`;
+        btn.innerHTML = `<img src="${src.img.src}" class="max-w-full max-h-full object-contain p-0.5"><div class="absolute top-0 left-0 bg-slate-800/60 text-white text-xs px-1.5 rounded-br-lg">${idx+1}</div>`;
+        btn.onclick = () => selectSourceImage(idx); 
+        container.appendChild(btn);
+      });
+    }
+
+    function updateGridUIFromSource() {
+       if (state.activeSourceIdx === null || !state.sources[state.activeSourceIdx]) return; 
+       const src = state.sources[state.activeSourceIdx];
+       
+       document.querySelectorAll('.layout-btn').forEach(b => b.className = "layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600");
+       const activeBtn = Array.from(document.querySelectorAll('.layout-btn')).find(b => b.dataset.layout === src.layout); 
+       if(activeBtn) activeBtn.className = "layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20";
+       
+       getEl('preUploadCustomInputs').classList.toggle('hidden', src.layout !== 'custom'); 
+       getEl('preRows').value = src.rows; 
+       getEl('preCols').value = src.cols;
+       getEl('gridMarginX').value = src.marginX; getEl('marginValX').textContent = `${src.marginX}px`; 
+       getEl('gridMarginY').value = src.marginY; getEl('marginValY').textContent = `${src.marginY}px`;
+       getEl('gridGapX').value = src.gapX; getEl('gapValX').textContent = `${src.gapX}px`; 
+       getEl('gridGapY').value = src.gapY; getEl('gapValY').textContent = `${src.gapY}px`;
+    }
+
+    function applyGridChange() {
+       if (state.activeSourceIdx === null) return; 
+       const src = state.sources[state.activeSourceIdx];
+       src.marginX = +getEl('gridMarginX').value; 
+       src.marginY = +getEl('gridMarginY').value; 
+       src.gapX = +getEl('gridGapX').value; 
+       src.gapY = +getEl('gridGapY').value;
+       
+       let activeLayout = 'auto'; 
+       document.querySelectorAll('.layout-btn').forEach(b => { if(b.classList.contains('bg-emerald-500')) activeLayout = b.dataset.layout; }); 
+       src.layout = activeLayout;
+       
+       if (src.layout === '1x1') { src.rows=1; src.cols=1; } 
+       if (state.layout === '1x1') { src.rows=1; src.cols=1; } 
+       if (state.layout === '1x1') { src.rows=1; src.cols=1; } 
+       else if (src.layout === '2x2') { src.rows=2; src.cols=2; } 
+       else if (src.layout === '3x3') { src.rows=3; src.cols=3; } 
+       else if (src.layout === 'custom') { src.rows=+getEl('preRows').value; src.cols=+getEl('preCols').value; }
+       
+       recalculateSourceGrid(state.activeSourceIdx); 
+       syncAllBoxes();
+       els.stickersSlider.innerHTML = ''; 
+       for(let i=0; i<state.allBoxes.length; i++) addStickerPlaceholder(i);
+       
+       if (state.selectedStickerIdx !== null && state.selectedStickerIdx >= state.allBoxes.length) state.selectedStickerIdx = 0;
+       if (state.allBoxes.length > 0) selectSticker(state.selectedStickerIdx || 0, false); 
+       processAllStickersAsync();
+    }
+
+    // ★ 恢復高速全區域掃描，保證絕對不會遺漏「飄浮文字」與「獨立特效」
+    function findTightBoundingBox(pixels, startX, startY, width, height, imgW) {
+        let minX = width, maxX = 0, minY = height, maxY = 0, found = false; 
+        
+        for (let y = 0; y < height; y++) { 
+            const absY = startY + y;
+            if (absY >= pixels.length / 4 / imgW) break; 
+            for (let x = 0; x < width; x++) {
+                const absX = startX + x;
+                const idx = (absY * imgW + absX) * 4;
+                
+                // 只要有實體顏色 (透明度 > 15)，就全部包起來
+                if (pixels[idx + 3] > 15) { 
+                    if (state.isChromaEnabled && (Math.abs(pixels[idx]-state.chromaColor[0])+Math.abs(pixels[idx+1]-state.chromaColor[1])+Math.abs(pixels[idx+2]-state.chromaColor[2])) <= state.tolerance) continue;
+                    
+                    found = true;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        
+        if (!found) { 
+            return { found: false, minX: startX, maxX: startX + width, minY: startY, maxY: startY + height };
+        }
+        return { found: true, minX: startX + minX, maxX: startX + maxX, minY: startY + minY, maxY: startY + maxY };
+    }
+
+    function recalculateSourceGrid(srcIdx) {
+      const src = state.sources[srcIdx], w = src.img.width, h = src.img.height; 
+      const tCv = document.createElement('canvas'); tCv.width = w; tCv.height = h; tCv.getContext('2d').drawImage(src.img, 0, 0); 
+      const pixels = tCv.getContext('2d').getImageData(0, 0, w, h).data; 
+      const vCuts = [0], hCuts = [0];
+
+      if (src.layout === 'auto') {
+          const rS = new Int32Array(h), cS = new Int32Array(w);
+          for(let i=0; i<w*h; i++) { 
+              if(pixels[i*4+3]>45 && (!state.isChromaEnabled || Math.abs(pixels[i*4]-state.chromaColor[0])+Math.abs(pixels[i*4+1]-state.chromaColor[1])+Math.abs(pixels[i*4+2]-state.chromaColor[2])>state.tolerance)) { 
+                  rS[Math.floor(i/w)]++; cS[i%w]++; 
+              } 
+          }
+          const sCS = new Int32Array(w), sRS = new Int32Array(h);
+          for(let x=0; x<w; x++) sCS[x] = cS[x] + (x>0?cS[x-1]:0) + (x<w-1?cS[x+1]:0); 
+          for(let y=0; y<h; y++) sRS[y] = rS[y] + (y>0?rS[y-1]:0) + (y<h-1?rS[y+1]:0);
+          
+          const mgX = Math.max(8, w*0.015), mgY = Math.max(8, h*0.015), thX = Math.max(2, h*0.005), thY = Math.max(2, w*0.005);
+          let inC = false, gS = 0; 
+          for(let x=0; x<w; x++) { if(sCS[x]>=thY) { if(!inC) { if(gS>0 && (x-gS)>=mgX) vCuts.push(Math.floor((gS+x)/2)); inC=true; } } else if(inC){ gS=x; inC=false; } } 
+          vCuts.push(w); src.cols = vCuts.length-1;
+          
+          inC = false; gS = 0; 
+          for(let y=0; y<h; y++) { if(sRS[y]>=thX) { if(!inC) { if(gS>0 && (y-gS)>=mgY) hCuts.push(Math.floor((gS+y)/2)); inC=true; } } else if(inC){ gS=y; inC=false; } } 
+          hCuts.push(h); src.rows = hCuts.length-1;
+      } else {
+          const cW = (w-src.marginX*2-src.gapX*(src.cols-1))/src.cols, cH = (h-src.marginY*2-src.gapY*(src.rows-1))/src.rows;
+          for(let c=1; c<src.cols; c++) vCuts.push(Math.floor(src.marginX+c*(cW+src.gapX)-src.gapX/2)); vCuts.push(w);
+          for(let r=1; r<src.rows; r++) hCuts.push(Math.floor(src.marginY+r*(cH+src.gapY)-src.gapY/2)); hCuts.push(h);
+      }
+
+      src.boxes = [];
+      for (let r=0; r<src.rows; r++) { 
+          for (let c=0; c<src.cols; c++) {
+              const bW = vCuts[c+1]-vCuts[c], bH = hCuts[r+1]-hCuts[r]; 
+              const bb = findTightBoundingBox(pixels, vCuts[c], hCuts[r], bW, bH, w);
+              let mX=vCuts[c], mX2=vCuts[c+1]-1, mY=hCuts[r], mY2=hCuts[r+1]-1; 
+              if(bb.found) { mX = bb.minX; mX2 = bb.maxX; mY = bb.minY; mY2 = bb.maxY; }
+              
+              src.boxes.push({ 
+                  id: r*src.cols+c, parentSrc: src, gridX: vCuts[c], gridY: hCuts[r], gridW: bW, gridH: bH, 
+                  cropX: Math.max(0, mX-4), cropY: Math.max(0, mY-4), cropW: Math.min(w-1, mX2+4)-Math.max(0, mX-4), cropH: Math.min(h-1, mY2+4)-Math.max(0, mY-4), 
+                  offsetX: 0, offsetY: 0, protectMaskCanvas: null, history: [], historyIndex: -1, exportSelected: true 
+              });
+          }
+      }
+    }
+
+    function syncAllBoxes() {
+       state.allBoxes = []; 
+       state.sources.forEach(src => { src.boxes.forEach(b => { state.allBoxes.push(b); }); }); 
+       getEl('originalResolution').textContent = `共 ${state.sources.length} 張原圖, ${state.allBoxes.length} 個貼圖`; 
+    }
+
+    function snapBoxToContent(box) {
+      if(!box||!box.parentSrc.img) return; 
+      const raw=box.parentSrc.img, w=raw.width, h=raw.height;
+      
+      // ★ 緊緻圍欄防呆機制：
+      // 只往外探測 12px，確保能把微小切到的邊緣拉回來，但這點距離「絕對」碰不到隔壁的貼圖。
+      const pad = 12;
+      const sX = Math.max(0, box.cropX - pad);
+      const sY = Math.max(0, box.cropY - pad);
+      const sW = Math.min(w - sX, box.cropW + pad * 2);
+      const sH = Math.min(h - sY, box.cropH + pad * 2);
+
+      const cv = document.createElement('canvas'); 
+      cv.width = sW; 
+      cv.height = sH; 
+      // 確保完美擷取局部區塊，大幅提升拖曳流暢度
+      cv.getContext('2d').drawImage(raw, sX, sY, sW, sH, 0, 0, sW, sH);
+      
+      const pixels = cv.getContext('2d').getImageData(0, 0, sW, sH).data;
+      
+      // 因為是局部區塊，內部坐標從 0, 0 開始掃描
+      const bb = findTightBoundingBox(pixels, 0, 0, sW, sH, sW);
+      
+      if(bb.found){ 
+          // 轉回全域畫布座標
+          box.cropX = Math.max(0, sX + bb.minX - 2); 
+          box.cropY = Math.max(0, sY + bb.minY - 2); 
+          box.cropW = Math.min(w - box.cropX, (bb.maxX - bb.minX) + 4); 
+          box.cropH = Math.min(h - box.cropY, (bb.maxY - bb.minY) + 4); 
+          box.history=[]; box.historyIndex=-1; updateUndoRedoUI(); 
+      }
+    }
+
+    // ======================================================================
+    // 6. 小圖與貼圖選擇 
+    // ======================================================================
+    function addStickerPlaceholder(idx) {
+      const btn=document.createElement('button'); 
+      btn.id=`sticker-thumb-${idx}`; 
+      btn.className="shrink-0 w-[70px] h-[70px] rounded-lg border-2 border-slate-200 bg-slate-50 overflow-hidden relative checkerboard-bg hover:border-emerald-400 flex items-center justify-center";
+      btn.innerHTML=`<i data-lucide="loader" class="w-4 h-4 animate-spin text-slate-400"></i><div class="absolute top-0 left-0 bg-slate-800/60 text-white text-xs px-1.5 rounded-br-lg">${idx+1}</div>`;
+      btn.onclick=()=>selectSticker(idx,false); 
+      els.stickersSlider.appendChild(btn); 
+      if(window.lucide) window.lucide.createIcons();
+    }
+    
+    function updateStickerThumb(idx) {
+      const btn = getEl(`sticker-thumb-${idx}`);
+      if(btn && state.stickers[idx]) {
+          btn.innerHTML=`<img src="${state.stickers[idx].canvas.toDataURL()}" class="max-w-full max-h-full object-contain p-0.5"><div class="absolute top-0 left-0 bg-slate-800/60 text-white text-xs px-1.5 rounded-br-lg">${idx+1}</div>`;
+      }
+      if(state.currentTab === 3 && idx === state.selectedStickerIdx) updateStep3Preview(idx);
+    }
+
+    function selectSticker(idx, autoScroll=true) {
+      if(state.selectedStickerIdx!==null) getEl(`sticker-thumb-${state.selectedStickerIdx}`)?.classList.remove('border-emerald-500','ring-2');
+      state.selectedStickerIdx = idx; 
+      const curr = getEl(`sticker-thumb-${idx}`); 
+      
+      if(curr){ 
+          curr.classList.add('border-emerald-500','ring-2'); 
+          if(autoScroll) {
+             scrollToThumbSafe('stickersSlider', `sticker-thumb-${idx}`);
+          }
+      }
+      
+      const b=state.allBoxes[idx]; 
+      if(b){ 
+          const sI=state.sources.indexOf(b.parentSrc); 
+          if(sI!==-1 && sI!==state.activeSourceIdx){ 
+              state.activeSourceIdx=sI; 
+              const src=state.sources[sI]; 
+              document.querySelectorAll('.layout-btn').forEach(bn=>bn.className="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200"); 
+              const aBtn=Array.from(document.querySelectorAll('.layout-btn')).find(bn=>bn.dataset.layout===src.layout); 
+              if(aBtn) aBtn.className="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20"; 
+              
+              getEl('preUploadCustomInputs').classList.toggle('hidden', src.layout!=='custom'); 
+              getEl('preRows').value=src.rows; getEl('preCols').value=src.cols; 
+              ['X','Y'].forEach(a=>{
+                  getEl(`gridMargin${a}`).value=src[`margin${a}`]; 
+                  getEl(`marginVal${a}`).textContent=`${src[`margin${a}`]}px`; 
+                  getEl(`gridGap${a}`).value=src[`gap${a}`]; 
+                  getEl(`gapVal${a}`).textContent=`${src[`gap${a}`]}px`;
+              }); 
+              
+              const c=getEl('sourceThumbnails'); c.innerHTML=''; 
+              state.sources.forEach((s,i)=>{
+                  const btn=document.createElement('button'); 
+                  btn.className=`shrink-0 w-[60px] h-[60px] rounded-lg border-2 transition-all overflow-hidden relative checkerboard-bg flex items-center justify-center ${i===sI?'border-blue-500 ring-2 ring-blue-500/30 shadow-md':'border-slate-200 hover:border-blue-400'}`; 
+                  btn.innerHTML=`<img src="${s.img.src}" class="max-w-full max-h-full object-contain p-0.5"><div class="absolute top-0 left-0 bg-slate-800/60 text-white text-xs px-1.5 rounded-br-lg">${i+1}</div>`; 
+                  btn.onclick=()=>selectSourceImage(i); 
+                  c.appendChild(btn);
+              }); 
+          } 
+      }
+      
+      state.view.zoom=1; state.view.panX=0; state.view.panY=0; 
+      updateViewTransform(); 
+      updateUndoRedoUI(); 
+      
+      if(state.currentTab===1) drawSourceCanvas(); 
+      if(state.currentTab===2) renderStep5Canvas();
+      if(state.currentTab===3) updateStep3Preview(idx);
+    }
+
+    // ======================================================================
+    // 7. 影像處理與渲染引擎 (Image Processing Core)
+    // ======================================================================
+    function drawSourceCanvas() {
+      if (state.activeSourceIdx === null || !state.sources[state.activeSourceIdx]) return;
+      const src=state.sources[state.activeSourceIdx];
+      const ctx=els.sourceCanvas.getContext('2d');
+      els.sourceCanvas.width=src.img.width; 
+      els.sourceCanvas.height=src.img.height; 
+      ctx.clearRect(0,0,src.img.width,src.img.height); 
+      ctx.drawImage(src.img,0,0);
+      
+      src.boxes.forEach(box => {
+        const isSel=box===state.allBoxes[state.selectedStickerIdx];
+        ctx.strokeStyle='rgba(148,163,184,0.15)'; ctx.lineWidth=1; 
+        ctx.strokeRect(box.gridX,box.gridY,box.gridW,box.gridH);
+        
+        ctx.strokeStyle=isSel?'#10b981':'#ef4444'; ctx.lineWidth=isSel?4:2; 
+        if(!isSel) ctx.setLineDash([5,4]); 
+        ctx.strokeRect(box.cropX,box.cropY,box.cropW,box.cropH); 
+        ctx.setLineDash([]);
+        
+        if (isSel) { 
+            ctx.fillStyle='#10b981'; ctx.strokeStyle='#fff'; ctx.lineWidth=2; 
+            [box.cropX, box.cropX+box.cropW/2, box.cropX+box.cropW].forEach((x, cx) => {
+                [box.cropY, box.cropY+box.cropH/2, box.cropY+box.cropH].forEach((y, cy) => {
+                    if(!(cx===1 && cy===1)){
+                        ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.fill(); ctx.stroke();
+                    }
+                });
+            }); 
+        }
+      });
+    }
+
+    function applyChromaKey(imgData, box) {
+      const w=imgData.width, h=imgData.height, d=imgData.data;
+      const tr=state.chromaColor[0], tg=state.chromaColor[1], tb=state.chromaColor[2], tol=state.tolerance;
+      const pmD=box.protectMaskCanvas?box.protectMaskCanvas.getContext('2d').getImageData(0,0,w,h).data:null; 
+      let visited=null;
+      
+      if (!state.isChromaEnabled) return { imageData: imgData, visited };
+      
+      if (state.exteriorOnlyChroma) {
+        visited=new Uint8Array(w*h); 
+        const q=[]; 
+        const isBg=(x,y)=>{
+            const i=(y*w+x)*4; 
+            if(pmD&&pmD[i+3]>0) return pmD[i]>128; 
+            if(d[i+3]===0) return true; 
+            return(Math.abs(d[i]-tr)+Math.abs(d[i+1]-tg)+Math.abs(d[i+2]-tb))<=tol*1.35;
+        };
+        for(let x=0;x<w;x++){ if(isBg(x,0)){q.push(x,0);visited[x]=1;} if(isBg(x,h-1)){q.push(x,h-1);visited[(h-1)*w+x]=1;} }
+        for(let y=0;y<h;y++){ if(isBg(0,y)){q.push(0,y);visited[y*w]=1;} if(isBg(w-1,y)){q.push(w-1,y);visited[y*w+w-1]=1;} }
+        
+        let hd=0; 
+        while(hd<q.length){ 
+            const cx=q[hd++], cy=q[hd++]; 
+            [cx-1,cy, cx+1,cy, cx,cy-1, cx,cy+1].forEach((nx,i,arr)=>{
+                if(i%2===0){
+                    const ny=arr[i+1]; 
+                    if(nx>=0&&nx<w&&ny>=0&&ny<h&&!visited[ny*w+nx]&&isBg(nx,ny)){
+                        visited[ny*w+nx]=1;q.push(nx,ny);
+                    }
+                }
+            }); 
+        }
+        for(let i=0;i<w*h;i++){ 
+            let fk=false, fd=false; 
+            if(pmD&&pmD[i*4+3]>0){if(pmD[i*4+1]>128)fk=true; else if(pmD[i*4]>128)fd=true;} 
+            if(fk) continue; 
+            if(fd||visited[i]){ 
+                if(fd)d[i*4+3]=0; 
+                else{
+                    const df=Math.abs(d[i*4]-tr)+Math.abs(d[i*4+1]-tg)+Math.abs(d[i*4+2]-tb); 
+                    if(df<=tol) d[i*4+3]=0; 
+                    else if(df<tol*1.4) d[i*4+3]=Math.floor(d[i*4+3]*((df-tol)/(tol*0.4)));
+                } 
+                if(d[i*4+3]===0){d[i*4]=255;d[i*4+1]=255;d[i*4+2]=255;} 
+            } 
+        }
+      } else {
+        for(let i=0;i<d.length;i+=4){ 
+            let fk=false, fd=false; 
+            if(pmD&&pmD[i+3]>0){if(pmD[i+1]>128)fk=true; else if(pmD[i]>128)fd=true;} 
+            if(fk) continue; 
+            if(fd){d[i+3]=0; d[i]=d[i+1]=d[i+2]=255; continue;} 
+            const df=Math.abs(d[i]-tr)+Math.abs(d[i+1]-tg)+Math.abs(d[i+2]-tb); 
+            if(df<=tol) d[i+3]=0; 
+            else if(df<tol*1.4) d[i+3]=Math.floor(d[i+3]*((df-tol)/(tol*0.4))); 
+            if(d[i+3]===0){d[i]=d[i+1]=d[i+2]=255;} 
+        }
+      }
+      return { imageData: imgData, visited };
+    }
+
+    function applyDespeckle(imgD) {
+      const w=imgD.width, h=imgD.height, d=imgD.data, vis=new Uint8Array(w*h);
+      for(let y=0; y<h; y++) {
+        for(let x=0; x<w; x++) {
+          const i=y*w+x;
+          if(d[i*4+3]>0 && !vis[i]) {
+            const q=[x,y], c=[i]; vis[i]=1; let hd=0;
+            while(hd<q.length) {
+              const cx=q[hd++], cy=q[hd++];
+              [cx-1,cy, cx+1,cy, cx,cy-1, cx,cy+1].forEach((nx, _idx, arr) => {
+                if(_idx%2===0) {
+                  const ny=arr[_idx+1];
+                  if(nx>=0 && nx<w && ny>=0 && ny<h) {
+                    const ni=ny*w+nx;
+                    if(!vis[ni] && d[ni*4+3]>0) { vis[ni]=1; q.push(nx,ny); c.push(ni); }
+                  }
+                }
+              });
+            }
+            if(c.length < 30) { c.forEach(ci => { d[ci*4+3]=0; d[ci*4]=255; d[ci*4+1]=255; d[ci*4+2]=255; }); }
+          }
+        }
+      }
+    }
+
+    function applyErosion(imgD, r) {
+      if(r<=0) return; const w=imgD.width, h=imgD.height, d=imgD.data, a1=new Uint8Array(w*h), a2=new Uint8Array(w*h);
+      for(let i=0;i<w*h;i++) a1[i]=d[i*4+3];
+      for(let k=0;k<r;k++){ 
+          for(let i=0;i<w*h;i++) a2[i]=a1[i]; 
+          for(let y=0;y<h;y++) {
+              for(let x=0;x<w;x++){ 
+                  const i=y*w+x; 
+                  if(a1[i]>0&&((x>0&&a1[i-1]===0)||(x<w-1&&a1[i+1]===0)||(y>0&&a1[i-w]===0)||(y<h-1&&a1[i+w]===0)||(x>0&&y>0&&a1[i-w-1]===0)||(x<w-1&&y>0&&a1[i-w+1]===0)||(x>0&&y<h-1&&a1[i+w-1]===0)||(x<w-1&&y<h-1&&a1[i+w+1]===0))) a2[i]=0; 
+              }
+          } 
+          for(let i=0;i<w*h;i++) a1[i]=a2[i]; 
+      }
+      for(let i=0;i<w*h;i++){ d[i*4+3]=a1[i]; if(a1[i]===0) { d[i*4]=255; d[i*4+1]=255; d[i*4+2]=255; } }
+    }
+
+    function applyFeathering(imgD, r) {
+      if(r<=0) return; const w=imgD.width, h=imgD.height, d=imgD.data, a=new Uint8Array(w*h), t=new Uint8Array(w*h);
+      for(let i=0;i<w*h;i++) a[i]=d[i*4+3];
+      for(let y=0;y<h;y++) for(let x=0;x<w;x++){ let s=0, c=0; for(let k=Math.max(0,x-r);k<=Math.min(w-1,x+r);k++){s+=a[y*w+k];c++;} t[y*w+x]=s/c; }
+      for(let x=0;x<w;x++) for(let y=0;y<h;y++){ let s=0, c=0; for(let k=Math.max(0,y-r);k<=Math.min(h-1,y+r);k++){s+=t[k*w+x];c++;} d[(y*w+x)*4+3]=s/c; }
+    }
+
+    function renderStep5Canvas() {
+      if(state.selectedStickerIdx===null||!state.allBoxes[state.selectedStickerIdx]) return;
+      const b=state.allBoxes[state.selectedStickerIdx], cv=els.step5Canvas, ctx=cv.getContext('2d');
+      cv.width=state.targetW; cv.height=state.targetH; ctx.clearRect(0,0,state.targetW,state.targetH);
+      const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH);
+      const fW=b.cropW*sc, fH=b.cropH*sc, pX=(state.targetW-fW)/2+b.offsetX;
+      
+      let pY = (state.targetH-fH)/2+b.offsetY; 
+      if (state.alignMode === 'bottom') { pY = state.targetH - state.safeMargin - fH + b.offsetY; }
+      
+      const tCv=document.createElement('canvas'); tCv.width=b.cropW; tCv.height=b.cropH; tCv.getContext('2d').drawImage(b.parentSrc.img, -b.cropX, -b.cropY);
+      const rD=tCv.getContext('2d').getImageData(0,0,b.cropW,b.cropH), dC=new ImageData(new Uint8ClampedArray(rD.data), b.cropW, b.cropH);
+      
+      const { imageData:pD } = applyChromaKey(dC, b); 
+      if (state.autoDespeckle) applyDespeckle(pD); 
+      applyErosion(pD, state.shrinkRadius); 
+      applyFeathering(pD, state.featherRadius);
+      
+      const vD=new ImageData(b.cropW, b.cropH);
+      for(let i=0;i<rD.data.length;i+=4){ let fA=pD.data[i+3]; if(fA<255){ const rr=(255-fA)/255; vD.data[i]=Math.min(255,rD.data[i]*(1-rr*0.6)+255*(rr*0.6)); vD.data[i+1]=rD.data[i+1]*(1-rr*0.6); vD.data[i+2]=rD.data[i+2]*(1-rr*0.6); vD.data[i+3]=255-(rr*105); } else { vD.data[i]=rD.data[i]; vD.data[i+1]=rD.data[i+1]; vD.data[i+2]=rD.data[i+2]; vD.data[i+3]=255; } }
+      const vCv=document.createElement('canvas'); vCv.width=b.cropW; vCv.height=b.cropH; vCv.getContext('2d').putImageData(vD,0,0);
+      ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high'; ctx.drawImage(vCv, pX, pY, fW, fH);
+
+      if (state.brush.mode!=='none' && state.brush.lastPos) {
+        const cX=state.brush.lastPos.x, cY=state.brush.lastPos.y, sX=cv.width/cv.getBoundingClientRect().width;
+        ctx.save(); ctx.beginPath();
+        if(state.brush.mode==='magic'){ ctx.strokeStyle='#a855f7'; ctx.lineWidth=2*sX; ctx.moveTo(cX-8*sX,cY); ctx.lineTo(cX+8*sX,cY); ctx.moveTo(cX,cY-8*sX); ctx.lineTo(cX,cY+8*sX); ctx.stroke(); ctx.beginPath(); ctx.arc(cX,cY,2*sX,0,Math.PI*2); ctx.fillStyle='#a855f7'; ctx.fill(); }
+        else { ctx.strokeStyle=state.brush.mode==='erase'?'#ef4444':'#10b981'; ctx.lineWidth=2*sX; ctx.arc(cX,cY,state.brush.size/2,0,Math.PI*2); ctx.stroke(); }
+        ctx.restore();
+      }
+    }
+
+    function generateSingleStickerCanvas(idx) {
+      const b=state.allBoxes[idx]; if(!b) return null;
+      const cv=document.createElement('canvas'); cv.width=state.targetW; cv.height=state.targetH; const ctx=cv.getContext('2d');
+      if(!b.parentSrc.img) return { id:idx, name: getStickerFilename(idx), canvas:cv };
+      const tCv=document.createElement('canvas'); tCv.width=b.cropW; tCv.height=b.cropH; tCv.getContext('2d').drawImage(b.parentSrc.img,-b.cropX,-b.cropY);
+      
+      const { imageData:pD, visited:vM } = applyChromaKey(tCv.getContext('2d').getImageData(0,0,b.cropW,b.cropH), b);
+      if (state.autoDespeckle) applyDespeckle(pD); 
+      applyErosion(pD, state.shrinkRadius); 
+      applyFeathering(pD, state.featherRadius);
+      
+      const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH);
+      const fW=b.cropW*sc, fH=b.cropH*sc, pX=(state.targetW-fW)/2+b.offsetX;
+      
+      let pY = (state.targetH-fH)/2+b.offsetY;
+      if (state.alignMode === 'bottom') { pY = state.targetH - state.safeMargin - fH + b.offsetY; }
+
+      const pCv=document.createElement('canvas'); pCv.width=b.cropW; pCv.height=b.cropH; pCv.getContext('2d').putImageData(pD,0,0);
+      ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+      
+      if(state.isBorderEnabled) {
+        const bCv=document.createElement('canvas'); bCv.width=b.cropW; bCv.height=b.cropH; const bCtx=bCv.getContext('2d'), bD=bCtx.createImageData(b.cropW,b.cropH), bRGB=hexToRgb(state.borderColor);
+        for(let i=0;i<b.cropW*b.cropH;i++){ let sld=state.exteriorOnlyChroma&&vM?vM[i]===0:pD.data[i*4+3]>20; if(sld){bD.data[i*4]=bRGB[0];bD.data[i*4+1]=bRGB[1];bD.data[i*4+2]=bRGB[2];bD.data[i*4+3]=255;}else bD.data[i*4+3]=0; }
+        bCtx.putImageData(bD,0,0); const sCv=document.createElement('canvas'); sCv.width=Math.ceil(fW); sCv.height=Math.ceil(fH); sCv.getContext('2d').imageSmoothingEnabled=true; sCv.getContext('2d').drawImage(bCv,0,0,fW,fH);
+        if(state.borderThickness>0){ ctx.save(); for(let d=1.5;d<=state.borderThickness;d+=1.5){ const nA=Math.max(8,Math.ceil(2*Math.PI*d/1.5)); for(let a=0;a<nA;a++) ctx.drawImage(sCv, pX+Math.cos(a/nA*2*Math.PI)*d, pY+Math.sin(a/nA*2*Math.PI)*d); } ctx.restore(); }
+      }
+      ctx.drawImage(pCv,pX,pY,fW,fH); return { id:idx, name: getStickerFilename(idx), canvas:cv };
+    }
+
+    async function processAllStickersAsync() {
+        if (!state.allBoxes.length) return; processingId++; const cId = processingId;
+        const dzBtn = getEl('downloadZipBtn'); if(dzBtn) dzBtn.disabled = true;
+        if(state.stickers.length !== state.allBoxes.length) state.stickers = new Array(state.allBoxes.length);
+
+        if (state.selectedStickerIdx !== null) { await yieldToMain(); if(cId!==processingId) return; processSingleSticker(state.selectedStickerIdx); }
+        for(let i=0; i<state.allBoxes.length; i++) {
+            if(cId!==processingId) return; if(i===state.selectedStickerIdx) continue;
+            if(i%2===0){ await yieldToMain(); if(cId!==processingId) return; getEl('originalResolution').textContent = `背景處理中 ${i}/${state.allBoxes.length}...`; }
+            processSingleSticker(i);
+        }
+        if (cId===processingId) { 
+            getEl('originalResolution').textContent = `處理完成 (共 ${state.allBoxes.length} 個貼圖)`; 
+            if(dzBtn) dzBtn.disabled = false; 
+            if(state.currentTab===3) renderStep3(); 
+        }
+    }
+
+    function processSingleSticker(idx) { 
+        if(idx===null||!state.allBoxes[idx]) return; 
+        state.stickers[idx]=generateSingleStickerCanvas(idx); 
+        updateStickerThumb(idx); 
+    }
+
+    // ======================================================================
+    // 8. Step 3 渲染預覽與拖曳排序邏輯
+    // ======================================================================
+    function updateStep3Preview(idx) {
+        state.selectedStickerIdx = idx;
+        const sticker = state.stickers[idx];
+        const mainImg = getEl('step3MainImage');
+        if(mainImg && sticker) mainImg.src = sticker.canvas.toDataURL();
+        
+        const sizeLabel = getEl('step3MainSizeLabel');
+        if(sizeLabel) sizeLabel.textContent = `${state.targetW} x ${state.targetH} px`;
+        
+        updateStep3Guide();
+
+        document.querySelectorAll('.step3-card').forEach((card, i) => {
+            if(i === idx) {
+                card.classList.add('border-blue-500', 'ring-2', 'ring-blue-500/30', 'shadow-md');
+                card.classList.remove('border-slate-200', 'dark:border-slate-700');
+            } else {
+                card.classList.remove('border-blue-500', 'ring-2', 'ring-blue-500/30', 'shadow-md');
+                card.classList.add('border-slate-200', 'dark:border-slate-700');
+            }
+        });
+    }
+
+    function renderStep3() {
+      const g = getEl('step3Grid'); g.innerHTML=''; let firstValidImg = null;
+      state.stickers.forEach((s, idx) => {
+          if(!s) return; const b=state.allBoxes[idx]; if(b.exportSelected===undefined) b.exportSelected=true;
+          
+          const dataUrl = s.canvas.toDataURL('image/png');
+          if(idx === state.selectedStickerIdx) firstValidImg = dataUrl; 
+          if(!firstValidImg) firstValidImg = dataUrl;
+          
+          const kb = Math.round((dataUrl.length * 0.75) / 1024);
+          const isOversize = kb > 1000;
+          const sizeHtml = isOversize ? `<span class="text-rose-500 font-bold" title="檔案超過 1MB，可能無法上架！"><i data-lucide="alert-triangle" class="w-3 h-3 inline pb-0.5"></i> ${kb}KB</span>` : `<span class="text-slate-400">${kb}KB</span>`;
+
+          const cd=document.createElement('div'); const isSelected = state.selectedStickerIdx === idx;
+          cd.className=`w-full bg-white dark:bg-slate-800 border-2 ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/30 shadow-md' : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'} rounded-xl p-2 flex flex-col gap-1.5 relative cursor-move transition-colors step3-card`; cd.draggable=true;
+          
+          cd.ondragstart=e=>{ draggedItemIdx=idx; setTimeout(()=>cd.classList.add('opacity-50'),0); };
+          cd.ondragend=()=>{ cd.classList.remove('opacity-50'); draggedItemIdx=null; document.querySelectorAll('.step3-card').forEach(c=>c.classList.remove('ring-2','ring-blue-500')); };
+          cd.ondragover=e=>{ e.preventDefault(); cd.classList.add('ring-2','ring-blue-500'); }; cd.ondragleave=()=>cd.classList.remove('ring-2','ring-blue-500');
+          cd.ondrop=e=>{ 
+             e.preventDefault(); 
+             if(draggedItemIdx!==null&&draggedItemIdx!==idx){ 
+                 const oS=state.allBoxes[state.selectedStickerIdx]; state.allBoxes.splice(idx,0,state.allBoxes.splice(draggedItemIdx,1)[0]); state.stickers.splice(idx,0,state.stickers.splice(draggedItemIdx,1)[0]); if(oS) state.selectedStickerIdx=state.allBoxes.indexOf(oS); 
+                 renderStep3(); getEl('stickersSlider').innerHTML=''; for(let i=0;i<state.allBoxes.length;i++) addStickerPlaceholder(i); state.stickers.forEach((_,i)=>updateStickerThumb(i)); if(state.selectedStickerIdx!==null) selectSticker(state.selectedStickerIdx,false); 
+             } 
+          };
+          cd.onclick = (e) => { 
+              if(e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return; 
+              updateStep3Preview(idx);
+          };
+
+          const fN = getStickerFilename(idx);
+          cd.innerHTML=`
+              <div class="flex justify-between items-center px-1">
+                  <span class="text-xs font-bold text-white bg-slate-400 dark:bg-slate-600 px-1.5 py-0.5 rounded">#${idx+1}</span>
+                  <div class="flex items-center gap-1.5">
+                     <span class="text-[10px] font-mono">${sizeHtml}</span>
+                     <input type="checkbox" class="w-4 h-4 text-emerald-500 rounded border-slate-300 cursor-pointer" ${b.exportSelected?'checked':''} onchange="window.toggleExport(${idx},this.checked)" title="匯出此圖">
+                  </div>
+              </div>
+              <div class="step3-preview-container w-full aspect-square checkerboard-bg rounded-lg border border-slate-200 flex items-center justify-center p-1 bg-white">
+                  <img src="${dataUrl}" class="max-w-full max-h-full object-contain pointer-events-none">
+              </div>
+              <div class="text-[10px] text-center ${state.lineNamingMode ? 'text-emerald-600 font-bold' : 'text-slate-500'} font-mono truncate w-full px-1" title="${fN}">${fN}</div>
+              <button onclick="window.downloadSingle(${idx})" class="w-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 dark:bg-slate-700 py-1 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 text-slate-600 mt-0.5"><i data-lucide="download" class="w-3 h-3"></i></button>
+          `;
+          g.appendChild(cd);
+      }); 
+
+      const mainImg = getEl('step3MainImage');
+      if(mainImg) {
+          if (state.selectedStickerIdx !== null && state.stickers[state.selectedStickerIdx]) mainImg.src = state.stickers[state.selectedStickerIdx].canvas.toDataURL();
+          else if (firstValidImg) mainImg.src = firstValidImg;
+          else mainImg.src = '';
+      }
+      const sizeLabel = getEl('step3MainSizeLabel'); if(sizeLabel) sizeLabel.textContent = `${state.targetW} x ${state.targetH} px`;
+      
+      updateStep3Guide();
+      applyStep3Bg(); if(window.lucide) window.lucide.createIcons();
+    }
+
+    // ======================================================================
+    // 9. 歷史紀錄與筆刷工具 (History & Brush)
+    // ======================================================================
+    function updateUndoRedoUI() {
+        if(state.selectedStickerIdx===null||!state.allBoxes[state.selectedStickerIdx]){ els.undoBtn.disabled=true; els.redoBtn.disabled=true; return; }
+        const b=state.allBoxes[state.selectedStickerIdx]; els.undoBtn.disabled=(!b.history||b.historyIndex<=0); els.redoBtn.disabled=(!b.history||b.historyIndex>=b.history.length-1);
+    }
+    function ensureInitialHistory(b) {
+        if(!b) return; if(!b.history) b.history=[]; if(b.history.length===0){ if(!b.protectMaskCanvas){ const tc=document.createElement('canvas'); tc.width=b.cropW; tc.height=b.cropH; b.history.push(tc.getContext('2d').getImageData(0,0,b.cropW,b.cropH)); } else b.history.push(b.protectMaskCanvas.getContext('2d').getImageData(0,0,b.cropW,b.cropH)); b.historyIndex=0; updateUndoRedoUI(); }
+    }
+    function commitHistory(b) {
+        if(!b||!b.protectMaskCanvas) return; if(b.historyIndex<b.history.length-1) b.history=b.history.slice(0,b.historyIndex+1);
+        b.history.push(b.protectMaskCanvas.getContext('2d').getImageData(0,0,b.cropW,b.cropH)); if(b.history.length>6) b.history.shift();
+        b.historyIndex=b.history.length-1; updateUndoRedoUI();
+    }
+    function restoreHistory(b) {
+        if(!b||!b.history||b.historyIndex<0) return; if(!b.protectMaskCanvas){ b.protectMaskCanvas=document.createElement('canvas'); b.protectMaskCanvas.width=b.cropW; b.protectMaskCanvas.height=b.cropH; }
+        b.protectMaskCanvas.getContext('2d').putImageData(b.history[b.historyIndex],0,0); renderStep5Canvas(); updateUndoRedoUI();
+    }
+    function undoHistory() { const b=state.allBoxes[state.selectedStickerIdx]; if(b&&b.history&&b.historyIndex>0){b.historyIndex--; restoreHistory(b);} }
+    function redoHistory() { const b=state.allBoxes[state.selectedStickerIdx]; if(b&&b.history&&b.historyIndex<b.history.length-1){b.historyIndex++; restoreHistory(b);} }
+
+    function applyBrushStroke(lX, lY) {
+      const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;
+      const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH), pX=(state.targetW-b.cropW*sc)/2+b.offsetX, pY=(state.targetH-b.cropH*sc)/2+b.offsetY;
+      const mX=(lX-pX)/sc, mY=(lY-pY)/sc; if(!b.protectMaskCanvas){ b.protectMaskCanvas=document.createElement('canvas'); b.protectMaskCanvas.width=b.cropW; b.protectMaskCanvas.height=b.cropH; }
+      const ctx=b.protectMaskCanvas.getContext('2d'), lmX=state.brush.lastPos?(state.brush.lastPos.x-pX)/sc:mX, lmY=state.brush.lastPos?(state.brush.lastPos.y-pY)/sc:mY;
+      ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=state.brush.size/sc;
+      if(state.brush.mode==='paint'){ ctx.globalCompositeOperation='source-over'; ctx.strokeStyle='#0f0'; ctx.fillStyle='#0f0'; } 
+      else if(state.brush.mode==='erase'){ ctx.globalCompositeOperation='source-over'; ctx.strokeStyle='#f00'; ctx.fillStyle='#f00'; } 
+      else if(state.brush.mode==='clear'){ ctx.globalCompositeOperation='destination-out'; }
+      ctx.beginPath(); ctx.moveTo(lmX,lmY); ctx.lineTo(mX,mY); ctx.stroke(); ctx.beginPath(); ctx.arc(mX,mY,(state.brush.size/sc)/2,0,Math.PI*2); ctx.fill(); ctx.restore(); renderStep5Canvas();
+    }
+
+    function applyMagicErase(lX, lY) {
+      const b=state.allBoxes[state.selectedStickerIdx]; if(!b) return;
+      const sc=Math.min((state.targetW-state.safeMargin*2)/b.cropW, (state.targetH-state.safeMargin*2)/b.cropH), pX=(state.targetW-b.cropW*sc)/2+b.offsetX, pY=(state.targetH-b.cropH*sc)/2+b.offsetY;
+      const mX=Math.floor((lX-pX)/sc), mY=Math.floor((lY-pY)/sc); if(mX<0||mX>=b.cropW||mY<0||mY>=b.cropH||!b.parentSrc.img) return;
+      const tCv=document.createElement('canvas'); tCv.width=b.cropW; tCv.height=b.cropH; tCv.getContext('2d').drawImage(b.parentSrc.img,-b.cropX,-b.cropY); const rD=tCv.getContext('2d').getImageData(0,0,b.cropW,b.cropH);
+      if(!b.protectMaskCanvas){ b.protectMaskCanvas=document.createElement('canvas'); b.protectMaskCanvas.width=b.cropW; b.protectMaskCanvas.height=b.cropH; }
+      const mCtx=b.protectMaskCanvas.getContext('2d'), mD=mCtx.getImageData(0,0,b.cropW,b.cropH), tI=(mY*b.cropW+mX)*4, tR=rD.data[tI], tG=rD.data[tI+1], tB=rD.data[tI+2]; if(rD.data[tI+3]===0) return;
+      const tol=state.tolerance, vis=new Uint8Array(b.cropW*b.cropH), q=[mX,mY]; vis[mY*b.cropW+mX]=1; let hd=0;
+      while(hd<q.length){ const cx=q[hd++], cy=q[hd++]; const idx=(cy*b.cropW+cx)*4; mD.data[idx]=255; mD.data[idx+3]=255; 
+         [cx-1,cy,cx+1,cy,cx,cy-1,cx,cy+1].forEach((nx,i,arr)=>{if(i%2===0){const ny=arr[i+1]; if(nx>=0&&nx<b.cropW&&ny>=0&&ny<b.cropH){const nI=ny*b.cropW+nx; if(!vis[nI]){vis[nI]=1; const rI=nI*4; if(Math.abs(rD.data[rI]-tR)+Math.abs(rD.data[rI+1]-tG)+Math.abs(rD.data[rI+2]-tB)<=tol && rD.data[rI+3]>0) q.push(nx,ny);}}}}); }
+      mCtx.putImageData(mD,0,0); commitHistory(b); renderStep5Canvas();
+    }
+
+    // ======================================================================
+    // 10. 事件綁定 (Event Listeners)
+    // ======================================================================
+    function setupEventListeners() {
+      // 分頁與引導按鈕
+      ['tab1Btn', 'tab2Btn', 'tab3Btn'].forEach((id, i) => getEl(id).addEventListener('click', () => switchTab(i+1)));
+      getEl('executeProcessBtn').addEventListener('click', () => { processAllStickersAsync(); switchTab(2); });
+      getEl('step2To3Btn').addEventListener('click', () => switchTab(3)); 
+      
+      // 對比背景切換
+      document.querySelectorAll('.step3-bg-btn').forEach(btn => btn.addEventListener('click', e => { 
+          document.querySelectorAll('.step3-bg-btn').forEach(b => { b.classList.remove('ring-2', 'ring-emerald-500', 'border-transparent'); b.classList.add('border-slate-300'); }); 
+          e.target.classList.add('ring-2', 'ring-emerald-500', 'border-transparent'); e.target.classList.remove('border-slate-300'); 
+          state.step3Bg = e.target.dataset.bg; applyStep3Bg(); 
+      }));
+      
+      // 輔助線開關
+      const toggleGuideBtn = getEl('toggleGuideBtn');
+      if(toggleGuideBtn) {
+          toggleGuideBtn.addEventListener('click', () => {
+              state.showSafeGuide = !state.showSafeGuide;
+              const guide = getEl('step3SafeGuide');
+              const text = getEl('guideBtnText');
+              if(guide) {
+                  if(state.showSafeGuide) { guide.classList.remove('hidden', 'opacity-0'); guide.classList.add('opacity-100'); }
+                  else { guide.classList.remove('opacity-100'); guide.classList.add('opacity-0'); setTimeout(()=>guide.classList.add('hidden'), 200); }
+              }
+              if(text) text.textContent = state.showSafeGuide ? '隱藏輔助留白區' : '顯示輔助留白區';
+              updateStep3Guide();
+          });
+      }
+
+      // 檔案拖曳與載入
+      getEl('dropZone').addEventListener('click', () => getEl('fileInput').click()); 
+      getEl('fileInput').addEventListener('change', e => { if(e.target.files.length) appendMultipleFiles(Array.from(e.target.files)); e.target.value=''; }); 
+      getEl('addMoreBtn').addEventListener('click', () => getEl('fileInput').click()); 
+      window.addEventListener('dragover', e => e.preventDefault()); 
+      window.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) appendMultipleFiles(Array.from(e.dataTransfer.files)); });
+      
+      // 工具列全域按鈕
+      getEl('themeToggle').addEventListener('click', () => { document.documentElement.classList.toggle('dark'); localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; });
+      getEl('clearAllBtn').addEventListener('click', clearWorkspace); 
+      getEl('resetGridSpacingBtn')?.addEventListener('click', () => { ['gridMarginX','gridMarginY','gridGapX','gridGapY'].forEach(id => { const el=getEl(id); el.value=0; el.dispatchEvent(new Event('input')); }); });
+      
+      // 網格設定
+      const smartSnapEl = getEl('smartSnapToggle'); if (smartSnapEl) smartSnapEl.addEventListener('change', e => state.smartSnap = e.target.checked);
+      document.querySelectorAll('.layout-btn').forEach(btn => btn.addEventListener('click', () => { if(state.activeSourceIdx===null) return; document.querySelectorAll('.layout-btn').forEach(b=>b.className="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"); btn.className="layout-btn px-1 py-2.5 rounded-lg font-bold flex flex-col items-center justify-center gap-1 bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20"; getEl('preUploadCustomInputs').classList.toggle('hidden', btn.dataset.layout!=='custom'); applyGridChange(); }));
+      ['preRows', 'preCols', 'gridMarginX', 'gridMarginY', 'gridGapX', 'gridGapY'].forEach(id => getEl(id)?.addEventListener('input', e => { if(state.activeSourceIdx===null) return; if(id.startsWith('grid')) getEl(id.replace('grid','').toLowerCase()+'Val'+(id.endsWith('X')?'X':'Y').replace('margin','margin').replace('gap','gap')).textContent=`${e.target.value}px`; applyGridChange(); }));
+      
+      // 尺寸與對齊設定
+      getEl('categorySelect').addEventListener('change', e => renderSubOptions(e.target.value));
+      ['customTargetW', 'customTargetH'].forEach(id => getEl(id).addEventListener('input', e => { state[id==='customTargetW'?'targetW':'targetH']=Math.max(10,parseInt(e.target.value)||370); updateCanvasRatio(); debouncedProcessAndRender(); }));
+      ['safeMargin', 'featherRadius', 'shrinkRadius', 'colorTolerance', 'borderThickness'].forEach(id => getEl(id).addEventListener('input', e => { state[id]=+e.target.value; getEl(id+'Val').textContent=`${state[id]}`+(id==='colorTolerance'?'':' px'); updateStep3Guide(); debouncedProcessAndRender(); }));
+      
+      getEl('alignCenterBtn')?.addEventListener('click', e => { state.alignMode = 'center'; e.target.className = "px-2 py-2 rounded-lg font-bold transition-all bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20"; getEl('alignBottomBtn').className = "px-2 py-2 rounded-lg font-bold transition-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"; debouncedProcessAndRender(); });
+      getEl('alignBottomBtn')?.addEventListener('click', e => { state.alignMode = 'bottom'; e.target.className = "px-2 py-2 rounded-lg font-bold transition-all bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20"; getEl('alignCenterBtn').className = "px-2 py-2 rounded-lg font-bold transition-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"; debouncedProcessAndRender(); });
+
+      // 去背與特效設定
+      getEl('enableChroma').addEventListener('change', e => { state.isChromaEnabled=e.target.checked; getEl('chromaSettings').style.opacity=state.isChromaEnabled?'1':'0.4'; if(state.currentTab===2) renderStep5Canvas(); processAllStickersAsync(); }); 
+      getEl('bgColorInput').addEventListener('input', e => { state.chromaColor=hexToRgb(e.target.value); if(state.currentTab===2) renderStep5Canvas(); processAllStickersAsync(); }); 
+      getEl('exteriorOnlyChroma').addEventListener('change', e => { state.exteriorOnlyChroma=e.target.checked; if(state.currentTab===2) renderStep5Canvas(); processAllStickersAsync(); }); 
+      getEl('enableBorder').addEventListener('change', e => { state.isBorderEnabled=e.target.checked; getEl('borderSettings').classList.toggle('hidden', !state.isBorderEnabled); if(state.currentTab===2) renderStep5Canvas(); processAllStickersAsync(); }); 
+      getEl('borderColorInput').addEventListener('input', e => { state.borderColor=e.target.value; if(state.currentTab===2) renderStep5Canvas(); processAllStickersAsync(); });
+      getEl('autoDespeckleToggle')?.addEventListener('change', e => { state.autoDespeckle = e.target.checked; debouncedProcessAndRender(); });
+
+      // 筆刷工具
+      const bBtns = [{id:'brushViewBtn', m:'none'},{id:'brushMagicBtn', m:'magic'},{id:'brushProtectBtn', m:'paint'},{id:'brushRemoveBtn', m:'erase'}];
+      bBtns.forEach(b => getEl(b.id).addEventListener('click', () => { state.brush.mode=b.m; bBtns.forEach(ob=>getEl(ob.id).className="px-2 py-2.5 rounded-lg font-bold transition-all bg-white border border-slate-200 flex items-center justify-center gap-1.5"); getEl(b.id).className="px-2 py-2.5 rounded-lg font-bold transition-all bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-500/20 flex items-center justify-center gap-1.5"; updateCursorStyle(); if(state.currentTab===2) renderStep5Canvas(); }));
+      getEl('brushSize').addEventListener('input', e => { state.brush.size=+e.target.value; if(state.currentTab===2) renderStep5Canvas(); });
+      getEl('brushClearBtn').addEventListener('click', () => { if(state.selectedStickerIdx!==null){ const b=state.allBoxes[state.selectedStickerIdx]; if(b){ ensureInitialHistory(b); if(b.protectMaskCanvas){ b.protectMaskCanvas.getContext('2d').clearRect(0,0,b.cropW,b.cropH); commitHistory(b); if(state.currentTab===2) renderStep5Canvas(); } } } });
+      
+      getEl('resetPosBtn').addEventListener('click', () => { 
+          if(state.selectedStickerIdx!==null){ 
+              const b=state.allBoxes[state.selectedStickerIdx]; 
+              if(b){ 
+                  b.offsetX=0; b.offsetY=0; state.view.zoom=1; state.view.panX=0; state.view.panY=0; updateViewTransform(); 
+                  snapBoxToContent(b);
+                  if(state.currentTab===2) renderStep5Canvas(); if(state.currentTab===1) drawSourceCanvas(); processSingleSticker(state.selectedStickerIdx); 
+              } 
+          } 
+      });
+
+      getEl('applyProtectBtn').addEventListener('click', function() { const og=this.innerHTML; this.innerHTML=`<i data-lucide="loader" class="w-5 h-5 animate-spin"></i> 處理中`; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{ processSingleSticker(state.selectedStickerIdx); this.innerHTML=og; if(window.lucide) window.lucide.createIcons(); }, 50); });
+      
+      // 輸出與打包設定
+      getEl('lineNamingToggle')?.addEventListener('change', e => { 
+          state.lineNamingMode = e.target.checked; 
+          getEl('customNameInputs').style.opacity = state.lineNamingMode ? '0.3' : '1';
+          getEl('customNameInputs').style.pointerEvents = state.lineNamingMode ? 'none' : 'auto';
+          if(state.currentTab === 3) renderStep3(); 
+      });
+      const dlBtn = getEl('downloadZipBtn'); if(dlBtn) dlBtn.addEventListener('click', window.downloadAllAsZip);
+      ['filenamePrefix', 'filenameSuffix'].forEach(id => getEl(id).addEventListener('input', e => { state[id] = e.target.value; if(state.currentTab===3) renderStep3(); }));
+
+      // ==========================================
+      // 畫布滑鼠操作 (拖曳與框選)
+      // ==========================================
+      els.sourceCanvas.addEventListener('mousedown', e => { 
+          if(state.activeSourceIdx===null || state.currentTab!==1) return; 
+          const s = state.sources[state.activeSourceIdx];
+          const r = els.sourceCanvas.getBoundingClientRect();
+          const mx = ((e.clientX - r.left) / r.width) * els.sourceCanvas.width;
+          const my = ((e.clientY - r.top) / r.height) * els.sourceCanvas.height; 
+          
+          let targetBoxIdx = null;
+          let h = null;
+
+          // 1. 優先判定：是否點擊到「當前正在編輯」的框線或綠色控制點
+          if (state.selectedStickerIdx !== null) {
+              const b = state.allBoxes[state.selectedStickerIdx];
+              if (b && b.parentSrc === s) {
+                  const px = [b.cropX, b.cropX + b.cropW / 2, b.cropX + b.cropW];
+                  const py = [b.cropY, b.cropY + b.cropH / 2, b.cropY + b.cropH];
+                  const hd = ['nw','n','ne','w','none','e','sw','s','se']; 
+                  
+                  for(let cy=0; cy<3; cy++) {
+                      for(let cx=0; cx<3; cx++) {
+                          if(!(cx===1 && cy===1) && Math.sqrt(Math.pow(mx-px[cx], 2) + Math.pow(my-py[cy], 2)) <= 25) {
+                              h = hd[cy*3 + cx];
+                          }
+                      }
+                  }
+                  if(!h && mx >= b.cropX && mx <= b.cropX + b.cropW && my >= b.cropY && my <= b.cropY + b.cropH) {
+                      h = 'move'; 
+                  }
+                  if (h) targetBoxIdx = state.selectedStickerIdx;
+              }
+          }
+
+          // 2. 次要判定：如果沒點到正在編輯的框，才去掃描是不是點到別的九宮格
+          if (!h) {
+              for (let b of s.boxes) { 
+                  if (mx >= b.gridX && mx <= b.gridX + b.gridW && my >= b.gridY && my <= b.gridY + b.gridH) { 
+                      const gI = state.allBoxes.indexOf(b); 
+                      if(gI !== -1) {
+                          selectSticker(gI, false); 
+                          targetBoxIdx = gI;
+                          if (mx >= b.cropX && mx <= b.cropX + b.cropW && my >= b.cropY && my <= b.cropY + b.cropH) h = 'move';
+                      }
+                      break; 
+                  } 
+              }
+          }
+
+          // 3. 執行拖曳狀態綁定
+          if (h && targetBoxIdx !== null) {
+              const b = state.allBoxes[targetBoxIdx];
+              state.dragState = {
+                  isDragging: true, globalBoxIdx: targetBoxIdx, handle: h, 
+                  startX: mx, startY: my, origCropX: b.cropX, origCropY: b.cropY, origCropW: b.cropW, origCropH: b.cropH
+              }; 
+          }
+      });
+      
+      window.addEventListener('mousemove', e => { 
+          if(!state.dragState.isDragging || state.dragState.globalBoxIdx===null || state.currentTab!==1) return; 
+          const r=els.sourceCanvas.getBoundingClientRect();
+          const mx=((e.clientX-r.left)/r.width)*els.sourceCanvas.width;
+          const my=((e.clientY-r.top)/r.height)*els.sourceCanvas.height;
+          const ds=state.dragState;
+          const b=state.allBoxes[ds.globalBoxIdx]; 
+          if(!b) return; 
+          
+          const dx=mx-ds.startX, dy=my-ds.startY; 
+          let nX=ds.origCropX, nY=ds.origCropY, nW=ds.origCropW, nH=ds.origCropH;
+          const mW=els.sourceCanvas.width, mH=els.sourceCanvas.height; 
+          
+          switch(ds.handle){ 
+              case'move': nX=Math.max(0,Math.min(mW-ds.origCropW,ds.origCropX+dx)); nY=Math.max(0,Math.min(mH-ds.origCropH,ds.origCropY+dy)); break; 
+              case'e': nW=Math.max(15,Math.min(mW-ds.origCropX,ds.origCropW+dx)); break; 
+              case'w': nX=Math.max(0,Math.min(ds.origCropX+ds.origCropW-15,ds.origCropX+dx)); nW=ds.origCropW-(nX-ds.origCropX); break; 
+              case's': nH=Math.max(15,Math.min(mH-ds.origCropY,ds.origCropH+dy)); break; 
+              case'n': nY=Math.max(0,Math.min(ds.origCropY+ds.origCropH-15,ds.origCropY+dy)); nH=ds.origCropH-(nY-ds.origCropY); break; 
+              case'se': nW=Math.max(15,Math.min(mW-ds.origCropX,ds.origCropW+dx)); nH=Math.max(15,Math.min(mH-ds.origCropY,ds.origCropH+dy)); break; 
+              case'sw': nX=Math.max(0,Math.min(ds.origCropX+ds.origCropW-15,ds.origCropX+dx)); nW=ds.origCropW-(nX-ds.origCropX); nH=Math.max(15,Math.min(mH-ds.origCropY,ds.origCropH+dy)); break; 
+              case'ne': nW=Math.max(15,Math.min(mW-ds.origCropX,ds.origCropW+dx)); nY=Math.max(0,Math.min(ds.origCropY+ds.origCropH-15,ds.origCropY+dy)); nH=ds.origCropH-(nY-ds.origCropY); break; 
+              case'nw': nX=Math.max(0,Math.min(ds.origCropX+ds.origCropW-15,ds.origCropX+dx)); nW=ds.origCropW-(nX-ds.origCropX); nY=Math.max(0,Math.min(ds.origCropY+ds.origCropH-15,ds.origCropY+dy)); nH=ds.origCropH-(nY-ds.origCropY); break; 
+          } 
+          b.cropX=Math.round(nX); b.cropY=Math.round(nY); b.cropW=Math.round(nW); b.cropH=Math.round(nH); 
+          
+          if(b.protectMaskCanvas){ 
+              const bk=document.createElement('canvas'); bk.width=b.protectMaskCanvas.width; bk.height=b.protectMaskCanvas.height; 
+              bk.getContext('2d').drawImage(b.protectMaskCanvas,0,0); 
+              b.protectMaskCanvas.width=b.cropW; b.protectMaskCanvas.height=b.cropH; 
+              b.protectMaskCanvas.getContext('2d').drawImage(bk,0,0,bk.width,bk.height,0,0,b.cropW,b.cropH); 
+          } 
+          b.history=[]; b.historyIndex=-1; updateUndoRedoUI(); drawSourceCanvas(); 
+      });
+      
+      // ★ 修正：鬆開滑鼠後不但執行磁吸，更必須呼叫 processSingleSticker 以同步更新縮圖畫面
+      window.addEventListener('mouseup', () => { 
+          if (state.dragState.isDragging && state.dragState.globalBoxIdx !== null && state.currentTab === 1) {
+              if (state.smartSnap) {
+                  snapBoxToContent(state.allBoxes[state.dragState.globalBoxIdx]);
+              }
+              drawSourceCanvas();
+              processSingleSticker(state.dragState.globalBoxIdx); // 同步更新 UI
+          }
+          state.dragState.isDragging = false; 
+      });
+      
+      // ==========================================
+      // 修補畫筆操作
+      // ==========================================
+      els.step5Wrapper.addEventListener('mousedown', e => { 
+          if(state.currentTab!==2) return; 
+          if(state.view.isSpaceDown||state.brush.mode==='none'){ state.view.isPanning=true; state.view.startX=e.clientX-state.view.panX; state.view.startY=e.clientY-state.view.panY; updateCursorStyle(); return; } 
+          if(state.selectedStickerIdx===null||!state.allBoxes[state.selectedStickerIdx]) return; 
+          const b=state.allBoxes[state.selectedStickerIdx], r=els.step5Canvas.getBoundingClientRect(), sX=els.step5Canvas.width/r.width, sY=els.step5Canvas.height/r.height; 
+          state.brush.lastPos={x:(e.clientX-r.left)*sX, y:(e.clientY-r.top)*sY}; ensureInitialHistory(b); 
+          if(state.brush.mode==='magic'){ return applyMagicErase(state.brush.lastPos.x, state.brush.lastPos.y); } 
+          state.brush.isDrawing=true; applyBrushStroke(state.brush.lastPos.x, state.brush.lastPos.y); 
+      });
+      els.step5Wrapper.addEventListener('mousemove', e => { 
+          if(state.currentTab!==2) return; 
+          if(state.view.isPanning){ state.view.panX=e.clientX-state.view.startX; state.view.panY=e.clientY-state.view.startY; return updateViewTransform(); } 
+          if(state.selectedStickerIdx===null) return; 
+          const r=els.step5Canvas.getBoundingClientRect(), sX=els.step5Canvas.width/r.width, sY=els.step5Canvas.height/r.height, mx=(e.clientX-r.left)*sX, my=(e.clientY-r.top)*sY; 
+          if(state.brush.isDrawing&&state.brush.mode!=='none'&&state.brush.mode!=='magic'){ applyBrushStroke(mx,my); state.brush.lastPos={x:mx,y:my}; } 
+          else { state.brush.lastPos={x:mx,y:my}; renderStep5Canvas(); } 
+      });
+      window.addEventListener('mouseup', () => { 
+          if(state.currentTab!==2) return; 
+          if(state.view.isPanning){ state.view.isPanning=false; updateCursorStyle(); } 
+          if(state.brush.isDrawing){ state.brush.isDrawing=false; const b=state.allBoxes[state.selectedStickerIdx]; if(b) commitHistory(b); } 
+      });
+      els.step5Wrapper.addEventListener('mouseleave', () => { state.brush.lastPos=null; if(!state.view.isPanning&&state.currentTab===2) renderStep5Canvas(); });
+      els.step5Wrapper.addEventListener('wheel', e => { 
+          if(state.currentTab!==2) return; e.preventDefault(); 
+          const d=e.deltaY>0?0.9:1.1; let nZ=Math.max(0.2,Math.min(state.view.zoom*d,5)); 
+          const r=els.step5Wrapper.getBoundingClientRect(), mx=e.clientX-r.left-r.width/2, my=e.clientY-r.top-r.height/2; 
+          state.view.panX=mx-(mx-state.view.panX)*(nZ/state.view.zoom); state.view.panY=my-(my-state.view.panY)*(nZ/state.view.zoom); 
+          state.view.zoom=nZ; updateViewTransform(); 
+      }, {passive:false});
+      
+      getEl('zoomInBtn').addEventListener('click', e => { e.stopPropagation(); state.view.zoom=Math.min(5,state.view.zoom*1.2); updateViewTransform(); });
+      getEl('zoomOutBtn').addEventListener('click', e => { e.stopPropagation(); state.view.zoom=Math.max(0.2,state.view.zoom/1.2); updateViewTransform(); });
+      getEl('zoomResetBtn').addEventListener('click', e => { e.stopPropagation(); state.view.zoom=1; state.view.panX=0; state.view.panY=0; updateViewTransform(); });
+
+      // 鍵盤快速鍵
+      window.addEventListener('keydown', e => { 
+          if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return; 
+          if(e.ctrlKey||e.metaKey){ 
+              if(e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redoHistory():undoHistory(); } 
+              else if(e.key.toLowerCase()==='y'){ e.preventDefault(); redoHistory(); } 
+          } 
+          if(e.code==='Space'&&state.currentTab===2){ 
+              if(!state.view.isSpaceDown){ state.view.isSpaceDown=true; updateCursorStyle(); getEl('spaceKeyHint')?.classList.add('bg-emerald-100','text-emerald-700'); } 
+              e.preventDefault(); 
+          } 
+          if(state.selectedStickerIdx!==null&&state.currentTab===1&&e.key.startsWith('Arrow')){ 
+              const b=state.allBoxes[state.selectedStickerIdx], s=e.shiftKey?5:1; let m=false; 
+              if(e.key==='ArrowUp'){b.offsetY-=s;m=true;} else if(e.key==='ArrowDown'){b.offsetY+=s;m=true;} else if(e.key==='ArrowLeft'){b.offsetX-=s;m=true;} else if(e.key==='ArrowRight'){b.offsetX+=s;m=true;} 
+              if(m){ e.preventDefault(); processSingleSticker(state.selectedStickerIdx); } 
+          } 
+      });
+      window.addEventListener('keyup', e => { if(e.code==='Space'&&state.currentTab===2){ state.view.isSpaceDown=false; state.view.isPanning=false; updateCursorStyle(); getEl('spaceKeyHint')?.classList.remove('bg-emerald-100','text-emerald-700'); } });
+      
+      els.undoBtn.addEventListener('click', undoHistory); 
+      els.redoBtn.addEventListener('click', redoHistory);
+    }
+  </script>
 </body>
 </html>
