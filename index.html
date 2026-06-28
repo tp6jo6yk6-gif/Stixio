@@ -3,23 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stixio - Create once. Adapt everywhere.</title>
-  <meta name="description" content="Stixio is a fast sticker production workspace for importing, detecting, refining, reviewing, packaging, and exporting sticker packs." />
+  <title>Stixio｜LINE 貼圖安全區域自動裁切與去背工具</title>
+  <meta name="description" content="Stixio 貼圖完整工作流程：多圖匯入、智能裁切、細部去背修補、預覽排序與 ZIP 匯出。" />
   <meta name="robots" content="noindex,nofollow" />
-  <meta name="application-name" content="Stixio" />
-  <meta name="apple-mobile-web-app-title" content="Stixio" />
-  <meta property="og:title" content="Stixio" />
-  <meta property="og:description" content="Create once. Adapt everywhere." />
-  <meta property="og:type" content="website" />
-  <link rel="manifest" href="/manifest.json" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#f8fafc;color:#0f172a;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.loading{text-align:center}.spinner{width:36px;height:36px;margin:0 auto 16px;border:4px solid #d1fae5;border-top-color:#10b981;border-radius:999px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+  </style>
 </head>
-<body class="bg-slate-950">
-  <div id="app"></div>
-  <script type="module">
-    import { initStixioApp } from './src/ui/stixio-app.js';
-    initStixioApp(document.getElementById('app'));
-  </script>
+<body>
+  <div class="loading" role="status" aria-live="polite">
+    <div class="spinner"></div>
+    <strong>正在恢復 Stixio 完整功能…</strong>
+  </div>
+  <script type="module" src="./src/legacy/restore.js"></script>
 </body>
 </html>
