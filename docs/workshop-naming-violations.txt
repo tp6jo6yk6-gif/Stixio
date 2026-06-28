@@ -1,0 +1,2 @@
+.github/workflows/fix-index-logic.yml: /\bLINE\b/
+.github/workflows/fix-index-logic.yml: /lineNamingMode/
