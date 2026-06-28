@@ -3,7 +3,7 @@
 
 import { getStickerFilename, createZipFileName } from '../file-naming.js';
 import { renderFrameToCanvas } from '../render.js';
-import { reviewFrames } from '../review/index.js';
+import { reviewFrames, ReviewIssueSeverity } from '../review/index.js';
 
 export const ExportFormats = Object.freeze({
   PNG: 'png',
@@ -94,10 +94,9 @@ export async function createZipExport({
 } = {}) {
   if (!JSZipClass) throw new Error('JSZip is not available.');
   if (!sourceImage) throw new Error('ZIP export requires sourceImage.');
+
   const prepared = prepareRenderedExport({ sourceImage, frames, renderOptions, exportOptions });
-  if (!prepared.review.ready && exportOptions.allowWarningsOnly === false) {
-    throw new Error('Export review contains blocking errors.');
-  }
+  assertExportReviewReady(prepared.review, exportOptions);
 
   const zip = new JSZipClass();
   prepared.items.forEach(item => {
@@ -122,6 +121,27 @@ export async function createZipExport({
     review: prepared.review,
     renderedMap: prepared.renderedMap
   };
+}
+
+export function assertExportReviewReady(review, exportOptions = {}) {
+  const blockingIssues = getBlockingExportIssues(review);
+  if (blockingIssues.length) {
+    const first = blockingIssues[0];
+    const message = first?.message || 'Export review contains blocking errors.';
+    throw new Error(`ZIP export blocked: ${message}`);
+  }
+
+  const warningIssues = (review?.issues || []).filter(issue => issue.severity === ReviewIssueSeverity.WARNING);
+  if (warningIssues.length && exportOptions.allowWarnings !== true) {
+    const first = warningIssues[0];
+    throw new Error(`ZIP export blocked by warning: ${first.message}`);
+  }
+
+  return true;
+}
+
+export function getBlockingExportIssues(review) {
+  return (review?.issues || []).filter(issue => issue.severity === ReviewIssueSeverity.ERROR);
 }
 
 export function canvasToPngDataUrl(canvas) {
