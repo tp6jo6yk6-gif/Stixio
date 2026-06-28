@@ -1,0 +1,36 @@
+name: Connect refine mask to Render Engine
+
+on:
+  push:
+    branches:
+      - stixio-line-integration
+    paths:
+      - 'scripts/patch-render-mask.mjs'
+      - '.github/workflows/patch-render-mask.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stixio-line-integration
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/patch-render-mask.mjs
+      - name: Verify integration
+        run: |
+          grep -q "protectMaskCanvas: frame.custom" src/core/render.js
+          grep -q "protectMaskCanvas: refineOptions.protectMaskCanvas" src/core/render.js
+      - name: Commit Render Engine change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/core/render.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Connect manual masks to shared Render Engine"
+          git push origin HEAD:stixio-line-integration
