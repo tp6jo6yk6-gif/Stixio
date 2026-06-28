@@ -1,0 +1,10 @@
+{
+  "name": "Stixio",
+  "short_name": "Stixio",
+  "description": "Create once. Adapt everywhere.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "icons": []
+}
