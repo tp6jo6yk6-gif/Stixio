@@ -12,11 +12,10 @@ if (!source.includes('const bootErrors = []')) {
 const oldExpect = `  await expect(page.locator('#fileInput')).toBeAttached();
   await expect(page.locator('#sourceCanvas')).toBeVisible();`;
 const newExpect = `  try {
-    await expect(page.locator('#fileInput')).toBeAttached({ timeout: 8000 });
+    await page.waitForSelector('#fileInput', { state: 'attached', timeout: 8000 });
     await expect(page.locator('#sourceCanvas')).toBeVisible();
   } catch (error) {
-    const body = await page.locator('body').innerHTML().catch(() => '<body unavailable>');
-    throw new Error(\`Workshop boot failed.\\n\${bootErrors.join('\\n') || 'No pageerror captured.'}\\nBODY: \${body.slice(0, 1500)}\\nORIGINAL: \${error.message}\`);
+    throw new Error(\`Workshop boot failed.\\n\${bootErrors.join('\\n') || 'No pageerror captured.'}\\nORIGINAL: \${error.message}\`);
   }`;
 
 if (!source.includes('Workshop boot failed.')) {
