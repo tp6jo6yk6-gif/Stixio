@@ -18,7 +18,10 @@
   <div id="app"></div>
   <script type="module">
     import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js';
-    initStixioWorkshop(document.getElementById('app'));
+    import { enhanceWorkshopUx } from './src/ui/workshop-ux.js';
+    const root = document.getElementById('app');
+    initStixioWorkshop(root);
+    enhanceWorkshopUx(root);
   </script>
 </body>
 </html>
