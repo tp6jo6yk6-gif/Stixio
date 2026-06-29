@@ -53,12 +53,17 @@ jobs:
           node-version: '22'
       - name: Apply Package full completion
         run: |
-          node --check scripts/apply-package-full-completion.mjs
-          if grep -q "PACKAGE_FULL_COMPLETION" src/ui/stixio-workshop-app-v2.js; then
-            echo "Package migration already applied."
-          else
-            node scripts/apply-package-full-completion.mjs
-          fi
+          set -o pipefail
+          {
+            echo '=== Migration syntax ==='
+            node --check scripts/apply-package-full-completion.mjs
+            echo '=== Migration apply ==='
+            if grep -q "PACKAGE_FULL_COMPLETION" src/ui/stixio-workshop-app-v2.js; then
+              echo "Package migration already applied."
+            else
+              node scripts/apply-package-full-completion.mjs
+            fi
+          } 2>&1 | tee package-migration.log
       - name: Install test dependencies
         run: npm install
       - name: Check syntax, unit tests and build
@@ -86,6 +91,7 @@ jobs:
         with:
           name: package-browser-report
           path: |
+            package-migration.log
             package-ci.log
             package-browser.log
             src/ui/stixio-workshop-app-v2.js
