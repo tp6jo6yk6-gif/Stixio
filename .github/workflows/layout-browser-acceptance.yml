@@ -8,7 +8,9 @@ on:
       - 'src/ui/stixio-workshop-app-v2.js'
       - 'scripts/apply-layout-browser-details.mjs'
       - 'scripts/apply-layout-e2e-diagnostics.mjs'
+      - 'scripts/apply-layout-e2e-harness.mjs'
       - 'tests/e2e/layout.spec.js'
+      - 'tests/fixtures/layout-harness.html'
       - 'playwright.layout.config.js'
       - 'package.json'
       - '.github/workflows/layout-browser-acceptance.yml'
@@ -20,7 +22,9 @@ on:
       - 'src/core/layout-recovery.js'
       - 'scripts/apply-layout-browser-details.mjs'
       - 'scripts/apply-layout-e2e-diagnostics.mjs'
+      - 'scripts/apply-layout-e2e-harness.mjs'
       - 'tests/e2e/layout.spec.js'
+      - 'tests/fixtures/layout-harness.html'
       - 'playwright.layout.config.js'
       - 'package.json'
       - '.github/workflows/layout-browser-acceptance.yml'
@@ -47,6 +51,7 @@ jobs:
           else
             node scripts/apply-layout-browser-details.mjs
           fi
+          node scripts/apply-layout-e2e-harness.mjs
           node scripts/apply-layout-e2e-diagnostics.mjs
       - name: Install test dependencies
         run: npm install
@@ -55,6 +60,7 @@ jobs:
           node --check src/ui/stixio-workshop-app-v2.js
           node --check scripts/apply-layout-browser-details.mjs
           node --check scripts/apply-layout-e2e-diagnostics.mjs
+          node --check scripts/apply-layout-e2e-harness.mjs
           npm test
           npm run build
       - name: Install Chromium
