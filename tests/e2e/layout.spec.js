@@ -13,7 +13,17 @@ function sheetSvg(colorA = '#ef4444', colorB = '#3b82f6') {
 }
 
 async function openWorkshop(page) {
-  await page.goto('/index.html');
+  await page.route('https://cdn.tailwindcss.com/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: ''
+  }));
+  await page.route('https://cdnjs.cloudflare.com/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: 'window.JSZip = class JSZip {}'
+  }));
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#fileInput')).toBeAttached();
   await expect(page.locator('#sourceCanvas')).toBeVisible();
 }
