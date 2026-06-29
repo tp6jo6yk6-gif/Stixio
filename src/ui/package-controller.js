@@ -81,7 +81,7 @@ export function createPackageController(adapter) {
         destinationKey: packagePlan.destinationKey
       }
     });
-    return { frames, packagePlan, entries, reviewReport, preflight, manifest, output };
+    return { frames, packagePlan, entries, reviewReport, preflight, manifest, output, settings: local.settings };
   }
 
   function renderWorkspaceShell() {
@@ -188,7 +188,7 @@ export function createPackageController(adapter) {
       ${metric(summary.totalSizeLabel, 'Estimated', 'bg-slate-100')}
       ${metric(summary.errors, 'Errors', summary.errors ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800')}
       ${metric(summary.warnings, 'Warnings', 'bg-amber-100 text-amber-800')}
-    </div><div class="mt-3 rounded-2xl ${snapshot.preflight.ready ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'} p-3 text-sm font-black">${snapshot.preflight.ready ? '✓ Package 已通過預檢，可產生 ZIP' : escapeHtml(snapshot.preflight.errors[0]?.message || 'Package 尚未就緒')}</div>`;
+    </div><div class="mt-3 rounded-2xl ${snapshot.preflight.ready ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'} p-3 text-sm font-black">${snapshot.preflight.ready ? '✓ Package 已通過預檢，可產生 ZIP' : `Package 尚未就緒 · ${escapeHtml(snapshot.preflight.errors[0]?.message || '請完成 Review 與角色設定')}` }</div>`;
   }
 
   function renderEntries(snapshot) {

@@ -64,6 +64,7 @@ import {
   ReviewSortModes,
   ReviewIssueSeverity
 } from '../core/index.js';
+import { createPackageController } from './package-controller.js';
 
 const HANDLE_SIZE = 14;
 const MIN_FRAME_SIZE = 8;
@@ -138,7 +139,8 @@ const state = {
   refineRenderTimer: null,
   reviewView: createRefineViewState({ minZoom: 0.25, maxZoom: 4 }),
   reviewPan: null,
-  reviewPointerActive: false
+  reviewPointerActive: false,
+  packageController: null
 };
 
 export function initStixioWorkshop(root = document.getElementById('app')) {
@@ -146,6 +148,7 @@ export function initStixioWorkshop(root = document.getElementById('app')) {
   document.title = `${BRAND.name} Workshop`;
   root.innerHTML = renderShell();
   bindStaticEvents(root);
+  mountPackageController(root);
   refresh();
 }
 
@@ -169,7 +172,7 @@ function renderShell() {
       </header>
       <main class="mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-5 py-6 xl:grid-cols-[360px_1fr_340px]">
         <aside class="space-y-4">${renderImportPanel()}${renderDetectionPanel()}${renderOutputPanel()}${renderRefinePanel()}</aside>
-        <section class="space-y-4">${renderSourceEditor()}${renderRefineEditor()}${renderReviewBoard()}</section>
+        <section class="space-y-4">${renderSourceEditor()}${renderRefineEditor()}${renderReviewBoard()}${renderPackageBoard()}</section>
         <aside class="space-y-4">${renderSourceListPanel()}${renderSelectedPanel()}${renderReviewPanel()}${renderPackagePanel()}</aside>
       </main>
     </div>`;
@@ -190,7 +193,7 @@ function renderDetectionPanel() {
 function renderOutputPanel() {
   const presets = getStickerPresets(state.settings.stickerCategory);
   const safeMax = Math.max(0, Math.floor(Math.min(state.settings.targetW, state.settings.targetH) / 2) - 1);
-  return `<section id="stage-package" class="scroll-mt-40 rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Rules Engine</p><h2 class="mt-1 text-xl font-black">輸出規格與對齊</h2><label class="mt-4 block text-xs font-black text-slate-500">貼圖類型<select id="categoryInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${Object.values(StickerCategories).map(value=>`<option value="${value}" ${value===state.settings.stickerCategory?'selected':''}>${categoryLabel(value)}</option>`).join('')}</select></label><label class="mt-3 block text-xs font-black text-slate-500">輸出用途<select id="presetRoleInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${presets.map(item=>`<option value="${item.role}" ${item.role===state.settings.outputRole?'selected':''}>${item.name} · ${item.width}×${item.height}</option>`).join('')}</select></label><div class="mt-3 grid grid-cols-2 gap-3">${numberInput('targetWInput','自訂寬度',state.settings.targetW,1,8192)}${numberInput('targetHInput','自訂高度',state.settings.targetH,1,8192)}</div>${rangeInput('safeMarginInput','安全留白',state.settings.safeMargin,0,safeMax)}<div class="mt-3"><div class="mb-2 text-xs font-black text-slate-500">圖案對齊</div><div class="grid grid-cols-2 gap-2">${alignButton('center','絕對置中')}${alignButton('bottom','靠下貼齊')}</div></div><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${state.settings.targetW} × ${state.settings.targetH}px · safe ${state.settings.safeMargin}px</div></section>`;
+  return `<section id="package-rules-panel" class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Rules Engine</p><h2 class="mt-1 text-xl font-black">輸出規格與對齊</h2><label class="mt-4 block text-xs font-black text-slate-500">貼圖類型<select id="categoryInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${Object.values(StickerCategories).map(value=>`<option value="${value}" ${value===state.settings.stickerCategory?'selected':''}>${categoryLabel(value)}</option>`).join('')}</select></label><label class="mt-3 block text-xs font-black text-slate-500">輸出用途<select id="presetRoleInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${presets.map(item=>`<option value="${item.role}" ${item.role===state.settings.outputRole?'selected':''}>${item.name} · ${item.width}×${item.height}</option>`).join('')}</select></label><div class="mt-3 grid grid-cols-2 gap-3">${numberInput('targetWInput','自訂寬度',state.settings.targetW,1,8192)}${numberInput('targetHInput','自訂高度',state.settings.targetH,1,8192)}</div>${rangeInput('safeMarginInput','安全留白',state.settings.safeMargin,0,safeMax)}<div class="mt-3"><div class="mb-2 text-xs font-black text-slate-500">圖案對齊</div><div class="grid grid-cols-2 gap-2">${alignButton('center','絕對置中')}${alignButton('bottom','靠下貼齊')}</div></div><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${state.settings.targetW} × ${state.settings.targetH}px · safe ${state.settings.safeMargin}px</div></section>`;
 }
 
 function renderRefinePanel() {
@@ -212,6 +215,10 @@ function renderReviewBoard() {
   return `<section id="stage-review" class="scroll-mt-40 rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><div class="flex flex-wrap items-start justify-between gap-3"><div><p class="text-[10px] font-black uppercase tracking-[.2em] text-sky-600">Review · Quality Gate</p><h2 class="text-xl font-black">大型預覽、品質檢查與核准</h2><p class="mt-1 text-xs font-bold text-slate-400">檢查透明度、碰邊、安全區、檔案大小與輸出命名，再核准進入 Package。</p></div><div class="flex flex-wrap gap-2"><button id="reviewPrevBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">← 上一張</button><button id="reviewNextBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">下一張 →</button><button id="toggleSafeGuideBtn" class="rounded-xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-700">${state.settings.showSafeGuide?'隱藏':'顯示'}安全區</button><button id="toggleContentBoundsBtn" class="rounded-xl bg-sky-50 px-3 py-2 text-xs font-black text-sky-700">${state.settings.showContentBounds?'隱藏':'顯示'}內容邊界</button></div></div><div class="mt-4 grid gap-3 rounded-3xl bg-slate-50 p-4 lg:grid-cols-[1fr_190px_190px]"><label class="text-xs font-black text-slate-500">搜尋<input id="reviewSearchInput" value="${escapeHtml(state.settings.reviewSearch)}" placeholder="名稱、來源或檔名" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950"></label><label class="text-xs font-black text-slate-500">篩選<select id="reviewFilterInput" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950"><option value="all">全部</option><option value="errors">錯誤</option><option value="warnings">警告</option><option value="pending">待核准</option><option value="approved">已核准</option><option value="selected">要匯出</option><option value="excluded">已排除</option></select></label><label class="text-xs font-black text-slate-500">排序<select id="reviewSortInput" class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950"><option value="frame-order">Frame 順序</option><option value="issue-severity">問題嚴重度</option><option value="file-size-desc">檔案大小</option><option value="name">名稱</option><option value="source">來源</option></select></label></div><div class="mt-3 flex flex-wrap items-center gap-2"><span class="text-[10px] font-black uppercase tracking-widest text-slate-400">預覽背景</span><button data-review-bg="checker" class="review-bg rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">透明格</button><button data-review-bg="white" class="review-bg rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">白</button><button data-review-bg="black" class="review-bg rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">黑</button><button data-review-bg="sticker-preview" class="review-bg rounded-xl bg-[#06c755] px-3 py-2 text-xs font-black text-white">貼圖綠</button><span class="ml-auto text-[10px] font-bold text-slate-400">滾輪縮放 · 拖曳平移 · ← → 切換</span><button id="reviewZoomOutBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">−</button><button id="reviewZoomResetBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">${Math.round(state.reviewView.zoom*100)}%</button><button id="reviewZoomInBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">＋</button></div><div class="mt-4 grid gap-4 lg:grid-cols-[1fr_250px]"><div id="reviewHeroStage" class="relative min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 touch-none" style="position:relative;min-height:360px;overflow:hidden;touch-action:none"><div id="reviewTransformLayer" class="pointer-events-none absolute left-1/2 top-1/2 h-full w-full origin-center" style="position:absolute;left:50%;top:50%;width:100%;height:100%;pointer-events:none;transform-origin:center;transform:${refineViewTransform(state.reviewView)}"><img id="reviewHeroImage" class="absolute inset-0 h-full w-full object-contain" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none"><div id="reviewSafeGuide" class="pointer-events-none absolute border-2 border-rose-500 bg-rose-500/10" style="position:absolute;pointer-events:none"></div><div id="reviewContentBounds" class="pointer-events-none absolute border-2 border-sky-400 bg-sky-400/10" style="position:absolute;pointer-events:none"></div></div></div><div id="reviewHeroMeta" class="rounded-3xl bg-slate-950 p-4 text-sm text-white"></div></div><div class="mt-4 flex flex-wrap gap-2"><button id="reviewSelectAllBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">篩選結果全選</button><button id="reviewSelectNoneBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">篩選結果排除</button><button id="reviewInvertBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">反選</button><button id="reviewApproveCleanBtn" class="rounded-xl bg-emerald-300 px-3 py-2 text-xs font-black text-slate-950">核准無錯誤項目</button><button id="reviewRevokeVisibleBtn" class="rounded-xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">撤銷篩選結果核准</button></div><div id="reviewProgressBar" class="mt-4"></div><div id="reviewGrid" class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-5"></div></section>`;
 }
 
+function renderPackageBoard() {
+  return '<div id="packageWorkspaceRoot"></div>';
+}
+
 function renderSourceListPanel() {
   return `<section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Layout · Document Engine</p><h2 class="mt-1 text-xl font-black">原圖清單</h2><div id="sourceList" class="mt-4 space-y-2"></div></section>`;
 }
@@ -226,7 +233,7 @@ function renderReviewPanel() {
 }
 
 function renderPackagePanel() {
-  return `<section class="rounded-[1.75rem] border border-slate-900/10 bg-slate-950 p-5 text-white shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-emerald-300">Package · Review Engine</p><label class="mt-4 block text-xs font-black text-slate-300">命名模式<select id="packageNamingModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="package" ${state.settings.packageNamingMode===PackageNamingModes.PACKAGE?'selected':''}>角色命名</option><option value="sequential" ${state.settings.packageNamingMode===PackageNamingModes.SEQUENTIAL?'selected':''}>自訂流水號</option></select></label><div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">前綴<input id="filenamePrefixInput" value="${escapeHtml(state.settings.filenamePrefix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">後綴<input id="filenameSuffixInput" value="${escapeHtml(state.settings.filenameSuffix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div><label class="mt-3 block text-xs font-black text-slate-300">檔案警告上限 KB<input id="maxFileSizeKBInput" type="number" min="1" max="102400" value="${state.settings.maxFileSizeKB}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><div id="reviewSummary" class="mt-4 space-y-2 text-sm"></div><button id="downloadSelectedBtn" class="mt-4 w-full rounded-2xl bg-emerald-300 py-3 text-sm font-black text-slate-950">下載選取 PNG</button></section>`;
+  return '<div id="packageSettingsRoot"></div>';
 }
 
 function layoutButton(mode,label){return `<button data-layout="${mode}" class="layout-btn rounded-xl px-2 py-2 text-xs font-black ${state.settings.layoutMode===mode?'bg-slate-950 text-white':'bg-slate-100'}">${label}</button>`;}
@@ -236,6 +243,7 @@ function rangeInput(id,label,value,min,max){return `<label class="mt-3 block tex
 
 // REFINE_FULL_COMPLETION
 // REVIEW_FULL_COMPLETION
+// PACKAGE_FULL_COMPLETION
 
 function bindStaticEvents(root) {
   const fileInput = root.querySelector('#fileInput');
@@ -309,12 +317,7 @@ function bindStaticEvents(root) {
   root.querySelector('#offsetYInput').addEventListener('change',event=>setSelectedOffset('offsetY',event.target.value));
   root.querySelectorAll('.nudge-btn').forEach(button=>button.addEventListener('click',()=>nudgeSelectedOffset(Number(button.dataset.nudgeX||0),Number(button.dataset.nudgeY||0))));
   root.querySelector('#resetOffsetBtn').addEventListener('click',resetSelectedOffset);
-  root.querySelector('#packageNamingModeInput').addEventListener('change',event=>{state.settings.packageNamingMode=event.target.value;refresh();});
-  root.querySelector('#filenamePrefixInput').addEventListener('input',event=>{state.settings.filenamePrefix=event.target.value;renderReviewGrid();renderLargeReview();});
-  root.querySelector('#filenameSuffixInput').addEventListener('input',event=>{state.settings.filenameSuffix=event.target.value;renderReviewGrid();renderLargeReview();});
-  root.querySelector('#maxFileSizeKBInput').addEventListener('change',event=>{state.settings.maxFileSizeKB=Math.max(1,Number(event.target.value)||DEFAULT_MAX_FILE_SIZE_KB);refresh();});
-  root.querySelector('#downloadSelectedBtn').addEventListener('click', downloadSelectedPng);
-  root.querySelector('#exportZipBtn').addEventListener('click', downloadZip);
+  root.querySelector('#exportZipBtn').addEventListener('click', () => state.packageController?.exportPackage());
   root.querySelector('#undoBtn').addEventListener('click', undoFrames);
   root.querySelector('#redoBtn').addEventListener('click', redoFrames);
   bindSourceCanvas(root.querySelector('#sourceCanvas'));
@@ -323,7 +326,49 @@ function bindStaticEvents(root) {
   bindGlobalEvents();
 }
 
-function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);refresh();}
+function mountPackageController(root){
+  if(!state.packageController){
+    state.packageController=createPackageController({
+      getExportFrames:exportFrames,
+      ensureRendered:frame=>renderFrame(frame),
+      getPackagePlan:list=>packagePlan(list),
+      getRenderedMap:()=>state.rendered,
+      getSourceNames:reviewSourceNames,
+      getReviewReport:()=>{runReview();return state.reviewReport;},
+      getOutputMetadata:()=>({documentId:state.document.id,documentName:state.document.name,targetW:state.settings.targetW,targetH:state.settings.targetH,category:state.settings.stickerCategory,safeMargin:state.settings.safeMargin}),
+      getNamingSettings:()=>({mode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,maxFileSizeKB:state.settings.maxFileSizeKB}),
+      updateNamingSetting:(key,value)=>{
+        if(key==='mode')state.settings.packageNamingMode=value;
+        if(key==='prefix')state.settings.filenamePrefix=value;
+        if(key==='suffix')state.settings.filenameSuffix=value;
+        if(key==='maxFileSizeKB')state.settings.maxFileSizeKB=Math.max(1,Number(value)||DEFAULT_MAX_FILE_SIZE_KB);
+        runReview();refresh();
+      },
+      assignRoles:mode=>{
+        const selected=exportFrames();
+        if(mode==='auto'&&selected.length<3){window.alert('至少需要 3 張輸出，才能分配 Main、Tab 與 Sticker。');return false;}
+        const selectedIds=new Set(selected.map(frame=>frame.id));
+        setFrames(frames().map(frame=>{
+          if(!selectedIds.has(frame.id))return frame;
+          const index=selected.findIndex(item=>item.id===frame.id);
+          const role=mode==='auto'?(index===0?AssetRoles.MAIN:index===1?AssetRoles.TAB:AssetRoles.STICKER):AssetRoles.STICKER;
+          return{...frame,state:{...frame.state,packageRole:role},custom:{...frame.custom,outputRole:role}};
+        }));
+        runReview();refresh();return true;
+      },
+      downloadSelectedPng,
+      openFrame:frameId=>{selectFrame(frameId);state.activeEditor='review';refresh();document.getElementById('stage-review')?.scrollIntoView({behavior:'smooth',block:'start'});},
+      getJSZipClass:()=>window.JSZip,
+      downloadBlob,
+      downloadDataUrl,
+      downloadText:(text,name,type)=>downloadBlob(new Blob([text],{type}),name),
+      alert:message=>window.alert(message)
+    });
+  }
+  state.packageController.mount(root);
+}
+
+function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);mountPackageController(root);refresh();}
 function bindRange(root,id,key,render=true,afterChange=null){root.querySelector(`#${id}`).addEventListener('input',event=>{state.settings[key]=Number(event.target.value);const label=root.querySelector(`#${id}Value`);if(label)label.textContent=event.target.value;if(render){clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}if(afterChange)afterChange();});}
 function updateRefineSetting(key,value){state.settings[key]=value;clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}
 function scheduleRenderAll(delay=90){if(state.refineRenderTimer)clearTimeout(state.refineRenderTimer);state.refineRenderTimer=setTimeout(()=>{state.refineRenderTimer=null;clearRenderCache();renderAll();refresh();},delay);}
@@ -441,7 +486,7 @@ function renderAll(){frames().forEach(frame=>renderFrame(frame));runReview();}
 function clearRenderCache(){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;invalidateAllReviewApprovals();}
 function runReview(){const selected=exportFrames(),plan=packagePlan(selected);const report=runFullReview(frames(),state.rendered,{targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,safeAreaMargin:state.settings.safeMargin,maxFileSizeKB:state.settings.maxFileSizeKB,packageItems:plan.items,requireTransparency:true});const packageIssues=[...plan.validation.errors,...plan.validation.warnings].map(issue=>({...issue,id:issue.id||createId('issue'),frameId:issue.frameId||null,metadata:issue.metadata||{}}));const issues=[...report.issues,...packageIssues];const summary={total:issues.length,errors:issues.filter(issue=>issue.severity==='error').length,warnings:issues.filter(issue=>issue.severity==='warning').length,info:issues.filter(issue=>issue.severity==='info').length};state.reviewReport={...report,issues,summary,ready:report.allSelectedApproved&&summary.errors===0&&plan.ready,canPackage:report.allSelectedApproved&&summary.errors===0&&plan.ready,packagePlan:plan};}
 
-function refresh(){drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();const status=document.getElementById('sourceStatus');if(status){const source=activeSource();status.textContent=source?`${source.name} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames`:'尚未匯入';}const undoBtn=document.getElementById('undoBtn');const redoBtn=document.getElementById('redoBtn');if(undoBtn)undoBtn.disabled=!canUndo(state.frameHistory);if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}
+function refresh(){drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();const status=document.getElementById('sourceStatus');if(status){const source=activeSource();status.textContent=source?`${source.name} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames`:'尚未匯入';}const undoBtn=document.getElementById('undoBtn');const redoBtn=document.getElementById('redoBtn');if(undoBtn)undoBtn.disabled=!canUndo(state.frameHistory);if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}
 
 function renderSourceList(){
   const holder=document.getElementById('sourceList');if(!holder)return;
@@ -669,7 +714,7 @@ function applyFrameListChange(label,nextFrames,nextSelected,sourceId=state.activ
 
 function downloadSelectedPng(){const frame=selectedFrame();if(frame)downloadFramePng(frame);}
 function downloadFramePng(frame){const canvas=renderFrame(frame,true),item=packageItemFor(frame);downloadDataUrl(canvas.toDataURL('image/png'),item?.fileName||'sticker.png');}
-async function downloadZip(){const selected=exportFrames();if(!selected.length)return alert('請至少勾選一張圖片。');runReview();if(!state.reviewReport?.canPackage){const firstError=state.reviewReport?.issues.find(issue=>issue.severity==='error');const pending=selected.find(frame=>!frame.state?.reviewApproved);if(firstError?.frameId)selectFrame(firstError.frameId);else if(pending)selectFrame(pending.id);refresh();return alert(firstError?reviewIssueText(firstError):'仍有尚未核准的輸出，請先完成 Review。');}try{const plan=packagePlan(selected);if(!plan.ready)throw new Error(plan.validation.errors[0]?.message||'Package 設定不完整。');const rules=currentRules();const result=await createMultiSourceZipExport({sourceImages:state.sources,frames:selected,renderOptions:getRenderOptions(),renderedMap:state.rendered,exportOptions:{prefix:state.settings.filenamePrefix||'stixio-workshop',allowWarnings:true,destinationKey:rules.key,packagePlan:plan,rules},JSZipClass:window.JSZip});state.rendered=result.renderedMap;downloadBlob(result.blob,result.fileName);refresh();}catch(error){alert(error.message||'ZIP 匯出失敗');}}
+async function downloadZip(){return state.packageController?.exportPackage();}
 function downloadDataUrl(url,name){const link=document.createElement('a');link.href=url;link.download=name;link.click();}
 function downloadBlob(blob,name){const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);}
 

@@ -56,8 +56,9 @@ export function sanitizePackageSegment(value, fallback = 'untitled', maxLength =
     .replace(/\s+/g, ' ')
     .replace(/\.{2,}/g, '.')
     .trim()
-    .replace(/^[. ]+|[. ]+$/g, '')
-    .replace(/-+/g, '-');
+    .replace(/^[. -]+|[. ]+$/g, '')
+    .replace(/-+/g, '-')
+    .replace(/\s*-\s*/g, '-');
   if (!result) result = fallback;
   const bareName = result.split('.')[0].toLowerCase();
   if (WINDOWS_RESERVED_NAMES.has(bareName)) result = `_${result}`;
@@ -77,7 +78,7 @@ export function sanitizePackageFileName(value, fallback = 'file.png') {
 }
 
 export function normalizeZipFileName(value, fallback = 'stixio-package') {
-  const raw = String(value || fallback).replace(/\.zip$/i, '');
+  const raw = String(value || fallback).trim().replace(/\.zip$/i, '');
   return `${sanitizePackageSegment(raw, fallback, 120)}.zip`;
 }
 
@@ -145,7 +146,7 @@ export function validatePackageEntries(entries = [], settings = {}) {
 
   entries.forEach(entry => {
     totalBytes += Math.max(0, Number(entry.bytes || 0));
-    if (!entry.canvas) errors.push(packageIssue('package.canvas.missing', `${entry.name || entry.path} has no rendered PNG.`, 'error', entry));
+    if (!entry.canvas && !entry.base64 && !entry.bytesData) errors.push(packageIssue('package.canvas.missing', `${entry.name || entry.path} has no rendered PNG.`, 'error', entry));
     if (!entry.approved) errors.push(packageIssue('package.review.pending', `${entry.name || entry.path} is not approved in Review.`, 'error', entry));
     if (!entry.path || entry.path.startsWith('/') || entry.path.includes('..') || entry.path.includes('\\')) {
       errors.push(packageIssue('package.path.unsafe', `Unsafe package path: ${entry.path || '(empty)'}.`, 'error', entry));
