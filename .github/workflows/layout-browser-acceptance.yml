@@ -17,9 +17,11 @@ on:
     paths:
       - 'src/ui/stixio-workshop-app-v2.js'
       - 'src/core/layout-recovery.js'
+      - 'scripts/apply-layout-browser-details.mjs'
       - 'tests/e2e/layout.spec.js'
       - 'playwright.layout.config.js'
       - 'package.json'
+      - '.github/workflows/layout-browser-acceptance.yml'
   workflow_dispatch:
 
 permissions:
@@ -65,11 +67,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       - name: Commit verified Layout details
-        if: github.event_name == 'push'
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/ui/stixio-workshop-app-v2.js
           git diff --cached --quiet && exit 0
           git commit -m "Finish Layout browser synchronization details"
-          git push origin HEAD:layout-browser-acceptance
+          git push origin HEAD:${HEAD_BRANCH}
