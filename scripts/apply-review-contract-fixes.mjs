@@ -32,5 +32,9 @@ source = source.replace(
   '<div class="text-xs font-black uppercase tracking-widest text-sky-300">Selected Review</div><div class="mt-2 break-all text-lg font-black">${escapeHtml(item?.fileName||frame.name)}</div>',
   '<div class="text-xs font-black uppercase tracking-widest text-sky-300">Selected Review</div><div class="mt-2 break-all text-lg font-black">${escapeHtml(frame.name)}</div><div class="mt-1 break-all font-mono text-xs text-slate-300">${escapeHtml(item?.fileName||"")}</div>'
 );
+source = source.replace(
+  "card.dataset.frameId=frame.id;card.dataset.reviewCard='true';",
+  "card.dataset.frameId=frame.id;card.dataset.sourceId=frame.sourceImageId;card.dataset.reviewCard='true';"
+);
 await writeFile(path, source, 'utf8');
-console.log('Review migration boundaries and viewport mechanics normalized.');
+console.log('Review migration boundaries, viewport mechanics and card identity normalized.');
