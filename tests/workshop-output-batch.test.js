@@ -3,18 +3,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   AssetRoles,
-  StickerCategories,
   PackageNamingModes,
-  getAvailableAssetRoles,
-  createSourceLayoutSettings,
-  applySourceLayoutSettings,
+  StickerCategories,
+  buildWorkshopPackagePlan,
   clampSafeMargin,
   createPlatformNeutralRules,
-  buildWorkshopPackagePlan,
-  getStickerPlacement
+  createSourceLayoutSettings,
+  getAvailableAssetRoles,
+  getStickerPackageFilename,
+  getStickerPlacement,
+  getStickerFilename
 } from '../src/core/index.js';
-
-const root = new URL('../', import.meta.url);
 
 test('fullscreen and effect categories expose their background roles', () => {
   assert.ok(getAvailableAssetRoles(StickerCategories.FULLSCREEN).includes(AssetRoles.BACKGROUND));
@@ -22,41 +21,47 @@ test('fullscreen and effect categories expose their background roles', () => {
 });
 
 test('source layout settings remain independent per source', () => {
-  const first = createSourceLayoutSettings({ layoutMode: '2x2', rows: 2, cols: 2, gapX: 8 });
-  const second = createSourceLayoutSettings({ layoutMode: '3x3', rows: 3, cols: 3, gapX: 20 });
-  const merged = applySourceLayoutSettings({ tolerance: 30 }, first);
-  assert.equal(merged.rows, 2);
-  assert.equal(first.gapX, 8);
-  assert.equal(second.gapX, 20);
+  const first = createSourceLayoutSettings({ rows: 2, cols: 3, marginX: 10 });
+  const second = createSourceLayoutSettings({ rows: 4, cols: 1, marginX: 20 });
+  assert.notDeepEqual(first, second);
+  assert.equal(first.rows, 2);
+  assert.equal(second.rows, 4);
 });
 
 test('safe margin is clamped to the custom canvas', () => {
-  assert.equal(clampSafeMargin(100, 100, 80), 39);
-  assert.equal(clampSafeMargin(12, 370, 320), 12);
+  assert.equal(clampSafeMargin(999, 100, 80), 39);
+  assert.equal(clampSafeMargin(-5, 100, 80), 0);
 });
 
 test('platform-neutral rules do not use a platform brand key', () => {
-  const rules = createPlatformNeutralRules({ category: StickerCategories.FULLSCREEN });
+  const rules = createPlatformNeutralRules({ targetW: 512, targetH: 512 });
   assert.equal(rules.key, 'workshop');
-  assert.ok(rules.package.roles.some(role => role.key === AssetRoles.BACKGROUND));
+  assert.equal(rules.canvas.width, 512);
+  assert.equal(rules.canvas.height, 512);
 });
 
 test('Workshop package plan supports special roles and package filenames', () => {
-  const plan = buildWorkshopPackagePlan([
-    { id: 's1', state: { packageRole: AssetRoles.STICKER } },
+  const frames = [
     { id: 'main', state: { packageRole: AssetRoles.MAIN } },
     { id: 'tab', state: { packageRole: AssetRoles.TAB } },
-    { id: 'bg', state: { packageRole: AssetRoles.BACKGROUND } }
-  ], { category: StickerCategories.FULLSCREEN, namingMode: PackageNamingModes.PACKAGE });
-  assert.deepEqual(plan.items.map(item => item.fileName), ['01.png', 'main.png', 'tab.png', 'background.png']);
+    { id: 'one', state: { packageRole: AssetRoles.STICKER } },
+    { id: 'two', state: { packageRole: AssetRoles.STICKER } }
+  ];
+  const plan = buildWorkshopPackagePlan(frames, { category: StickerCategories.NORMAL, namingMode: PackageNamingModes.PACKAGE });
   assert.equal(plan.ready, true);
+  assert.deepEqual(plan.items.map(item => item.fileName), ['main.png', 'tab.png', '01.png', '02.png']);
+  assert.equal(getStickerPackageFilename(0), 'main.png');
+  assert.equal(getStickerFilename(2, { packageNamingMode: true }), '01.png');
 });
 
 test('custom sequential naming applies prefix and suffix', () => {
-  const plan = buildWorkshopPackagePlan([
-    { id: 'a', state: { packageRole: AssetRoles.STICKER } },
-    { id: 'b', state: { packageRole: AssetRoles.STICKER } }
-  ], { namingMode: PackageNamingModes.SEQUENTIAL, prefix: 'pack', suffix: 'final' });
+  const frames = [{ id: 'a' }, { id: 'b' }];
+  const plan = buildWorkshopPackagePlan(frames, {
+    category: StickerCategories.NORMAL,
+    namingMode: PackageNamingModes.SEQUENTIAL,
+    prefix: 'pack',
+    suffix: 'final'
+  });
   assert.deepEqual(plan.items.map(item => item.fileName), ['pack_1_final.png', 'pack_2_final.png']);
 });
 
@@ -75,6 +80,8 @@ test('placement supports bottom alignment and output offsets', () => {
 
 test('Workshop UI includes all first-batch output controls', async () => {
   const app = await readFile(new URL('../src/ui/stixio-workshop-app-v2.js', import.meta.url), 'utf8');
+  const packageController = await readFile(new URL('../src/ui/package-controller.js', import.meta.url), 'utf8');
+  const ui = `${app}\n${packageController}`;
   for (const token of [
     'targetWInput',
     'safeMarginInput',
@@ -86,7 +93,7 @@ test('Workshop UI includes all first-batch output controls', async () => {
     'maxFileSizeKBInput',
     'sourceLayouts'
   ]) {
-    assert.match(app, new RegExp(token));
+    assert.match(ui, new RegExp(token));
   }
-  assert.doesNotMatch(app, /key\s*:\s*['"]line['"]/);
+  assert.doesNotMatch(ui, /key\s*:\s*['"]line['"]/);
 });
