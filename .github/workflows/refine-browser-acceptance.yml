@@ -9,6 +9,7 @@ on:
       - 'src/core/refine/**'
       - 'src/ui/stixio-workshop-app-v2.js'
       - 'scripts/apply-refine-full-completion.mjs'
+      - 'scripts/apply-refine-contract-fixes.mjs'
       - 'tests/refine-completion.test.js'
       - 'tests/e2e/refine.spec.js'
       - 'playwright.refine.config.js'
@@ -22,6 +23,7 @@ on:
       - 'src/core/refine/**'
       - 'src/ui/stixio-workshop-app-v2.js'
       - 'scripts/apply-refine-full-completion.mjs'
+      - 'scripts/apply-refine-contract-fixes.mjs'
       - 'tests/refine-completion.test.js'
       - 'tests/e2e/refine.spec.js'
       - 'playwright.refine.config.js'
@@ -46,11 +48,13 @@ jobs:
       - name: Apply Refine full completion
         run: |
           node --check scripts/apply-refine-full-completion.mjs
+          node --check scripts/apply-refine-contract-fixes.mjs
           if grep -q "REFINE_FULL_COMPLETION" src/ui/stixio-workshop-app-v2.js; then
             echo "Refine migration already applied."
           else
             node scripts/apply-refine-full-completion.mjs
           fi
+          node scripts/apply-refine-contract-fixes.mjs
       - name: Install test dependencies
         run: npm install
       - name: Check syntax, unit tests and build
