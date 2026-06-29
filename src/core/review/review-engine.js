@@ -6,7 +6,7 @@ export const ReviewBackgrounds = Object.freeze({
   WHITE: 'white',
   BLACK: 'black',
   CHECKER: 'checker',
-  Sticker: 'sticker-preview'
+  STICKER: 'sticker-preview'
 });
 
 export const ReviewIssueSeverity = Object.freeze({
