@@ -8,6 +8,13 @@ function replaceOnce(from, to, label) {
   source = source.replace(from, to);
 }
 
+if (source.includes('grid:{rows:layout.rows,cols:layout.cols')) {
+  source = source.replace(
+    'grid:{rows:layout.rows,cols:layout.cols',
+    'grid:{layout:layout.layoutMode,rows:layout.rows,cols:layout.cols'
+  );
+}
+
 replaceOnce(
   "    row.className=`grid grid-cols-[1fr_auto] gap-2 rounded-2xl border p-2 ${source.id===state.activeSourceId?'border-emerald-400 bg-emerald-50':'border-slate-200'}`;",
   "    row.className=`grid grid-cols-[1fr_auto] gap-2 rounded-2xl border p-2 ${source.id===state.activeSourceId?'border-emerald-400 bg-emerald-50':'border-slate-200'}`;\n    row.dataset.sourceId=source.id;\n    row.dataset.sourceActive=String(source.id===state.activeSourceId);",
