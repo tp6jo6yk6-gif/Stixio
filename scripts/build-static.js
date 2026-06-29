@@ -7,6 +7,7 @@ await mkdir(dist, { recursive: true });
 
 const entries = [
   'index.html',
+  'legacy-preview.html',
   'local-preview.html',
   'local-preview.js',
   'next.html',
