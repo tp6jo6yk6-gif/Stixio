@@ -19,9 +19,11 @@
   <script type="module">
     import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js';
     import { enhanceWorkshopUx } from './src/ui/workshop-ux.js';
+    import { bridgeWorkshopLegacyControls } from './src/ui/workshop-ux-bridge.js';
     const root = document.getElementById('app');
     initStixioWorkshop(root);
     enhanceWorkshopUx(root);
+    bridgeWorkshopLegacyControls(root);
   </script>
 </body>
 </html>
