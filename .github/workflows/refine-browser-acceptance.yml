@@ -55,22 +55,34 @@ jobs:
         run: npm install
       - name: Check syntax, unit tests and build
         run: |
-          node --check src/ui/stixio-workshop-app-v2.js
-          node --check src/core/image-processing.js
-          node --check src/core/refine/mask-engine.js
-          node --check src/core/refine/refine-view.js
-          npm test
-          npm run build
+          set -o pipefail
+          {
+            echo '=== UI syntax ==='
+            node --check src/ui/stixio-workshop-app-v2.js
+            echo '=== Core syntax ==='
+            node --check src/core/image-processing.js
+            node --check src/core/refine/mask-engine.js
+            node --check src/core/refine/refine-view.js
+            echo '=== Unit tests ==='
+            npm test
+            echo '=== Build ==='
+            npm run build
+          } 2>&1 | tee refine-ci.log
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run Refine browser acceptance
-        run: npm run test:e2e:refine
+        run: |
+          set -o pipefail
+          npm run test:e2e:refine 2>&1 | tee refine-browser.log
       - name: Upload Refine browser report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: refine-browser-report
           path: |
+            refine-ci.log
+            refine-browser.log
+            src/ui/stixio-workshop-app-v2.js
             playwright-report/refine
             test-results
           if-no-files-found: ignore
