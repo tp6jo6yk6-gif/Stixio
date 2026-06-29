@@ -63,7 +63,7 @@ test('pixel analysis reports directional margins and transparency ratios', () =>
   const rendered = fakeRendered(10, 8, (x, y) => x >= 2 && x <= 7 && y >= 1 && y <= 5 ? 255 : 0);
   const analysis = analyzeRenderedCanvas(rendered);
   assert.equal(analysis.supported, true);
-  assert.deepEqual(analysis.bounds.margins, { top: 1, right: 2, bottom: 2, left: 2 });
+  assert.deepEqual(analysis.edgeMargins, { top: 1, right: 2, bottom: 2, left: 2 });
   assert.equal(analysis.alphaCount, 30);
   assert.equal(analysis.nonTransparentRatio, 30 / 80);
   assert.equal(analysis.transparentRatio, 50 / 80);
