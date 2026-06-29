@@ -38,7 +38,7 @@ export function reviewRenderedPixels(rendered, frame, frameName = frame?.name ||
   }
 
   const safeAreaMargin = Math.max(0, Number(options.safeAreaMargin ?? options.safeEdgeMargin ?? 2) || 0);
-  if (analysis.bounds && Object.values(analysis.bounds.margins).some(margin => margin < safeAreaMargin)) {
+  if (analysis.edgeMargins && Object.values(analysis.edgeMargins).some(margin => margin < safeAreaMargin)) {
     issues.push(createIssue({
       code: 'render.safeMargin',
       message: `${frameName} enters the ${safeAreaMargin}px safe-area margin.`,
@@ -100,13 +100,15 @@ export function analyzeRenderedCanvas(rendered, options = {}) {
       y: minY,
       width: maxX - minX + 1,
       height: maxY - minY + 1,
-      margin: Math.min(minX, minY, width - 1 - maxX, height - 1 - maxY),
-      margins: {
-        top: minY,
-        right: width - 1 - maxX,
-        bottom: height - 1 - maxY,
-        left: minX
-      }
+      margin: Math.min(minX, minY, width - 1 - maxX, height - 1 - maxY)
+    }
+    : null;
+  const edgeMargins = alphaCount > 0
+    ? {
+      top: minY,
+      right: width - 1 - maxX,
+      bottom: height - 1 - maxY,
+      left: minX
     }
     : null;
 
@@ -122,7 +124,8 @@ export function analyzeRenderedCanvas(rendered, options = {}) {
     translucentRatio: total ? translucentCount / total : 0,
     edgeAlphaCount,
     edgeAlphaRatio: alphaCount ? edgeAlphaCount / alphaCount : 0,
-    bounds
+    bounds,
+    edgeMargins
   };
 }
 
