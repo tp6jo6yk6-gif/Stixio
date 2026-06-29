@@ -1,0 +1,79 @@
+name: Review browser acceptance
+
+on:
+  push:
+    branches:
+      - review-full-completion
+    paths:
+      - 'src/core/review/**'
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'tests/review-full-completion.test.js'
+      - 'tests/e2e/review.spec.js'
+      - 'playwright.review.config.js'
+      - 'package.json'
+      - '.github/workflows/review-browser-acceptance.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/core/review/**'
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'tests/review-full-completion.test.js'
+      - 'tests/e2e/review.spec.js'
+      - 'playwright.review.config.js'
+      - 'package.json'
+      - '.github/workflows/review-browser-acceptance.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: review-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: npm install
+      - name: Check syntax, unit tests and build
+        run: |
+          set -o pipefail
+          {
+            echo '=== UI syntax ==='
+            node --check src/ui/stixio-workshop-app-v2.js
+            echo '=== Review core syntax ==='
+            node --check src/core/review/review-engine.js
+            node --check src/core/review/pixel-review.js
+            node --check src/core/review/review-workflow.js
+            echo '=== Unit tests ==='
+            npm test
+            echo '=== Build ==='
+            npm run build
+          } 2>&1 | tee review-ci.log
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Review browser acceptance
+        run: |
+          set -o pipefail
+          npm run test:e2e:review 2>&1 | tee review-browser.log
+      - name: Upload Review report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-browser-report
+          path: |
+            review-ci.log
+            review-browser.log
+            src/ui/stixio-workshop-app-v2.js
+            playwright-report/review
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
