@@ -2,6 +2,7 @@ import {
   BRAND,
   createDocument,
   addSourceRef,
+  removeSourceRef,
   setDocumentFrames,
   createSourceImageRef,
   detectGrid,
@@ -37,7 +38,9 @@ import {
   createPlatformNeutralRules,
   buildWorkshopPackagePlan,
   renderWorkshopFrame,
-  estimateCanvasPngBytes
+  estimateCanvasPngBytes,
+  mergeDetectedFrameStates,
+  getNextSourceId
 } from '../core/index.js';
 
 const HANDLE_SIZE = 14;
@@ -81,6 +84,7 @@ const state = {
   document: createDocument({ name: 'Sticker Package Project' }),
   sources: new Map(),
   sourceLayouts: new Map(),
+  selectedFrameBySource: new Map(),
   activeSourceId: null,
   selectedFrameId: null,
   rendered: new Map(),
@@ -241,7 +245,27 @@ function readGridSettings(){state.settings.rows=valueOf('rowsInput',1);state.set
 function setLayoutMode(mode){state.settings.layoutMode=mode;if(mode==='1x1'){state.settings.rows=1;state.settings.cols=1;}if(mode==='2x2'){state.settings.rows=2;state.settings.cols=2;}if(mode==='3x3'){state.settings.rows=3;state.settings.cols=3;}saveActiveSourceLayout();rerenderShell();}
 function saveActiveSourceLayout(){if(state.activeSourceId)state.sourceLayouts.set(state.activeSourceId,createSourceLayoutSettings(state.settings));}
 function sourceLayout(sourceId){return state.sourceLayouts.get(sourceId)||createSourceLayoutSettings(state.settings);}
-function activateSource(sourceId){state.activeSourceId=sourceId;state.settings=applySourceLayoutSettings(state.settings,sourceLayout(sourceId));const first=frames().find(frame=>frame.sourceImageId===sourceId);if(first)state.selectedFrameId=first.id;rerenderShell();}
+function activateSource(sourceId){
+  if(!state.sources.has(sourceId))return;
+  if(state.activeSourceId&&state.selectedFrameId)state.selectedFrameBySource.set(state.activeSourceId,state.selectedFrameId);
+  state.activeSourceId=sourceId;
+  state.settings=applySourceLayoutSettings(state.settings,sourceLayout(sourceId));
+  const sourceFrames=frames().filter(frame=>frame.sourceImageId===sourceId);
+  const rememberedId=state.selectedFrameBySource.get(sourceId);
+  const selected=sourceFrames.find(frame=>frame.id===rememberedId)||sourceFrames[0]||null;
+  state.selectedFrameId=selected?.id||null;
+  if(selected)state.selectedFrameBySource.set(sourceId,selected.id);
+  rerenderShell();
+}
+function selectFrame(frameId){
+  const frame=frames().find(item=>item.id===frameId);
+  if(!frame)return;
+  if(state.activeSourceId&&state.selectedFrameId)state.selectedFrameBySource.set(state.activeSourceId,state.selectedFrameId);
+  state.activeSourceId=frame.sourceImageId;
+  state.settings=applySourceLayoutSettings(state.settings,sourceLayout(frame.sourceImageId));
+  state.selectedFrameId=frame.id;
+  state.selectedFrameBySource.set(frame.sourceImageId,frame.id);
+}
 
 function changeCategory(category){state.settings.stickerCategory=category;const role=getStickerPresets(category)[0].role;state.settings=applyStickerPreset(state.settings,category,role);state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);normalizeFrameRolesForCategory();clearRenderCache();renderAll();rerenderShell();}
 function changePreset(role){state.settings=applyStickerPreset(state.settings,state.settings.stickerCategory,role);state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);clearRenderCache();renderAll();rerenderShell();}
@@ -264,10 +288,35 @@ async function importFiles(fileList) {
   rerenderShell();
 }
 
+function deleteSource(sourceId){
+  const source=state.sources.get(sourceId);if(!source)return;
+  if(!window.confirm(`確定刪除「${source.name}」及其所有 Frames？`))return;
+  const sourceIds=[...state.sources.keys()];
+  const nextSourceId=getNextSourceId(sourceIds,sourceId);
+  const removedFrames=frames().filter(frame=>frame.sourceImageId===sourceId);
+  removedFrames.forEach(frame=>{state.rendered.delete(frame.id);state.renderKeys.delete(frame.id);state.maskHistories.delete(frame.id);});
+  state.sources.delete(sourceId);
+  state.sourceLayouts.delete(sourceId);
+  state.selectedFrameBySource.delete(sourceId);
+  state.document=removeSourceRef(state.document,sourceId);
+  state.activeSourceId=nextSourceId;
+  if(nextSourceId){
+    state.settings=applySourceLayoutSettings(state.settings,sourceLayout(nextSourceId));
+    const sourceFrames=frames().filter(frame=>frame.sourceImageId===nextSourceId);
+    const remembered=state.selectedFrameBySource.get(nextSourceId);
+    const selected=sourceFrames.find(frame=>frame.id===remembered)||sourceFrames[0]||null;
+    state.selectedFrameId=selected?.id||null;
+  }else{
+    state.selectedFrameId=null;
+  }
+  resetFrameHistory();clearRenderCache();renderAll();rerenderShell();
+}
+
 function detectActiveSource(){if(!state.activeSourceId)return;readGridSettings();detectSource(state.activeSourceId);refresh();}
 function detectSource(sourceId) {
   const source = state.sources.get(sourceId); if(!source)return;
   const layout = sourceLayout(sourceId);
+  const previousFrames=frames().filter(frame=>frame.sourceImageId===sourceId);
   let report;
   if(layout.layoutMode==='auto') report=detectProjectionGrid(source,{chromaEnabled:state.settings.chromaEnabled,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance,tighten:true});
   else {
@@ -275,8 +324,17 @@ function detectSource(sourceId) {
     report.frames=tightenFramesToContent(source,report.frames,{padding:4,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance});
   }
   const oldFrames=frames().filter(frame=>frame.sourceImageId!==sourceId);
-  const newFrames=report.frames.map((frame,index)=>({...frame,name:`${stripExtension(source.name)} ${String(index+1).padStart(2,'0')}`,custom:{...(frame.custom||{}),outputRole:AssetRoles.STICKER,offsetX:0,offsetY:0,maskVersion:0},state:{...(frame.state||{}),exportSelected:true,packageRole:AssetRoles.STICKER}}));
-  setFrames([...oldFrames,...newFrames]); state.selectedFrameId=newFrames[0]?.id||state.selectedFrameId; resetFrameHistory(); clearRenderCache(); renderAll();
+  const newFrames=mergeDetectedFrameStates(previousFrames,report.frames,{
+    defaultRole:AssetRoles.STICKER,
+    createName:(_,index)=>`${stripExtension(source.name)} ${String(index+1).padStart(2,'0')}`,
+    resizeMask:(mask,width,height)=>resizeMaskCanvas(mask,width,height)
+  });
+  setFrames([...oldFrames,...newFrames]);
+  const rememberedId=state.selectedFrameBySource.get(sourceId);
+  const selected=newFrames.find(frame=>frame.id===rememberedId)||newFrames[0]||null;
+  state.selectedFrameId=selected?.id||state.selectedFrameId;
+  if(selected)state.selectedFrameBySource.set(sourceId,selected.id);
+  resetFrameHistory(); clearRenderCache(); renderAll();
 }
 
 function frames(){return state.document.frames;}
@@ -294,12 +352,32 @@ function runReview(){const base=reviewFrames(frames(),state.rendered,{targetW:st
 
 function refresh(){drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();refreshMaskToolButtons();const status=document.getElementById('sourceStatus');if(status){const source=activeSource();status.textContent=source?`${source.name} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames`:'尚未匯入';}const undoBtn=document.getElementById('undoBtn');const redoBtn=document.getElementById('redoBtn');if(undoBtn)undoBtn.disabled=!canUndo(state.frameHistory);if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}
 
-function renderSourceList(){const holder=document.getElementById('sourceList');if(!holder)return;if(!state.sources.size){holder.innerHTML='<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-400">尚無原圖</div>';return;}holder.innerHTML='';state.sources.forEach(source=>{const layout=sourceLayout(source.id);const button=document.createElement('button');button.className=`flex w-full items-center gap-3 rounded-2xl border p-2 text-left ${source.id===state.activeSourceId?'border-emerald-400 bg-emerald-50':'border-slate-200'}`;button.innerHTML=`<img src="${source.uri}" class="h-12 w-12 rounded-xl object-cover"><div class="min-w-0"><div class="truncate text-xs font-black">${escapeHtml(source.name)}</div><div class="text-[10px] text-slate-400">${source.width}×${source.height} · ${layout.layoutMode}</div></div>`;button.addEventListener('click',()=>activateSource(source.id));holder.appendChild(button);});}
+function renderSourceList(){
+  const holder=document.getElementById('sourceList');if(!holder)return;
+  if(!state.sources.size){holder.innerHTML='<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-400">尚無原圖</div>';return;}
+  holder.innerHTML='';
+  state.sources.forEach(source=>{
+    const layout=sourceLayout(source.id);
+    const row=document.createElement('div');
+    row.className=`grid grid-cols-[1fr_auto] gap-2 rounded-2xl border p-2 ${source.id===state.activeSourceId?'border-emerald-400 bg-emerald-50':'border-slate-200'}`;
+    const button=document.createElement('button');
+    button.className='flex min-w-0 items-center gap-3 text-left';
+    button.innerHTML=`<img src="${source.uri}" class="h-12 w-12 rounded-xl object-cover"><div class="min-w-0"><div class="truncate text-xs font-black">${escapeHtml(source.name)}</div><div class="text-[10px] text-slate-400">${source.width}×${source.height} · ${layout.layoutMode} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames</div></div>`;
+    button.addEventListener('click',()=>activateSource(source.id));
+    const remove=document.createElement('button');
+    remove.type='button';
+    remove.title='刪除此原圖與其 Frames';
+    remove.className='rounded-xl bg-rose-50 px-3 text-xs font-black text-rose-700';
+    remove.textContent='刪除';
+    remove.addEventListener('click',event=>{event.stopPropagation();deleteSource(source.id);});
+    row.append(button,remove);holder.appendChild(row);
+  });
+}
 
 function drawSourceCanvas(){const canvas=document.getElementById('sourceCanvas');if(!canvas)return;const source=activeSource();const ctx=canvas.getContext('2d');if(!source){canvas.width=1;canvas.height=1;ctx.clearRect(0,0,1,1);return;}canvas.width=source.width;canvas.height=source.height;ctx.drawImage(source.img,0,0);frames().filter(frame=>frame.sourceImageId===source.id).forEach(frame=>drawFrameOverlay(ctx,frame,frame.id===state.selectedFrameId));}
 function drawFrameOverlay(ctx,frame,selected){const g=frame.geometry;ctx.save();ctx.strokeStyle=selected?'#10b981':'#ef4444';ctx.lineWidth=selected?Math.max(4,ctx.canvas.width/240):Math.max(2,ctx.canvas.width/400);ctx.strokeRect(g.x,g.y,g.width,g.height);if(selected)handlePoints(g).forEach(point=>{ctx.fillStyle='#10b981';ctx.fillRect(point.x-HANDLE_SIZE/2,point.y-HANDLE_SIZE/2,HANDLE_SIZE,HANDLE_SIZE);});ctx.restore();}
 function bindSourceCanvas(canvas){canvas.addEventListener('pointerdown',sourcePointerDown);canvas.addEventListener('pointermove',sourcePointerMove);canvas.addEventListener('pointerup',sourcePointerUp);canvas.addEventListener('pointerleave',sourcePointerUp);}
-function sourcePointerDown(event){const source=activeSource();if(!source)return;const point=canvasPoint(event);if(state.settings.maskTool==='picker'){pickColorFromSource(point);return;}const hit=hitTestFrame(point);if(!hit)return;state.selectedFrameId=hit.frame.id;state.frameDrag={frameId:hit.frame.id,handle:hit.handle,start:point,startGeometry:{...hit.frame.geometry},before:frameSnapshot()};event.currentTarget.setPointerCapture?.(event.pointerId);refresh();}
+function sourcePointerDown(event){const source=activeSource();if(!source)return;const point=canvasPoint(event);if(state.settings.maskTool==='picker'){pickColorFromSource(point);return;}const hit=hitTestFrame(point);if(!hit)return;selectFrame(hit.frame.id);state.frameDrag={frameId:hit.frame.id,handle:hit.handle,start:point,startGeometry:{...hit.frame.geometry},before:frameSnapshot()};event.currentTarget.setPointerCapture?.(event.pointerId);refresh();}
 function sourcePointerMove(event){if(!state.frameDrag)return;const point=canvasPoint(event);const drag=state.frameDrag;const frame=frames().find(item=>item.id===drag.frameId);if(!frame)return;const dx=point.x-drag.start.x,dy=point.y-drag.start.y;const geometry=resizeGeometry(drag.startGeometry,drag.handle,dx,dy);replaceFrame({...frame,geometry:clampGeometry(geometry,activeSource())});drawSourceCanvas();}
 function sourcePointerUp(){if(!state.frameDrag)return;const drag=state.frameDrag;state.frameDrag=null;let frame=frames().find(item=>item.id===drag.frameId);if(frame&&sourceLayout(frame.sourceImageId).smartSnap)frame=smartSnapFrameToContent(sourceForFrame(frame),frame,{searchPadding:12,padding:4,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance});if(frame){const mask=frame.custom?.protectMaskCanvas;if(mask&&(mask.width!==Math.round(frame.geometry.width)||mask.height!==Math.round(frame.geometry.height)))frame={...frame,custom:{...frame.custom,protectMaskCanvas:resizeMaskCanvas(mask,frame.geometry.width,frame.geometry.height),maskVersion:(frame.custom.maskVersion||0)+1}};replaceFrame(frame);}commitFrameChange(drag.handle==='move'?'Move Frame':'Resize Frame',drag.before,frameSnapshot());clearRenderCache();renderAll();refresh();}
 function canvasPoint(event){const canvas=event.currentTarget,rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height};}
@@ -335,7 +413,7 @@ function currentRules(){return createPlatformNeutralRules({category:state.settin
 function packagePlan(list=frames()){return buildWorkshopPackagePlan(list,{category:state.settings.stickerCategory,namingMode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,destinationKey:'workshop'});}
 function packageItemFor(frame,list=frames()){return packagePlan(list).items.find(item=>item.artworkId===frame.id)||null;}
 
-function renderReviewGrid(){const grid=document.getElementById('reviewGrid');if(!grid)return;if(!frames().length){grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';return;}grid.innerHTML='';const roles=availableRoleOptions(),plan=packagePlan();frames().forEach((frame,index)=>{const canvas=renderFrame(frame),card=document.createElement('div'),item=plan.items.find(entry=>entry.artworkId===frame.id);card.draggable=true;const kb=Math.ceil(estimateCanvasPngBytes(canvas)/1024),oversize=kb>state.settings.maxFileSizeKB;card.className=`rounded-3xl border p-2 ${oversize?'border-rose-400 bg-rose-50':frame.id===state.selectedFrameId?'border-emerald-400 bg-emerald-50':'border-slate-200 bg-white'}`;const dataUrl=canvas.toDataURL('image/png');card.innerHTML=`<button class="preview block aspect-[370/320] w-full overflow-hidden rounded-2xl ${reviewBackgroundClass()}"><img src="${dataUrl}" class="h-full w-full object-contain"></button><div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black">#${index+1} · <span class="${oversize?'text-rose-600':''}">${kb}KB${oversize?' ⚠':''}</span></span><input class="export-check" type="checkbox" ${frame.state?.exportSelected!==false?'checked':''}></div><div class="mt-1 truncate text-[10px] font-mono" title="${escapeHtml(item?.fileName||'')}">${escapeHtml(item?.fileName||'')}</div><select class="role-select mt-2 w-full rounded-xl bg-slate-100 px-2 py-1 text-xs font-black">${roles.map(role=>`<option value="${role}" ${packageRole(frame)===role?'selected':''}>${roleLabel(role)}</option>`).join('')}</select><button class="single-download mt-2 w-full rounded-xl bg-slate-950 py-2 text-xs font-black text-white">PNG</button>`;card.querySelector('.preview').addEventListener('click',()=>{state.selectedFrameId=frame.id;state.activeSourceId=frame.sourceImageId;state.settings=applySourceLayoutSettings(state.settings,sourceLayout(frame.sourceImageId));refresh();});card.querySelector('.export-check').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}});refresh();});card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value},custom:{...frame.custom,outputRole:event.target.value}});refresh();});card.querySelector('.single-download').addEventListener('click',()=>downloadFramePng(frame));card.addEventListener('dragstart',()=>state.draggedReviewFrameId=frame.id);card.addEventListener('dragover',event=>event.preventDefault());card.addEventListener('drop',()=>reorderFrame(state.draggedReviewFrameId,frame.id));grid.appendChild(card);});}
+function renderReviewGrid(){const grid=document.getElementById('reviewGrid');if(!grid)return;if(!frames().length){grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';return;}grid.innerHTML='';const roles=availableRoleOptions(),plan=packagePlan();frames().forEach((frame,index)=>{const canvas=renderFrame(frame),card=document.createElement('div'),item=plan.items.find(entry=>entry.artworkId===frame.id);card.draggable=true;const kb=Math.ceil(estimateCanvasPngBytes(canvas)/1024),oversize=kb>state.settings.maxFileSizeKB;card.className=`rounded-3xl border p-2 ${oversize?'border-rose-400 bg-rose-50':frame.id===state.selectedFrameId?'border-emerald-400 bg-emerald-50':'border-slate-200 bg-white'}`;const dataUrl=canvas.toDataURL('image/png');card.innerHTML=`<button class="preview block aspect-[370/320] w-full overflow-hidden rounded-2xl ${reviewBackgroundClass()}"><img src="${dataUrl}" class="h-full w-full object-contain"></button><div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black">#${index+1} · <span class="${oversize?'text-rose-600':''}">${kb}KB${oversize?' ⚠':''}</span></span><input class="export-check" type="checkbox" ${frame.state?.exportSelected!==false?'checked':''}></div><div class="mt-1 truncate text-[10px] font-mono" title="${escapeHtml(item?.fileName||'')}">${escapeHtml(item?.fileName||'')}</div><select class="role-select mt-2 w-full rounded-xl bg-slate-100 px-2 py-1 text-xs font-black">${roles.map(role=>`<option value="${role}" ${packageRole(frame)===role?'selected':''}>${roleLabel(role)}</option>`).join('')}</select><button class="single-download mt-2 w-full rounded-xl bg-slate-950 py-2 text-xs font-black text-white">PNG</button>`;card.querySelector('.preview').addEventListener('click',()=>{selectFrame(frame.id);refresh();});card.querySelector('.export-check').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}});refresh();});card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value},custom:{...frame.custom,outputRole:event.target.value}});refresh();});card.querySelector('.single-download').addEventListener('click',()=>downloadFramePng(frame));card.addEventListener('dragstart',()=>state.draggedReviewFrameId=frame.id);card.addEventListener('dragover',event=>event.preventDefault());card.addEventListener('drop',()=>reorderFrame(state.draggedReviewFrameId,frame.id));grid.appendChild(card);});}
 function reviewBackgroundClass(){if(state.settings.reviewBackground==='white')return'bg-white';if(state.settings.reviewBackground==='black')return'bg-slate-950';return'bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%)] bg-[length:16px_16px]';}
 function renderLargeReview(){const stage=document.getElementById('reviewHeroStage'),image=document.getElementById('reviewHeroImage'),guide=document.getElementById('reviewSafeGuide'),meta=document.getElementById('reviewHeroMeta');if(!stage||!image||!guide||!meta)return;const frame=selectedFrame()||frames()[0];stage.className=`relative grid min-h-[380px] place-items-center overflow-hidden rounded-3xl border border-slate-200 ${reviewBackgroundClass()}`;stage.style.aspectRatio=`${state.settings.targetW}/${state.settings.targetH}`;if(!frame){image.removeAttribute('src');guide.classList.add('hidden');meta.innerHTML='<div class="text-slate-400">尚無預覽</div>';return;}const canvas=renderFrame(frame),kb=Math.ceil(estimateCanvasPngBytes(canvas)/1024),oversize=kb>state.settings.maxFileSizeKB,item=packageItemFor(frame);image.src=canvas.toDataURL('image/png');const top=state.settings.safeMargin/state.settings.targetH*100,left=state.settings.safeMargin/state.settings.targetW*100;guide.style.top=`${top}%`;guide.style.bottom=`${top}%`;guide.style.left=`${left}%`;guide.style.right=`${left}%`;guide.classList.toggle('hidden',!state.settings.showSafeGuide);meta.innerHTML=`<div class="text-xs font-black uppercase tracking-widest text-emerald-300">Selected output</div><div class="mt-2 break-all text-lg font-black">${escapeHtml(item?.fileName||'')}</div><div class="mt-3 rounded-2xl bg-white/10 p-3">${state.settings.targetW}×${state.settings.targetH}px<br>safe ${state.settings.safeMargin}px<br>${state.settings.alignMode==='bottom'?'靠下貼齊':'絕對置中'}<br>offset ${frame.custom?.offsetX||0}, ${frame.custom?.offsetY||0}</div><div class="mt-3 rounded-2xl ${oversize?'bg-rose-500/20 text-rose-200':'bg-emerald-500/20 text-emerald-200'} p-3 font-black">${kb}KB ${oversize?`· 超過 ${state.settings.maxFileSizeKB}KB`:'· 檔案大小正常'}</div>`;}
 function reorderFrame(fromId,toId){if(!fromId||fromId===toId)return;const list=[...frames()],from=list.findIndex(frame=>frame.id===fromId),to=list.findIndex(frame=>frame.id===toId);if(from<0||to<0)return;const[item]=list.splice(from,1);list.splice(to,0,item);setFrames(list);state.draggedReviewFrameId=null;resetFrameHistory();refresh();}
