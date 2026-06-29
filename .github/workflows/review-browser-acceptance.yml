@@ -25,6 +25,10 @@ on:
       - '.github/workflows/review-browser-acceptance.yml'
   workflow_dispatch:
 
+concurrency:
+  group: review-browser-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
