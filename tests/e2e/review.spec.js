@@ -63,6 +63,15 @@ async function selectedHeroText(page) {
   return page.locator('#reviewHeroMeta').innerText();
 }
 
+function visiblePoint(box, viewport) {
+  const left = Math.max(0, box.x);
+  const right = Math.min(viewport.width, box.x + box.width);
+  const top = Math.max(0, box.y);
+  const bottom = Math.min(viewport.height, box.y + box.height);
+  if (right <= left || bottom <= top) throw new Error('Review hero stage has no visible intersection with the viewport.');
+  return { x: (left + right) / 2, y: (top + bottom) / 2 };
+}
+
 test.describe('Review browser acceptance', () => {
   test.beforeEach(async ({ page }) => {
     await openWorkshop(page);
@@ -88,17 +97,20 @@ test.describe('Review browser acceptance', () => {
     await expect(page.locator('#reviewContentBounds')).toHaveClass(/hidden/);
     await page.locator('#toggleContentBoundsBtn').click();
 
+    await stage.scrollIntoViewIfNeeded();
     const box = await stage.boundingBox();
-    if (!box) throw new Error('Review hero stage is not visible.');
+    const viewport = page.viewportSize();
+    if (!box || !viewport) throw new Error('Review hero stage is not visible.');
+    const point = visiblePoint(box, viewport);
     const before = await page.locator('#reviewTransformLayer').getAttribute('style');
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.move(point.x, point.y);
     await page.mouse.wheel(0, -260);
     await expect(page.locator('#reviewZoomResetBtn')).not.toHaveText('100%');
     const zoomed = await page.locator('#reviewTransformLayer').getAttribute('style');
     expect(zoomed).not.toBe(before);
 
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 35, { steps: 6 });
+    await page.mouse.move(Math.min(viewport.width - 10, point.x + 60), Math.min(viewport.height - 10, point.y + 35), { steps: 6 });
     await page.mouse.up();
     const panned = await page.locator('#reviewTransformLayer').getAttribute('style');
     expect(panned).not.toBe(zoomed);
