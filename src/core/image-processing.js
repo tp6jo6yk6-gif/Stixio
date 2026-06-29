@@ -14,12 +14,13 @@ export function applyChromaKey(imageData, options = {}) {
   const height = imageData.height;
   const data = imageData.data;
   const [targetR, targetG, targetB] = chromaColor;
-  const protectMaskData = protectMaskCanvas
-    ? protectMaskCanvas.getContext('2d').getImageData(0, 0, width, height).data
-    : null;
+  const protectMaskData = readMaskData(protectMaskCanvas, width, height);
 
   let visited = null;
-  if (!enabled) return { imageData, visited };
+  if (!enabled) {
+    applyDeleteMaskOnly(data, protectMaskData);
+    return { imageData, visited };
+  }
 
   if (exteriorOnly) {
     visited = floodExteriorBackground({
@@ -64,9 +65,10 @@ export function applyChromaKey(imageData, options = {}) {
   return { imageData, visited };
 }
 
-export function applyDespeckle(imageData, { minComponentSize = 30 } = {}) {
+export function applyDespeckle(imageData, { minComponentSize = 30, protectMaskCanvas = null } = {}) {
   const { width, height, data } = imageData;
   const visited = new Uint8Array(width * height);
+  const protectMaskData = readMaskData(protectMaskCanvas, width, height);
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -75,6 +77,7 @@ export function applyDespeckle(imageData, { minComponentSize = 30 } = {}) {
 
       const queue = [x, y];
       const component = [index];
+      let containsProtectedPixel = readMaskAction(protectMaskData, index * 4) === 'keep';
       visited[index] = 1;
       let head = 0;
 
@@ -87,11 +90,12 @@ export function applyDespeckle(imageData, { minComponentSize = 30 } = {}) {
             visited[ni] = 1;
             queue.push(nx, ny);
             component.push(ni);
+            if (readMaskAction(protectMaskData, ni * 4) === 'keep') containsProtectedPixel = true;
           }
         });
       }
 
-      if (component.length < minComponentSize) {
+      if (component.length < minComponentSize && !containsProtectedPixel) {
         component.forEach(componentIndex => {
           const offset = componentIndex * 4;
           data[offset + 3] = 0;
@@ -171,11 +175,41 @@ export function applyFeathering(imageData, radius = 0) {
   return imageData;
 }
 
+export function applyManualMaskOverrides(imageData, originalData, protectMaskCanvas = null) {
+  if (!protectMaskCanvas) return imageData;
+  const { width, height, data } = imageData;
+  const maskData = readMaskData(protectMaskCanvas, width, height);
+  if (!maskData) return imageData;
+  const original = originalData?.data || originalData;
+
+  for (let offset = 0; offset < data.length; offset += 4) {
+    const action = readMaskAction(maskData, offset);
+    if (action === 'keep' && original) {
+      data[offset] = original[offset];
+      data[offset + 1] = original[offset + 1];
+      data[offset + 2] = original[offset + 2];
+      data[offset + 3] = original[offset + 3];
+    } else if (action === 'delete') {
+      data[offset + 3] = 0;
+      setWhite(data, offset);
+    }
+  }
+
+  return imageData;
+}
+
 export function processStickerImageData(imageData, options = {}) {
+  const originalData = new Uint8ClampedArray(imageData.data);
   const { imageData: chromaData, visited } = applyChromaKey(imageData, options);
-  if (options.autoDespeckle) applyDespeckle(chromaData, options.despeckle || {});
+  if (options.autoDespeckle) {
+    applyDespeckle(chromaData, {
+      ...(options.despeckle || {}),
+      protectMaskCanvas: options.protectMaskCanvas || null
+    });
+  }
   applyErosion(chromaData, options.shrinkRadius || 0);
   applyFeathering(chromaData, options.featherRadius || 0);
+  applyManualMaskOverrides(chromaData, originalData, options.protectMaskCanvas || null);
   return { imageData: chromaData, visited };
 }
 
@@ -222,6 +256,22 @@ function floodExteriorBackground({ data, width, height, targetR, targetG, target
       queue.push(x, y);
     }
   }
+}
+
+function applyDeleteMaskOnly(data, maskData) {
+  if (!maskData) return;
+  for (let offset = 0; offset < data.length; offset += 4) {
+    if (readMaskAction(maskData, offset) === 'delete') {
+      data[offset + 3] = 0;
+      setWhite(data, offset);
+    }
+  }
+}
+
+function readMaskData(maskCanvas, width, height) {
+  if (!maskCanvas) return null;
+  if (maskCanvas.width !== width || maskCanvas.height !== height) return null;
+  return maskCanvas.getContext('2d').getImageData(0, 0, width, height).data;
 }
 
 function readMaskAction(maskData, offset) {
