@@ -2,20 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const path = 'tests/e2e/layout.spec.js';
 let source = await readFile(path, 'utf8');
-const from = `async function openWorkshop(page) {
-  await page.route(/https:\/\/cdn\\.tailwindcss\\.com(?:\\/.*)?/, route => route.fulfill({`;
-const to = `async function openWorkshop(page) {
-  const bootErrors = [];
-  page.on('pageerror', error => bootErrors.push(\`pageerror: \${error.stack || error.message}\`));
-  page.on('console', message => {
-    if (message.type() === 'error') bootErrors.push(\`console: \${message.text()}\`);
-  });
-  page.on('requestfailed', request => bootErrors.push(\`requestfailed: \${request.url()} — \${request.failure()?.errorText || 'unknown'}\`));
-  await page.route(/https:\/\/cdn\\.tailwindcss\\.com(?:\\/.*)?/, route => route.fulfill({`;
 
 if (!source.includes('const bootErrors = []')) {
-  if (!source.includes(from)) throw new Error('Could not locate openWorkshop for diagnostics.');
-  source = source.replace(from, to);
+  const marker = 'async function openWorkshop(page) {\n';
+  if (!source.includes(marker)) throw new Error('Could not locate openWorkshop for diagnostics.');
+  source = source.replace(marker, `${marker}  const bootErrors = [];\n  page.on('pageerror', error => bootErrors.push(\`pageerror: \${error.stack || error.message}\`));\n  page.on('console', message => {\n    if (message.type() === 'error') bootErrors.push(\`console: \${message.text()}\`);\n  });\n  page.on('requestfailed', request => bootErrors.push(\`requestfailed: \${request.url()} — \${request.failure()?.errorText || 'unknown'}\`));\n`);
 }
 
 const oldExpect = `  await expect(page.locator('#fileInput')).toBeAttached();
