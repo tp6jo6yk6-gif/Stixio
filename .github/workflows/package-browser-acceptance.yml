@@ -13,6 +13,7 @@ on:
       - 'src/ui/package-controller.js'
       - 'scripts/apply-package-full-completion.mjs'
       - 'scripts/apply-package-core-compatibility.mjs'
+      - 'scripts/apply-package-controller-fixes.mjs'
       - 'tests/package-full-completion.test.js'
       - 'tests/e2e/package.spec.js'
       - 'playwright.package.config.js'
@@ -30,6 +31,7 @@ on:
       - 'src/ui/package-controller.js'
       - 'scripts/apply-package-full-completion.mjs'
       - 'scripts/apply-package-core-compatibility.mjs'
+      - 'scripts/apply-package-controller-fixes.mjs'
       - 'tests/package-full-completion.test.js'
       - 'tests/e2e/package.spec.js'
       - 'playwright.package.config.js'
@@ -62,8 +64,10 @@ jobs:
             echo '=== Migration syntax ==='
             node --check scripts/apply-package-full-completion.mjs
             node --check scripts/apply-package-core-compatibility.mjs
+            node --check scripts/apply-package-controller-fixes.mjs
             echo '=== Migration apply ==='
             node scripts/apply-package-core-compatibility.mjs
+            node scripts/apply-package-controller-fixes.mjs
             if grep -q "PACKAGE_FULL_COMPLETION" src/ui/stixio-workshop-app-v2.js; then
               echo "Package migration already applied."
             else
@@ -102,6 +106,7 @@ jobs:
             package-ci.log
             package-browser.log
             src/core/package-workflow.js
+            src/ui/package-controller.js
             src/ui/stixio-workshop-app-v2.js
             playwright-report/package
             test-results
@@ -113,7 +118,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/core/package-workflow.js src/ui/stixio-workshop-app-v2.js
+          git add src/core/package-workflow.js src/ui/package-controller.js src/ui/stixio-workshop-app-v2.js
           git diff --cached --quiet && exit 0
           git commit -m "Complete Package delivery workflow and Chromium interactions"
           git push origin HEAD:${HEAD_BRANCH}
