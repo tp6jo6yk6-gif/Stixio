@@ -10,6 +10,7 @@ on:
       - 'src/core/export/**'
       - 'src/core/index.js'
       - 'src/ui/stixio-workshop-app-v2.js'
+      - 'src/ui/package-controller.js'
       - 'scripts/apply-package-full-completion.mjs'
       - 'tests/package-full-completion.test.js'
       - 'tests/e2e/package.spec.js'
@@ -25,6 +26,7 @@ on:
       - 'src/core/export/**'
       - 'src/core/index.js'
       - 'src/ui/stixio-workshop-app-v2.js'
+      - 'src/ui/package-controller.js'
       - 'scripts/apply-package-full-completion.mjs'
       - 'tests/package-full-completion.test.js'
       - 'tests/e2e/package.spec.js'
@@ -72,6 +74,7 @@ jobs:
           {
             echo '=== Package UI syntax ==='
             node --check src/ui/stixio-workshop-app-v2.js
+            node --check src/ui/package-controller.js
             echo '=== Package core syntax ==='
             node --check src/core/package-workflow.js
             echo '=== Unit tests ==='
