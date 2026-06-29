@@ -5,9 +5,12 @@ on:
     branches:
       - stixio-workshop
       - workshop-output-batch
+      - workshop-ux-batch
     paths:
       - 'src/core/**'
       - 'src/ui/stixio-workshop-app-v2.js'
+      - 'src/ui/workshop-ux.js'
+      - 'src/ui/workshop-ux-bridge.js'
       - 'index.html'
       - 'tests/**'
       - '.github/workflows/test-stixio-workshop.yml'
@@ -29,6 +32,8 @@ jobs:
       - name: Check module syntax
         run: |
           node --check src/ui/stixio-workshop-app-v2.js
+          node --check src/ui/workshop-ux.js
+          node --check src/ui/workshop-ux-bridge.js
           node --check src/core/workshop-output.js
           node --check src/core/sticker-presets.js
           node --check src/core/detection/content-bounds.js
@@ -38,7 +43,7 @@ jobs:
       - name: Check Workshop naming
         run: node --test tests/workshop-naming.test.js
       - name: Check Workshop integration
-        run: node --test tests/workshop-integration.test.js tests/workshop-output-batch.test.js
+        run: node --test tests/workshop-integration.test.js tests/workshop-output-batch.test.js tests/workshop-ux.test.js
       - name: Run project tests
         run: npm test
       - name: Build static site
