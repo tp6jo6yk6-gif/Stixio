@@ -3,7 +3,8 @@
 
 export const MaskActions = Object.freeze({
   KEEP: 'keep',
-  DELETE: 'delete'
+  DELETE: 'delete',
+  CLEAR: 'clear'
 });
 
 export function createMaskCanvas(width, height) {
@@ -30,7 +31,7 @@ export function paintMaskStroke(maskCanvas, from, to = from, options = {}) {
   const { action = MaskActions.KEEP, size = 15 } = options;
   const ctx = maskCanvas.getContext('2d');
   ctx.save();
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalCompositeOperation = action === MaskActions.CLEAR ? 'destination-out' : 'source-over';
   ctx.strokeStyle = action === MaskActions.DELETE ? 'rgba(255,0,0,1)' : 'rgba(0,255,0,1)';
   ctx.fillStyle = ctx.strokeStyle;
   ctx.lineWidth = Math.max(1, size);
@@ -54,6 +55,8 @@ export function applyMagicMask(sourceCanvas, maskCanvas, startX, startY, options
     tolerance = 30,
     contiguous = true
   } = options;
+
+  if (action === MaskActions.CLEAR) throw new Error('Magic mask supports keep or delete actions only.');
 
   const width = sourceCanvas.width;
   const height = sourceCanvas.height;
@@ -96,6 +99,36 @@ export function applyMagicMask(sourceCanvas, maskCanvas, startX, startY, options
   return maskCanvas;
 }
 
+export function getMaskStats(maskCanvas) {
+  if (!maskCanvas) return emptyMaskStats(0);
+  const imageData = maskCanvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+  return getMaskStatsFromImageData(imageData);
+}
+
+export function getMaskStatsFromImageData(imageData) {
+  const total = Math.max(0, imageData?.width * imageData?.height || 0);
+  if (!imageData?.data || total === 0) return emptyMaskStats(total);
+  let keep = 0;
+  let deleted = 0;
+
+  for (let offset = 0; offset < imageData.data.length; offset += 4) {
+    if (imageData.data[offset + 3] <= 0) continue;
+    if (imageData.data[offset + 1] > 128) keep++;
+    else if (imageData.data[offset] > 128) deleted++;
+  }
+
+  const marked = keep + deleted;
+  return {
+    total,
+    keep,
+    delete: deleted,
+    marked,
+    empty: Math.max(0, total - marked),
+    coverage: total ? marked / total : 0,
+    hasEdits: marked > 0
+  };
+}
+
 export function captureMaskSnapshot(maskCanvas) {
   if (!maskCanvas) return null;
   return maskCanvas.getContext('2d').getImageData(0, 0, maskCanvas.width, maskCanvas.height);
@@ -109,6 +142,10 @@ export function restoreMaskSnapshot(maskCanvas, snapshot) {
   }
   maskCanvas.getContext('2d').putImageData(snapshot, 0, 0);
   return maskCanvas;
+}
+
+function emptyMaskStats(total) {
+  return { total, keep: 0, delete: 0, marked: 0, empty: total, coverage: 0, hasEdits: false };
 }
 
 function matches(data, offset, target, tolerance) {
