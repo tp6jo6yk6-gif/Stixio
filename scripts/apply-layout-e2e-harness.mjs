@@ -6,5 +6,9 @@ source = source.replace(
   "await page.goto('/index.html', { waitUntil: 'commit' });",
   "await page.goto('/tests/fixtures/layout-harness.html', { waitUntil: 'domcontentloaded' });"
 );
+source = source.replace(
+  "    const canvas = page.locator('#sourceCanvas');\n    const box = await canvas.boundingBox();",
+  "    const canvas = page.locator('#sourceCanvas');\n    await canvas.scrollIntoViewIfNeeded();\n    const box = await canvas.boundingBox();"
+);
 await writeFile(path, source, 'utf8');
 console.log('Layout E2E harness enabled.');
