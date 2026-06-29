@@ -7,9 +7,6 @@ on:
     paths:
       - 'src/core/review/**'
       - 'src/ui/stixio-workshop-app-v2.js'
-      - 'scripts/apply-review-full-completion.mjs'
-      - 'scripts/apply-review-contract-fixes.mjs'
-      - 'scripts/apply-review-naming-fix.mjs'
       - 'tests/review-full-completion.test.js'
       - 'tests/e2e/review.spec.js'
       - 'playwright.review.config.js'
@@ -21,9 +18,6 @@ on:
     paths:
       - 'src/core/review/**'
       - 'src/ui/stixio-workshop-app-v2.js'
-      - 'scripts/apply-review-full-completion.mjs'
-      - 'scripts/apply-review-contract-fixes.mjs'
-      - 'scripts/apply-review-naming-fix.mjs'
       - 'tests/review-full-completion.test.js'
       - 'tests/e2e/review.spec.js'
       - 'playwright.review.config.js'
@@ -32,7 +26,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   chromium-review:
@@ -40,23 +34,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply Review full completion
-        run: |
-          node --check scripts/apply-review-full-completion.mjs
-          node --check scripts/apply-review-contract-fixes.mjs
-          node --check scripts/apply-review-naming-fix.mjs
-          if grep -q "REVIEW_FULL_COMPLETION" src/ui/stixio-workshop-app-v2.js; then
-            echo "Review migration already applied."
-          else
-            node scripts/apply-review-full-completion.mjs
-          fi
-          node scripts/apply-review-contract-fixes.mjs
-          node scripts/apply-review-naming-fix.mjs
       - name: Install test dependencies
         run: npm install
       - name: Check syntax, unit tests and build
@@ -89,18 +69,7 @@ jobs:
             review-ci.log
             review-browser.log
             src/ui/stixio-workshop-app-v2.js
-            scripts/apply-review-full-completion.mjs
             playwright-report/review
             test-results
           if-no-files-found: ignore
           retention-days: 14
-      - name: Commit verified Review UI
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/ui/stixio-workshop-app-v2.js scripts/apply-review-full-completion.mjs package-lock.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Complete Review workflow and Chromium interactions"
-          git push origin HEAD:${HEAD_BRANCH}
