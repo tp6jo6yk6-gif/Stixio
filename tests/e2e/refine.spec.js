@@ -43,7 +43,7 @@ async function importArtwork(page, buffer, layout = '1x1', name = 'repair.svg') 
   await page.locator('#fileInput').setInputFiles({ name, mimeType: 'image/svg+xml', buffer });
   const expected = layout === '2x2' ? 4 : 1;
   await expect(page.locator('#reviewGrid [data-frame-id]')).toHaveCount(expected, { timeout: 20_000 });
-  await expect(page.locator('#refineCanvas')).toHaveJSProperty('width', expect.any(Number));
+  await expect.poll(() => page.locator('#refineCanvas').evaluate(canvas => canvas.width), { timeout: 10_000 }).toBeGreaterThan(1);
   await page.locator('#refineCanvas').scrollIntoViewIfNeeded();
 }
 
