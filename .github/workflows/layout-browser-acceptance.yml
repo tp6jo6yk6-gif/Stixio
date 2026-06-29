@@ -7,6 +7,7 @@ on:
     paths:
       - 'src/ui/stixio-workshop-app-v2.js'
       - 'scripts/apply-layout-browser-details.mjs'
+      - 'scripts/apply-layout-e2e-diagnostics.mjs'
       - 'tests/e2e/layout.spec.js'
       - 'playwright.layout.config.js'
       - 'package.json'
@@ -18,6 +19,7 @@ on:
       - 'src/ui/stixio-workshop-app-v2.js'
       - 'src/core/layout-recovery.js'
       - 'scripts/apply-layout-browser-details.mjs'
+      - 'scripts/apply-layout-e2e-diagnostics.mjs'
       - 'tests/e2e/layout.spec.js'
       - 'playwright.layout.config.js'
       - 'package.json'
@@ -45,12 +47,14 @@ jobs:
           else
             node scripts/apply-layout-browser-details.mjs
           fi
+          node scripts/apply-layout-e2e-diagnostics.mjs
       - name: Install test dependencies
         run: npm install
       - name: Check syntax and unit tests
         run: |
           node --check src/ui/stixio-workshop-app-v2.js
           node --check scripts/apply-layout-browser-details.mjs
+          node --check scripts/apply-layout-e2e-diagnostics.mjs
           npm test
           npm run build
       - name: Install Chromium
