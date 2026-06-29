@@ -53,6 +53,15 @@ export function addSourceRef(document, sourceRef) {
   });
 }
 
+export function removeSourceRef(document, sourceId) {
+  assertDocument(document);
+  return touchDocument({
+    ...document,
+    sourceRefs: document.sourceRefs.filter(source => source.id !== sourceId),
+    frames: document.frames.filter(frame => frame.sourceImageId !== sourceId)
+  });
+}
+
 export function setDocumentFrames(document, frames) {
   assertDocument(document);
   return touchDocument({
