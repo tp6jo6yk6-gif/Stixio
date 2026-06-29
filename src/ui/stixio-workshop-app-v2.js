@@ -320,7 +320,7 @@ function detectSource(sourceId) {
   let report;
   if(layout.layoutMode==='auto') report=detectProjectionGrid(source,{chromaEnabled:state.settings.chromaEnabled,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance,tighten:true});
   else {
-    report=detectGrid(source,{grid:{rows:layout.rows,cols:layout.cols,marginX:layout.marginX,marginY:layout.marginY,gapX:layout.gapX,gapY:layout.gapY,snapToPixels:true,minCellSize:8}});
+    report=detectGrid(source,{grid:{layout:layout.layoutMode,rows:layout.rows,cols:layout.cols,marginX:layout.marginX,marginY:layout.marginY,gapX:layout.gapX,gapY:layout.gapY,snapToPixels:true,minCellSize:8}});
     report.frames=tightenFramesToContent(source,report.frames,{padding:4,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance});
   }
   const oldFrames=frames().filter(frame=>frame.sourceImageId!==sourceId);
@@ -360,6 +360,8 @@ function renderSourceList(){
     const layout=sourceLayout(source.id);
     const row=document.createElement('div');
     row.className=`grid grid-cols-[1fr_auto] gap-2 rounded-2xl border p-2 ${source.id===state.activeSourceId?'border-emerald-400 bg-emerald-50':'border-slate-200'}`;
+    row.dataset.sourceId=source.id;
+    row.dataset.sourceActive=String(source.id===state.activeSourceId);
     const button=document.createElement('button');
     button.className='flex min-w-0 items-center gap-3 text-left';
     button.innerHTML=`<img src="${source.uri}" class="h-12 w-12 rounded-xl object-cover"><div class="min-w-0"><div class="truncate text-xs font-black">${escapeHtml(source.name)}</div><div class="text-[10px] text-slate-400">${source.width}×${source.height} · ${layout.layoutMode} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames</div></div>`;
@@ -413,7 +415,7 @@ function currentRules(){return createPlatformNeutralRules({category:state.settin
 function packagePlan(list=frames()){return buildWorkshopPackagePlan(list,{category:state.settings.stickerCategory,namingMode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,destinationKey:'workshop'});}
 function packageItemFor(frame,list=frames()){return packagePlan(list).items.find(item=>item.artworkId===frame.id)||null;}
 
-function renderReviewGrid(){const grid=document.getElementById('reviewGrid');if(!grid)return;if(!frames().length){grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';return;}grid.innerHTML='';const roles=availableRoleOptions(),plan=packagePlan();frames().forEach((frame,index)=>{const canvas=renderFrame(frame),card=document.createElement('div'),item=plan.items.find(entry=>entry.artworkId===frame.id);card.draggable=true;const kb=Math.ceil(estimateCanvasPngBytes(canvas)/1024),oversize=kb>state.settings.maxFileSizeKB;card.className=`rounded-3xl border p-2 ${oversize?'border-rose-400 bg-rose-50':frame.id===state.selectedFrameId?'border-emerald-400 bg-emerald-50':'border-slate-200 bg-white'}`;const dataUrl=canvas.toDataURL('image/png');card.innerHTML=`<button class="preview block aspect-[370/320] w-full overflow-hidden rounded-2xl ${reviewBackgroundClass()}"><img src="${dataUrl}" class="h-full w-full object-contain"></button><div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black">#${index+1} · <span class="${oversize?'text-rose-600':''}">${kb}KB${oversize?' ⚠':''}</span></span><input class="export-check" type="checkbox" ${frame.state?.exportSelected!==false?'checked':''}></div><div class="mt-1 truncate text-[10px] font-mono" title="${escapeHtml(item?.fileName||'')}">${escapeHtml(item?.fileName||'')}</div><select class="role-select mt-2 w-full rounded-xl bg-slate-100 px-2 py-1 text-xs font-black">${roles.map(role=>`<option value="${role}" ${packageRole(frame)===role?'selected':''}>${roleLabel(role)}</option>`).join('')}</select><button class="single-download mt-2 w-full rounded-xl bg-slate-950 py-2 text-xs font-black text-white">PNG</button>`;card.querySelector('.preview').addEventListener('click',()=>{selectFrame(frame.id);refresh();});card.querySelector('.export-check').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}});refresh();});card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value},custom:{...frame.custom,outputRole:event.target.value}});refresh();});card.querySelector('.single-download').addEventListener('click',()=>downloadFramePng(frame));card.addEventListener('dragstart',()=>state.draggedReviewFrameId=frame.id);card.addEventListener('dragover',event=>event.preventDefault());card.addEventListener('drop',()=>reorderFrame(state.draggedReviewFrameId,frame.id));grid.appendChild(card);});}
+function renderReviewGrid(){const grid=document.getElementById('reviewGrid');if(!grid)return;if(!frames().length){grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';return;}grid.innerHTML='';const roles=availableRoleOptions(),plan=packagePlan();frames().forEach((frame,index)=>{const canvas=renderFrame(frame),card=document.createElement('div'),item=plan.items.find(entry=>entry.artworkId===frame.id);card.draggable=true;card.dataset.frameId=frame.id;card.dataset.sourceId=frame.sourceImageId;const kb=Math.ceil(estimateCanvasPngBytes(canvas)/1024),oversize=kb>state.settings.maxFileSizeKB;card.className=`rounded-3xl border p-2 ${oversize?'border-rose-400 bg-rose-50':frame.id===state.selectedFrameId?'border-emerald-400 bg-emerald-50':'border-slate-200 bg-white'}`;const dataUrl=canvas.toDataURL('image/png');card.innerHTML=`<button class="preview block aspect-[370/320] w-full overflow-hidden rounded-2xl ${reviewBackgroundClass()}"><img src="${dataUrl}" class="h-full w-full object-contain"></button><div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black">#${index+1} · <span class="${oversize?'text-rose-600':''}">${kb}KB${oversize?' ⚠':''}</span></span><input class="export-check" type="checkbox" ${frame.state?.exportSelected!==false?'checked':''}></div><div class="mt-1 truncate text-[10px] font-mono" title="${escapeHtml(item?.fileName||'')}">${escapeHtml(item?.fileName||'')}</div><select class="role-select mt-2 w-full rounded-xl bg-slate-100 px-2 py-1 text-xs font-black">${roles.map(role=>`<option value="${role}" ${packageRole(frame)===role?'selected':''}>${roleLabel(role)}</option>`).join('')}</select><button class="single-download mt-2 w-full rounded-xl bg-slate-950 py-2 text-xs font-black text-white">PNG</button>`;card.querySelector('.preview').addEventListener('click',()=>{selectFrame(frame.id);refresh();});card.querySelector('.export-check').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}});refresh();});card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value},custom:{...frame.custom,outputRole:event.target.value}});refresh();});card.querySelector('.single-download').addEventListener('click',()=>downloadFramePng(frame));card.addEventListener('dragstart',()=>state.draggedReviewFrameId=frame.id);card.addEventListener('dragover',event=>event.preventDefault());card.addEventListener('drop',()=>reorderFrame(state.draggedReviewFrameId,frame.id));grid.appendChild(card);});}
 function reviewBackgroundClass(){if(state.settings.reviewBackground==='white')return'bg-white';if(state.settings.reviewBackground==='black')return'bg-slate-950';return'bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%)] bg-[length:16px_16px]';}
 function renderLargeReview(){const stage=document.getElementById('reviewHeroStage'),image=document.getElementById('reviewHeroImage'),guide=document.getElementById('reviewSafeGuide'),meta=document.getElementById('reviewHeroMeta');if(!stage||!image||!guide||!meta)return;const frame=selectedFrame()||frames()[0];stage.className=`relative grid min-h-[380px] place-items-center overflow-hidden rounded-3xl border border-slate-200 ${reviewBackgroundClass()}`;stage.style.aspectRatio=`${state.settings.targetW}/${state.settings.targetH}`;if(!frame){image.removeAttribute('src');guide.classList.add('hidden');meta.innerHTML='<div class="text-slate-400">尚無預覽</div>';return;}const canvas=renderFrame(frame),kb=Math.ceil(estimateCanvasPngBytes(canvas)/1024),oversize=kb>state.settings.maxFileSizeKB,item=packageItemFor(frame);image.src=canvas.toDataURL('image/png');const top=state.settings.safeMargin/state.settings.targetH*100,left=state.settings.safeMargin/state.settings.targetW*100;guide.style.top=`${top}%`;guide.style.bottom=`${top}%`;guide.style.left=`${left}%`;guide.style.right=`${left}%`;guide.classList.toggle('hidden',!state.settings.showSafeGuide);meta.innerHTML=`<div class="text-xs font-black uppercase tracking-widest text-emerald-300">Selected output</div><div class="mt-2 break-all text-lg font-black">${escapeHtml(item?.fileName||'')}</div><div class="mt-3 rounded-2xl bg-white/10 p-3">${state.settings.targetW}×${state.settings.targetH}px<br>safe ${state.settings.safeMargin}px<br>${state.settings.alignMode==='bottom'?'靠下貼齊':'絕對置中'}<br>offset ${frame.custom?.offsetX||0}, ${frame.custom?.offsetY||0}</div><div class="mt-3 rounded-2xl ${oversize?'bg-rose-500/20 text-rose-200':'bg-emerald-500/20 text-emerald-200'} p-3 font-black">${kb}KB ${oversize?`· 超過 ${state.settings.maxFileSizeKB}KB`:'· 檔案大小正常'}</div>`;}
 function reorderFrame(fromId,toId){if(!fromId||fromId===toId)return;const list=[...frames()],from=list.findIndex(frame=>frame.id===fromId),to=list.findIndex(frame=>frame.id===toId);if(from<0||to<0)return;const[item]=list.splice(from,1);list.splice(to,0,item);setFrames(list);state.draggedReviewFrameId=null;resetFrameHistory();refresh();}
@@ -425,17 +427,56 @@ function setSelectedOffset(key,value){const frame=selectedFrame();if(!frame)retu
 function nudgeSelectedOffset(dx,dy){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,offsetX:(frame.custom?.offsetX||0)+dx,offsetY:(frame.custom?.offsetY||0)+dy}});commitFrameChange('Nudge Output Offset',before,frameSnapshot());clearRenderCache();renderAll();refresh();}
 function resetSelectedOffset(){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,offsetX:0,offsetY:0}});commitFrameChange('Reset Output Offset',before,frameSnapshot());clearRenderCache();renderAll();refresh();}
 
-function duplicateSelectedFrame(){const frame=selectedFrame();if(!frame)return;const copy={...frame,id:createId('frame'),name:`${frame.name} Copy`,geometry:clampGeometry({...frame.geometry,x:frame.geometry.x+20,y:frame.geometry.y+20},sourceForFrame(frame)),custom:{...frame.custom,protectMaskCanvas:null,maskVersion:0},state:{...frame.state,packageRole:AssetRoles.STICKER}};applyFrameListChange('Duplicate Frame',[...frames(),copy],copy.id);}
-function deleteSelectedFrame(){const frame=selectedFrame();if(!frame)return;const list=frames().filter(item=>item.id!==frame.id);applyFrameListChange('Delete Frame',list,list[0]?.id||null);}
+function duplicateSelectedFrame(){
+  const frame=selectedFrame();if(!frame)return;
+  const copy={...frame,id:createId('frame'),name:`${frame.name} Copy`,geometry:clampGeometry({...frame.geometry,x:frame.geometry.x+20,y:frame.geometry.y+20},sourceForFrame(frame)),custom:{...frame.custom,outputRole:AssetRoles.STICKER,protectMaskCanvas:null,maskVersion:0},state:{...frame.state,packageRole:AssetRoles.STICKER}};
+  const list=[...frames()];
+  const index=list.findIndex(item=>item.id===frame.id);
+  list.splice(index+1,0,copy);
+  applyFrameListChange('Duplicate Frame',list,copy.id,frame.sourceImageId);
+}
+function deleteSelectedFrame(){
+  const frame=selectedFrame();if(!frame)return;
+  const before=frames();
+  const sourceFrames=before.filter(item=>item.sourceImageId===frame.sourceImageId);
+  const sourceIndex=sourceFrames.findIndex(item=>item.id===frame.id);
+  const list=before.filter(item=>item.id!==frame.id);
+  const remainingSourceFrames=list.filter(item=>item.sourceImageId===frame.sourceImageId);
+  const next=remainingSourceFrames[Math.min(sourceIndex,remainingSourceFrames.length-1)]||remainingSourceFrames[sourceIndex-1]||null;
+  applyFrameListChange('Delete Frame',list,next?.id||null,frame.sourceImageId);
+}
 function frameSnapshot(){return{frames:cloneFrames(frames()),selectedFrameId:state.selectedFrameId};}
 function cloneFrames(list){return list.map(frame=>({...frame,geometry:{...frame.geometry},state:{...frame.state},custom:{...frame.custom}}));}
 function commitFrameChange(label,before,after){if(JSON.stringify(serializableSnapshot(before))===JSON.stringify(serializableSnapshot(after)))return;const command=createCommand({type:'frames.update',label,target:after.selectedFrameId,payload:{after},apply:()=>after});const executed=executeCommand(before,command);state.frameHistory=commitHistory(state.frameHistory,executed.entry);}
 function serializableSnapshot(snapshot){return{selectedFrameId:snapshot.selectedFrameId,frames:snapshot.frames.map(frame=>({...frame,custom:{...frame.custom,protectMaskCanvas:frame.custom?.protectMaskCanvas?'[mask]':null}}))};}
-function applyFrameSnapshot(snapshot){if(!snapshot)return;setFrames(cloneFrames(snapshot.frames));state.selectedFrameId=snapshot.selectedFrameId;clearRenderCache();renderAll();refresh();}
+function applyFrameSnapshot(snapshot){
+  if(!snapshot)return;
+  setFrames(cloneFrames(snapshot.frames));
+  const restored=frames().find(frame=>frame.id===snapshot.selectedFrameId)||null;
+  state.selectedFrameId=restored?.id||null;
+  if(restored){
+    state.activeSourceId=restored.sourceImageId;
+    state.selectedFrameBySource.set(restored.sourceImageId,restored.id);
+    state.settings=applySourceLayoutSettings(state.settings,sourceLayout(restored.sourceImageId));
+  }
+  clearRenderCache();renderAll();refresh();
+}
 function resetFrameHistory(){state.frameHistory=createHistory(frameSnapshot());}
 function undoFrames(){if(!canUndo(state.frameHistory))return;state.frameHistory=undo(state.frameHistory);applyFrameSnapshot(state.frameHistory.present);}
 function redoFrames(){if(!canRedo(state.frameHistory))return;state.frameHistory=redo(state.frameHistory);applyFrameSnapshot(state.frameHistory.present);}
-function applyFrameListChange(label,nextFrames,nextSelected){const before=frameSnapshot();setFrames(nextFrames);state.selectedFrameId=nextSelected;const after=frameSnapshot();commitFrameChange(label,before,after);clearRenderCache();renderAll();refresh();}
+function applyFrameListChange(label,nextFrames,nextSelected,sourceId=state.activeSourceId){
+  const before=frameSnapshot();
+  setFrames(nextFrames);
+  state.activeSourceId=sourceId||state.activeSourceId;
+  const selected=nextFrames.find(frame=>frame.id===nextSelected)||null;
+  state.selectedFrameId=selected?.id||null;
+  if(state.activeSourceId){
+    if(selected)state.selectedFrameBySource.set(state.activeSourceId,selected.id);
+    else state.selectedFrameBySource.delete(state.activeSourceId);
+    state.settings=applySourceLayoutSettings(state.settings,sourceLayout(state.activeSourceId));
+  }
+  const after=frameSnapshot();commitFrameChange(label,before,after);clearRenderCache();renderAll();refresh();
+}
 
 function downloadSelectedPng(){const frame=selectedFrame();if(frame)downloadFramePng(frame);}
 function downloadFramePng(frame){const canvas=renderFrame(frame,true),item=packageItemFor(frame);downloadDataUrl(canvas.toDataURL('image/png'),item?.fileName||'sticker.png');}

@@ -7,11 +7,17 @@
   "scripts": {
     "dev": "npx serve .",
     "preview:local": "npx serve . -l 4173",
+    "preview:test": "serve . -l 4173",
     "build": "node scripts/build-static.js",
     "preview": "npx serve dist",
     "preview:build": "npm run build && npx serve dist -l 4173",
     "test": "node --test tests/**/*.test.js",
+    "test:e2e:layout": "playwright test --config=playwright.layout.config.js",
     "ci": "npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "serve": "^14.2.5"
   },
   "keywords": [
     "stixio",

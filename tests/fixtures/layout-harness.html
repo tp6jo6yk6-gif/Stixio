@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stixio Layout Browser Acceptance</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    canvas { max-width: 100%; height: auto; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { initStixioWorkshop } from '../../src/ui/stixio-workshop-app-v2.js';
+    initStixioWorkshop(document.getElementById('app'));
+    document.documentElement.dataset.stixioReady = 'true';
+  </script>
+</body>
+</html>

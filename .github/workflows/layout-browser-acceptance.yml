@@ -1,0 +1,89 @@
+name: Layout browser acceptance
+
+on:
+  push:
+    branches:
+      - layout-browser-acceptance
+    paths:
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'scripts/apply-layout-browser-details.mjs'
+      - 'scripts/apply-layout-e2e-diagnostics.mjs'
+      - 'scripts/apply-layout-e2e-harness.mjs'
+      - 'tests/e2e/layout.spec.js'
+      - 'tests/fixtures/layout-harness.html'
+      - 'playwright.layout.config.js'
+      - 'package.json'
+      - '.github/workflows/layout-browser-acceptance.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'src/core/layout-recovery.js'
+      - 'scripts/apply-layout-browser-details.mjs'
+      - 'scripts/apply-layout-e2e-diagnostics.mjs'
+      - 'scripts/apply-layout-e2e-harness.mjs'
+      - 'tests/e2e/layout.spec.js'
+      - 'tests/fixtures/layout-harness.html'
+      - 'playwright.layout.config.js'
+      - 'package.json'
+      - '.github/workflows/layout-browser-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  chromium-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply remaining Layout details
+        run: |
+          if grep -q "card.dataset.frameId" src/ui/stixio-workshop-app-v2.js; then
+            echo "Layout detail migration already applied."
+          else
+            node scripts/apply-layout-browser-details.mjs
+          fi
+          node scripts/apply-layout-e2e-harness.mjs
+          node scripts/apply-layout-e2e-diagnostics.mjs
+      - name: Install test dependencies
+        run: npm install
+      - name: Check syntax and unit tests
+        run: |
+          node --check src/ui/stixio-workshop-app-v2.js
+          node --check scripts/apply-layout-browser-details.mjs
+          node --check scripts/apply-layout-e2e-diagnostics.mjs
+          node --check scripts/apply-layout-e2e-harness.mjs
+          npm test
+          npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Layout browser acceptance
+        run: npm run test:e2e:layout
+      - name: Upload browser report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layout-browser-report
+          path: |
+            playwright-report/layout
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Commit verified Layout details
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ui/stixio-workshop-app-v2.js package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Finish Layout browser synchronization details"
+          git push origin HEAD:${HEAD_BRANCH}
