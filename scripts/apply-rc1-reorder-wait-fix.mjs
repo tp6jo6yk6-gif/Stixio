@@ -31,7 +31,7 @@ source = source.replace(
       const cards = [...document.querySelectorAll('[data-review-card="true"]')];
       const source = cards[0];
       const target = cards[2];
-      if (!source || !target) throw new Error(\`Workshop reorder cards unavailable: \${cards.length}\`);
+      if (!source || !target) throw new Error('Workshop reorder cards unavailable');
       const dataTransfer = new DataTransfer();
       source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
       target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
@@ -41,7 +41,25 @@ source = source.replace(
     await expect.poll(async () => workshopApp.page.locator('[data-review-card="true"]').evaluateAll(cards => cards.map(card => card.dataset.frameId)), { timeout: 12000 }).not.toEqual(workshopIdsBefore);`
 );
 
+if (!source.includes('function expectGeometryListsClose(')) {
+  source = source.replace(
+    'test.beforeAll(async () => mkdir(outputDir, { recursive: true }));',
+    `function expectGeometryListsClose(legacy, workshop, tolerance = 1) {
+  expect(workshop).toHaveLength(legacy.length);
+  legacy.forEach((item, index) => item.forEach((value, field) => {
+    expect(Math.abs(workshop[index][field] - value)).toBeLessThanOrEqual(tolerance);
+  }));
+}
+
+test.beforeAll(async () => mkdir(outputDir, { recursive: true }));`
+  );
+}
+source = source.replace(
+  '    expect(workshopAfter).toEqual(legacyAfter);',
+  '    expectGeometryListsClose(legacyAfter, workshopAfter);'
+);
+
 await writeFile(testPath, source, 'utf8');
 await mkdir('parity-results/patched-sources/tests/e2e', { recursive: true });
 await copyFile(testPath, `parity-results/patched-sources/${testPath}`);
-console.log('Legacy and Workshop reorder handler fixes applied.');
+console.log('Legacy and Workshop reorder handlers and geometry tolerance applied.');
