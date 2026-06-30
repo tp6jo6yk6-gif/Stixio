@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
-const server = spawn('npm', ['run', 'preview:test'], {
-  shell: true,
+const serveEntry = fileURLToPath(new URL('../node_modules/serve/build/main.js', import.meta.url));
+const server = spawn(process.execPath, [serveEntry, '.', '-l', '4173'], {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: process.env
 });
@@ -70,7 +71,7 @@ try {
   }
 } finally {
   await browser?.close();
-  server.kill('SIGTERM');
+  await stopServer(server);
 }
 
 async function waitForServer(url) {
@@ -85,4 +86,17 @@ async function waitForServer(url) {
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   throw new Error(`Preview server did not start.\n${serverOutput}`);
+}
+
+async function stopServer(child) {
+  if (!child || child.exitCode != null) return;
+  child.kill('SIGTERM');
+  await Promise.race([
+    new Promise(resolve => child.once('exit', resolve)),
+    new Promise(resolve => setTimeout(resolve, 2000))
+  ]);
+  if (child.exitCode == null) child.kill('SIGKILL');
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.unref();
 }
