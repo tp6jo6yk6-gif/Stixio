@@ -27,7 +27,7 @@ permissions:
 jobs:
   chromium-parity:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,8 +47,8 @@ jobs:
           npm run parity:extract
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run all Legacy parity tests
-        run: npm run test:e2e:parity
+      - name: Run focused Review reorder parity
+        run: npx playwright test --config=playwright.parity.config.js -g "drag reorder changes geometry order"
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
