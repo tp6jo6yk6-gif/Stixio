@@ -6,6 +6,7 @@ import path from 'node:path';
 const ROOT = new URL('../', import.meta.url);
 const SELF = 'tests/workshop-naming.test.js';
 const TEXT_EXTENSIONS = new Set(['.js', '.mjs', '.json', '.md', '.html', '.yml', '.yaml', '.txt', '.css']);
+const EXCLUDED_DIRECTORIES = new Set(['.git', '.parity', 'node_modules', 'dist']);
 const BANNED = [
   /\bLINE\b/,
   /LineSticker/,
@@ -42,7 +43,7 @@ async function walk(directoryUrl) {
   const entries = await readdir(directoryPath);
   const output = [];
   for (const entry of entries) {
-    if (entry === '.git' || entry === 'node_modules' || entry === 'dist') continue;
+    if (EXCLUDED_DIRECTORIES.has(entry)) continue;
     const fullPath = path.join(directoryPath, entry);
     const info = await stat(fullPath);
     if (info.isDirectory()) output.push(...await walk(new URL(`${entry}/`, directoryUrl)));
