@@ -16,15 +16,17 @@ Updated: 2026-06-30
 - Review white, black and checker backgrounds
 - Review safe guide toggle
 
-## Batch 3 retry
+## Current full validation
 
-- Magic Delete now locates the target color directly from Canvas pixels
-- Drag reorder browser scope is resolved for every geometry capture
-- Positional role assignment is compared through the final ZIP
+- Magic Delete invokes the same Legacy flood-fill core at the detected target color
+- Review reorder uses standard DragEvent and compares geometry within 2 px
+- 40 and 100 output render, approval and ZIP packaging
+- Ten-source project export and re-import
+- Forty independent manual masks
+- Fifty Destination Profile switches
 
-## Next
+## After validation
 
-- 40 and 100 output stress tests
-- Ten-source project restore
-- Repeated Profile switching
-- Final read-only RC workflow and release report
+- Remove all temporary RC patch and validation workflows
+- Publish the final parity and stress report
+- Run the final read-only RC workflow on one commit
