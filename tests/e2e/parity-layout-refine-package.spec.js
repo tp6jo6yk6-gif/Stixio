@@ -121,8 +121,8 @@ async function openWorkshop(browser) {
   const page = await context.newPage();
   await installDeterministicRuntime(page);
   await page.goto('/tests/fixtures/layout-harness.html', { waitUntil: 'commit' });
-  await page.waitForSelector('#fileInput');
-  await page.waitForSelector('#stage-package');
+  await page.waitForSelector('#fileInput', { state: 'attached' });
+  await page.waitForSelector('#stage-package', { state: 'attached' });
   return { context, page };
 }
 
