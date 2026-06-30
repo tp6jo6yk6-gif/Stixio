@@ -128,7 +128,7 @@ async function exportProject(page) {
   const path = await download.path();
   if (!path) throw new Error('Project path unavailable.');
   const archive = JSON.parse(await readFile(path, 'utf8'));
-  return { path, snapshot: JSON.parse(archive['project.json'].value) };
+  return { path, archive, snapshot: JSON.parse(archive['project.json'].value) };
 }
 
 function heapSample(page) {
@@ -234,9 +234,11 @@ test('forty manual masks remain isolated and serializable', async ({ browser }) 
       await pointerAtCenter(app.page, '#refineCanvas');
     }
     const exported = await exportProject(app.page);
-    const maskCount = exported.snapshot.document.frames.filter(frame => frame.custom?.protectMask?.dataUrl).length;
-    expect(maskCount).toBe(40);
-    stressResults.push({ scenario: 'forty-isolated-masks', maskCount, totalMs: Date.now() - startedAt });
+    const manifestMaskCount = exported.snapshot.document.frames.filter(frame => frame.custom?.protectMask?.assetPath).length;
+    const archiveMaskCount = Object.keys(exported.archive).filter(path => path.startsWith('masks/') && path.endsWith('.png')).length;
+    expect(manifestMaskCount).toBe(40);
+    expect(archiveMaskCount).toBe(40);
+    stressResults.push({ scenario: 'forty-isolated-masks', manifestMaskCount, archiveMaskCount, totalMs: Date.now() - startedAt });
   } finally {
     await app.context.close();
   }

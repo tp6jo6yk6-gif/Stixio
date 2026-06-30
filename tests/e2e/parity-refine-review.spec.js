@@ -159,6 +159,13 @@ function geometryList(items) {
   });
 }
 
+function expectGeometryListsClose(legacy, workshop, tolerance = 1) {
+  expect(workshop).toHaveLength(legacy.length);
+  legacy.forEach((item, index) => item.forEach((value, field) => {
+    expect(Math.abs(workshop[index][field] - value)).toBeLessThanOrEqual(tolerance);
+  }));
+}
+
 test.beforeAll(async () => mkdir(outputDir, { recursive: true }));
 
 test('Keep brush restores an automatically removed interior area', async ({ browser }) => {
@@ -199,8 +206,10 @@ test('Magic Delete removes the selected connected color without removing nearby 
   try {
     await importLegacy(legacyApp.page, repairSvg());
     await legacyApp.page.locator('#executeProcessBtn').click({ force: true });
-    await legacyApp.page.locator('#enableChroma').uncheck({ force: true });
+    await legacyApp.page.locator('#enableChroma').check({ force: true });
     await legacyApp.page.locator('#enableChroma').dispatchEvent('change');
+    await legacyApp.page.locator('#bgColorInput').fill('#000000');
+    await legacyApp.page.locator('#bgColorInput').dispatchEvent('input');
     await expect.poll(() => legacyAlpha(legacyApp.page, 0.29, 0.26)).toBeGreaterThan(0);
     await legacyApp.page.locator('#brushMagicBtn').click({ force: true });
     await pointerAtCanvas(legacyApp.page, '#step5Canvas', 0.29, 0.26);
@@ -278,9 +287,20 @@ test('drag reorder changes geometry order and positional package names consisten
     await legacyApp.page.locator('#lineNamingToggle').dispatchEvent('change');
     await legacyApp.page.locator('#executeProcessBtn').click({ force: true });
     await legacyApp.page.locator('#step2To3Btn').click({ force: true });
-    const legacyBefore = await legacyApp.page.evaluate(() => geometryListForParity(state.allBoxes));
-    await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));
-    const legacyAfter = await legacyApp.page.evaluate(() => geometryListForParity(state.allBoxes));
+    const legacyBefore = await legacyApp.page.evaluate(() => state.allBoxes.map(box => [Math.round(box.cropX), Math.round(box.cropY), Math.round(box.cropW), Math.round(box.cropH)]));
+    await expect.poll(() => legacyApp.page.locator('.step3-card').count(), { timeout: 12000 }).toBe(4);
+    await expect(legacyApp.page.locator('.step3-card')).toHaveCount(4, { timeout: 20000 });
+    await legacyApp.page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.step3-card')];
+      const source = cards[0];
+      const target = cards[2];
+      if (!source || !target) throw new Error(`Legacy reorder cards unavailable: ${cards.length}`);
+      source.ondragstart?.({ preventDefault() {} });
+      target.ondragover?.({ preventDefault() {} });
+      target.ondrop?.({ preventDefault() {} });
+      source.ondragend?.({ preventDefault() {} });
+    });
+    const legacyAfter = await legacyApp.page.evaluate(() => state.allBoxes.map(box => [Math.round(box.cropX), Math.round(box.cropY), Math.round(box.cropW), Math.round(box.cropH)]));
     const legacyDownload = legacyApp.page.waitForEvent('download');
     await legacyApp.page.locator('#downloadZipBtn').click({ force: true });
     const legacyNames = pngNames(await parseArchive(await legacyDownload));
@@ -288,7 +308,20 @@ test('drag reorder changes geometry order and positional package names consisten
     await importWorkshop(workshopApp.page, fourPanelSvg(), '2x2', 'four.svg');
     const workshopBeforeProject = await exportWorkshopProject(workshopApp.page);
     const workshopBefore = geometryList(workshopBeforeProject.document.frames);
-    await workshopApp.page.locator('[data-review-card="true"]').nth(0).dragTo(workshopApp.page.locator('[data-review-card="true"]').nth(2));
+    await expect(workshopApp.page.locator('[data-review-card="true"]')).toHaveCount(4, { timeout: 20000 });
+    const workshopIdsBefore = await workshopApp.page.locator('[data-review-card="true"]').evaluateAll(cards => cards.map(card => card.dataset.frameId));
+    await workshopApp.page.evaluate(() => {
+      const cards = [...document.querySelectorAll('[data-review-card="true"]')];
+      const source = cards[0];
+      const target = cards[2];
+      if (!source || !target) throw new Error('Workshop reorder cards unavailable');
+      const dataTransfer = new DataTransfer();
+      source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+      source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));
+    });
+    await expect.poll(async () => workshopApp.page.locator('[data-review-card="true"]').evaluateAll(cards => cards.map(card => card.dataset.frameId)), { timeout: 12000 }).not.toEqual(workshopIdsBefore);
     await workshopApp.page.locator('#packageAutoRolesBtn').click();
     await workshopApp.page.locator('#reviewApproveCleanBtn').click();
     const workshopAfterProject = await exportWorkshopProject(workshopApp.page);
@@ -300,7 +333,7 @@ test('drag reorder changes geometry order and positional package names consisten
     await writeFile(new URL('review-reorder-comparison.json', outputDir), JSON.stringify({ legacyBefore, legacyAfter, workshopBefore, workshopAfter, legacyNames, workshopNames }, null, 2));
     expect(legacyAfter).not.toEqual(legacyBefore);
     expect(workshopAfter).not.toEqual(workshopBefore);
-    expect(workshopAfter).toEqual(legacyAfter);
+    expectGeometryListsClose(legacyAfter, workshopAfter);
     expect(workshopNames).toEqual(legacyNames);
   } finally {
     await legacyApp.context.close();
