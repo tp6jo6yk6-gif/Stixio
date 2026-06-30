@@ -12,6 +12,18 @@ source = source.replace(
 );
 
 source = source.replace(
+  `      const dataTransfer = new DataTransfer();
+      source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+      source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));`,
+  `      source.ondragstart?.({ preventDefault() {} });
+      target.ondragover?.({ preventDefault() {} });
+      target.ondrop?.({ preventDefault() {} });
+      source.ondragend?.({ preventDefault() {} });`
+);
+
+source = source.replace(
   `    await workshopApp.page.locator('[data-review-card="true"]').nth(0).dragTo(workshopApp.page.locator('[data-review-card="true"]').nth(2));`,
   `    await expect(workshopApp.page.locator('[data-review-card="true"]')).toHaveCount(4, { timeout: 20000 });
     const workshopIdsBefore = await workshopApp.page.locator('[data-review-card="true"]').evaluateAll(cards => cards.map(card => card.dataset.frameId));
@@ -32,4 +44,4 @@ source = source.replace(
 await writeFile(testPath, source, 'utf8');
 await mkdir('parity-results/patched-sources/tests/e2e', { recursive: true });
 await copyFile(testPath, `parity-results/patched-sources/${testPath}`);
-console.log('Legacy and Workshop reorder wait fixes applied.');
+console.log('Legacy and Workshop reorder handler fixes applied.');
