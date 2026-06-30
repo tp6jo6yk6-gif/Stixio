@@ -136,11 +136,13 @@ test('multiple sources keep independent Layout settings in Legacy and Workshop',
       frameCount: state.allBoxes.length
     }));
 
-    await workshopApp.page.locator('#fileInput').setInputFiles({ name: 'source-a.svg', mimeType: 'image/svg+xml', buffer: panelSvg('#ef4444') });
     await workshopApp.page.locator('[data-layout="2x2"]').click();
+    await workshopApp.page.locator('#fileInput').setInputFiles({ name: 'source-a.svg', mimeType: 'image/svg+xml', buffer: panelSvg('#ef4444') });
     await expect(workshopApp.page.locator('[data-review-card="true"]')).toHaveCount(4);
     await workshopApp.page.locator('#fileInput').setInputFiles({ name: 'source-b.svg', mimeType: 'image/svg+xml', buffer: panelSvg('#3b82f6') });
+    await expect(workshopApp.page.locator('[data-review-card="true"]')).toHaveCount(8);
     await workshopApp.page.locator('[data-layout="1x1"]').click();
+    await workshopApp.page.locator('#detectBtn').click();
     await expect(workshopApp.page.locator('[data-review-card="true"]')).toHaveCount(5);
     const project = await exportWorkshopProject(workshopApp.page);
     const layoutMap = new Map(project.sourceLayouts);

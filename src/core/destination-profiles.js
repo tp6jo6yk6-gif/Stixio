@@ -261,20 +261,32 @@ export function buildDestinationPackagePlan(frames = [], {
   namingMode = 'profile',
   prefix = '',
   suffix = '',
-  renderedMap = null
+  renderedMap = null,
+  identityFrames = frames
 } = {}) {
   const profile = createDestinationProfile(profileInput || getBuiltInDestinationProfile());
   const allowed = new Set(profile.roles.map(item => item.key));
   const fallback = profile.roles.find(item => item.key === AssetRoles.STICKER)?.key || profile.roles[0].key;
-  const counters = {};
+  const identityCounters = {};
+  const identityRoleIndex = new Map();
+  const identityOrder = new Map();
+  (identityFrames || frames).forEach((frame, order) => {
+    const requestedRole = frame.state?.packageRole || frame.custom?.outputRole || fallback;
+    const roleKey = allowed.has(requestedRole) ? requestedRole : fallback;
+    identityCounters[roleKey] = (identityCounters[roleKey] || 0) + 1;
+    identityRoleIndex.set(frame.id, identityCounters[roleKey]);
+    identityOrder.set(frame.id, order);
+  });
+  const fallbackCounters = {};
   const items = frames.map((frame, order) => {
     const requestedRole = frame.state?.packageRole || frame.custom?.outputRole || fallback;
     const roleKey = allowed.has(requestedRole) ? requestedRole : fallback;
-    counters[roleKey] = (counters[roleKey] || 0) + 1;
+    fallbackCounters[roleKey] = (fallbackCounters[roleKey] || 0) + 1;
     const roleRule = getDestinationRoleRule(profile, roleKey);
-    const index = counters[roleKey];
+    const index = identityRoleIndex.get(frame.id) || fallbackCounters[roleKey];
+    const stableOrder = identityOrder.has(frame.id) ? identityOrder.get(frame.id) : order;
     const fileName = namingMode === 'sequential'
-      ? sequentialFileName(order + 1, profile.output.extension, prefix, suffix)
+      ? sequentialFileName(stableOrder + 1, profile.output.extension, prefix, suffix)
       : destinationFileName(roleRule, index, profile.output.extension, prefix, suffix);
     const canvas = renderedMap?.get?.(frame.id) || null;
     return {

@@ -264,7 +264,8 @@ export function createDestinationController(adapter, options = {}) {
       namingMode: options.namingMode,
       prefix: options.prefix,
       suffix: options.suffix,
-      renderedMap: options.renderedMap
+      renderedMap: options.renderedMap,
+      identityFrames: options.identityFrames || frames
     });
   }
 
