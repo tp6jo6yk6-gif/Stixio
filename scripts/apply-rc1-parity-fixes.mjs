@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const parityTestPath = 'tests/e2e/parity-layout-refine-package.spec.js';
 const secondTestPath = 'tests/e2e/parity-multisource-mask-review.spec.js';
@@ -96,4 +96,12 @@ app = app.replace(
 );
 await writeFile(appPath, app, 'utf8');
 
-console.log('RC1 parity fixes applied.');
+const artifactRoot = 'parity-results/patched-sources';
+await mkdir(`${artifactRoot}/src/core`, { recursive: true });
+await mkdir(`${artifactRoot}/src/ui`, { recursive: true });
+await mkdir(`${artifactRoot}/tests/e2e`, { recursive: true });
+for (const sourcePath of [profilesPath, destinationControllerPath, appPath, parityTestPath, secondTestPath]) {
+  await copyFile(sourcePath, `${artifactRoot}/${sourcePath}`);
+}
+
+console.log('RC1 parity fixes applied and copied to parity artifacts.');
