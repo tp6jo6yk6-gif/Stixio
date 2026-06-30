@@ -1,7 +1,7 @@
 name: Finalize Legacy Parity RC1
 
 on:
-  pull_request:
+  push:
     branches:
       - workshop-parity-rc1
   workflow_dispatch:
@@ -11,57 +11,63 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   finalize-rc1:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           ref: workshop-parity-rc1
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Apply verified RC1 sources
+      - name: Apply finalized RC1 source tree
         run: |
           node --check scripts/finalize-rc1.mjs
           node scripts/finalize-rc1.mjs
           node --input-type=module -e "import{readFile,writeFile}from'node:fs/promises';const p=JSON.parse(await readFile('package-lock.json','utf8'));p.version='1.0.0-rc.1';if(p.packages?.[''])p.packages[''].version='1.0.0-rc.1';await writeFile('package-lock.json',JSON.stringify(p,null,2)+'\n');"
       - name: Install dependencies
         run: npm ci
-      - name: Verify finalized unit tests and build
+      - name: Unit tests, build, and Legacy fingerprint
         run: |
           npm test
           npm run build
           npm run parity:extract
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify finalized Magic and reorder parity
-        run: npx playwright test --config=playwright.parity.config.js -g "Magic Delete|drag reorder changes geometry order"
-      - name: Upload finalized RC1 source tree
+      - name: Run complete browser acceptance and parity gate
+        run: |
+          npm run test:e2e:layout
+          npm run test:e2e:refine
+          npm run test:e2e:review
+          npm run test:e2e:package
+          npm run test:e2e:project
+          npm run test:e2e:destination
+          npm run test:e2e:parity
+      - name: Commit finalized RC1
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Finalize Stixio 1.0.0 RC1 parity gate"
+          git push origin HEAD:workshop-parity-rc1
+      - name: Upload RC1 evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stixio-rc1-finalized-source
+          name: stixio-rc1-finalization-evidence
           path: |
-            .gitignore
-            .github/workflows/legacy-parity-rc.yml
-            package.json
-            package-lock.json
-            playwright.parity.config.js
+            parity-results
+            playwright-report
+            test-results
             docs/LEGACY-PARITY-RC1.md
             docs/RC1-PROGRESS.md
-            src/core/destination-profiles.js
-            src/ui/destination-controller.js
-            src/ui/stixio-workshop-app-v2.js
-            tests/e2e/parity.spec.js
-            tests/e2e/parity-layout-refine-package.spec.js
-            tests/e2e/parity-multisource-mask-review.spec.js
-            tests/e2e/parity-refine-review.spec.js
-            tests/e2e/parity-stress.spec.js
-            tests/rc1-package-identity.test.js
-            tests/workshop-naming.test.js
-          if-no-files-found: error
-          retention-days: 7
+          if-no-files-found: ignore
+          retention-days: 30
