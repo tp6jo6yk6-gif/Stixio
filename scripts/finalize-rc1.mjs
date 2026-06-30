@@ -192,6 +192,7 @@ const temporaryPaths = [
   '.github/workflows/legacy-parity-rc-run3.yml',
   'scripts/fix-parity-hidden-input.mjs',
   'scripts/apply-rc1-parity-fixes.mjs',
+  'scripts/apply-rc1-reorder-wait-fix.mjs',
   'scripts/fix-parity-refine-review-spec.mjs',
   'scripts/extend-parity-global-timeout.mjs',
   'scripts/fix-parity-stress-mask-count.mjs',
