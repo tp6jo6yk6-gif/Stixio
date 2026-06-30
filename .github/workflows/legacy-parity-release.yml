@@ -1,0 +1,72 @@
+name: Legacy Parity Release Gate
+
+on:
+  push:
+    branches:
+      - workshop-parity-rc1
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: legacy-parity-release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Unit tests, static build, and Legacy fingerprint
+        run: |
+          set -o pipefail
+          {
+            npm test
+            npm run build
+            npm run parity:extract
+          } 2>&1 | tee rc-unit-build.log
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Prepare Layout acceptance harness
+        run: |
+          node scripts/apply-layout-e2e-harness.mjs
+          node scripts/apply-layout-e2e-diagnostics.mjs
+      - name: Layout acceptance
+        run: npm run test:e2e:layout
+      - name: Refine acceptance
+        run: npm run test:e2e:refine
+      - name: Review acceptance
+        run: npm run test:e2e:review
+      - name: Package acceptance
+        run: npm run test:e2e:package
+      - name: Project acceptance
+        run: npm run test:e2e:project
+      - name: Destination acceptance
+        run: npm run test:e2e:destination
+      - name: Legacy parity and stress acceptance
+        run: npm run test:e2e:parity
+      - name: Upload RC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stixio-rc1-release-evidence
+          path: |
+            parity-results
+            rc-unit-build.log
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 30
