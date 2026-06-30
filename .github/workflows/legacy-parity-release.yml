@@ -40,6 +40,10 @@ jobs:
           } 2>&1 | tee rc-unit-build.log
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Prepare Layout acceptance harness
+        run: |
+          node scripts/apply-layout-e2e-harness.mjs
+          node scripts/apply-layout-e2e-diagnostics.mjs
       - name: Layout acceptance
         run: npm run test:e2e:layout
       - name: Refine acceptance
