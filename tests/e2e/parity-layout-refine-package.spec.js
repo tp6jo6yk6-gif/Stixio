@@ -3,6 +3,39 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const outputDir = new URL('../../parity-results/', import.meta.url);
 
+const CANVAS_SUMMARY_BODY = `
+  const ctx = canvas.getContext('2d');
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let nonTransparent = 0, alphaTotal = 0;
+  let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
+  let hash = 2166136261;
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      const offset = (y * canvas.width + x) * 4;
+      const alpha = image.data[offset + 3];
+      alphaTotal += alpha;
+      hash ^= image.data[offset]; hash = Math.imul(hash, 16777619);
+      hash ^= image.data[offset + 1]; hash = Math.imul(hash, 16777619);
+      hash ^= image.data[offset + 2]; hash = Math.imul(hash, 16777619);
+      hash ^= alpha; hash = Math.imul(hash, 16777619);
+      if (alpha > 0) {
+        nonTransparent += 1;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  return {
+    index,
+    width: canvas.width,
+    height: canvas.height,
+    coverage: nonTransparent / Math.max(1, canvas.width * canvas.height),
+    alphaMean: alphaTotal / Math.max(1, canvas.width * canvas.height),
+    bounds: maxX >= minX ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 } : null,
+    rgbaHash: (hash >>> 0).toString(16).padStart(8, '0')
+  };
+`;
+
 function fourPanelSvg() {
   return Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
@@ -17,19 +50,6 @@ function fourPanelSvg() {
       <path d="M550 560 H650 V640 H550 Z" fill="#f97316"/>
     </svg>
   `);
-}
-
-class BrowserZipFile {
-  constructor(entry) { this.entry = entry; this.dir = false; }
-  async async(type) {
-    const bytes = this.entry.kind === 'text'
-      ? new TextEncoder().encode(this.entry.value)
-      : Uint8Array.from(Buffer.from(this.entry.value, 'base64'));
-    if (type === 'string') return this.entry.kind === 'text' ? this.entry.value : new TextDecoder().decode(bytes);
-    if (type === 'base64') return Buffer.from(bytes).toString('base64');
-    if (type === 'uint8array') return bytes;
-    return bytes.buffer;
-  }
 }
 
 async function installDeterministicRuntime(page) {
@@ -47,9 +67,7 @@ async function installDeterministicRuntime(page) {
     class RuntimeZipFile {
       constructor(entry) { this.entry = entry; this.dir = false; }
       async async(type) {
-        const bytes = this.entry.kind === 'text'
-          ? new TextEncoder().encode(this.entry.value)
-          : fromBase64(this.entry.value);
+        const bytes = this.entry.kind === 'text' ? new TextEncoder().encode(this.entry.value) : fromBase64(this.entry.value);
         if (type === 'string') return this.entry.kind === 'text' ? this.entry.value : new TextDecoder().decode(bytes);
         if (type === 'base64') return toBase64(bytes);
         if (type === 'uint8array') return bytes;
@@ -58,11 +76,11 @@ async function installDeterministicRuntime(page) {
     }
     class RuntimeZip {
       constructor() { this.entries = {}; this.files = {}; }
-      file(path, value) {
+      file(path, value, options = {}) {
         if (arguments.length === 1) return this.files[path] || null;
-        const entry = typeof value === 'string'
+        const entry = typeof value === 'string' && !options.base64
           ? { kind: 'text', value }
-          : { kind: 'base64', value: toBase64(value) };
+          : { kind: 'base64', value: typeof value === 'string' ? value : toBase64(value) };
         this.entries[path] = entry;
         this.files[path] = new RuntimeZipFile(entry);
         return this;
@@ -84,9 +102,9 @@ async function installDeterministicRuntime(page) {
     window.JSZip = RuntimeZip;
     window.lucide = { createIcons() {} };
   });
-  await page.route('**/cdn.tailwindcss.com/**', route => route.fulfill({ contentType: 'application/javascript', body: 'window.tailwind={};' }));
-  await page.route('**/unpkg.com/lucide/**', route => route.fulfill({ contentType: 'application/javascript', body: 'window.lucide={createIcons(){}};' }));
-  await page.route('**/cdnjs.cloudflare.com/ajax/libs/jszip/**', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
+  await page.route(/cdn\.tailwindcss\.com/, route => route.fulfill({ contentType: 'application/javascript', body: 'window.tailwind={};' }));
+  await page.route(/unpkg\.com\/lucide/, route => route.fulfill({ contentType: 'application/javascript', body: 'window.lucide={createIcons(){}};' }));
+  await page.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/jszip/, route => route.fulfill({ contentType: 'application/javascript', body: '' }));
 }
 
 async function openLegacy(browser) {
@@ -94,7 +112,7 @@ async function openLegacy(browser) {
   const page = await context.newPage();
   await installDeterministicRuntime(page);
   await page.goto('/legacy-preview.html', { waitUntil: 'commit' });
-  await page.waitForFunction(() => typeof state !== 'undefined' && document.querySelector('#fileInput'));
+  await page.waitForFunction(() => typeof state !== 'undefined' && Boolean(document.querySelector('#fileInput')));
   return { context, page };
 }
 
@@ -119,23 +137,19 @@ async function importWorkshop(page) {
   await page.locator('#fileInput').setInputFiles({ name: 'four-panel.svg', mimeType: 'image/svg+xml', buffer: fourPanelSvg() });
   await page.locator('[data-layout="2x2"]').click();
   await expect(page.locator('[data-review-card="true"]')).toHaveCount(4, { timeout: 20000 });
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-review-card="true"] img')].every(image => image.complete && image.naturalWidth > 0));
 }
 
 async function legacySnapshot(page) {
-  return page.evaluate(() => ({
-    source: { width: state.sources[0].img.width, height: state.sources[0].img.height, rows: state.sources[0].rows, cols: state.sources[0].cols },
-    frames: state.allBoxes.map((box, index) => ({
-      index,
-      x: box.cropX,
-      y: box.cropY,
-      width: box.cropW,
-      height: box.cropH,
-      offsetX: box.offsetX,
-      offsetY: box.offsetY
-    })),
-    outputs: state.stickers.map((sticker, index) => canvasSummary(sticker.canvas, index)),
-    names: state.stickers.map((_sticker, index) => getStickerFilename(index))
-  }));
+  return page.evaluate(({ summaryBody }) => {
+    const summarize = new Function('canvas', 'index', summaryBody);
+    return {
+      source: { width: state.sources[0].img.width, height: state.sources[0].img.height, rows: state.sources[0].rows, cols: state.sources[0].cols },
+      frames: state.allBoxes.map((box, index) => ({ index, x: box.cropX, y: box.cropY, width: box.cropW, height: box.cropH, offsetX: box.offsetX, offsetY: box.offsetY })),
+      outputs: state.stickers.map((sticker, index) => summarize(sticker.canvas, index)),
+      names: state.stickers.map((_sticker, index) => getStickerFilename(index))
+    };
+  }, { summaryBody: CANVAS_SUMMARY_BODY });
 }
 
 async function workshopProjectSnapshot(page) {
@@ -151,13 +165,16 @@ async function workshopProjectSnapshot(page) {
 }
 
 async function workshopOutputSummaries(page) {
-  return page.locator('[data-review-card="true"] img').evaluateAll(images => images.map((image, index) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    canvas.getContext('2d').drawImage(image, 0, 0);
-    return canvasSummary(canvas, index);
-  }));
+  return page.locator('[data-review-card="true"] img').evaluateAll((images, summaryBody) => {
+    const summarize = new Function('canvas', 'index', summaryBody);
+    return images.map((image, index) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      canvas.getContext('2d').drawImage(image, 0, 0);
+      return summarize(canvas, index);
+    });
+  }, CANVAS_SUMMARY_BODY);
 }
 
 function normalizedGeometry(frame) {
@@ -192,9 +209,7 @@ function pngPaths(entries) {
   return Object.keys(entries).filter(path => path.toLowerCase().endsWith('.png')).sort();
 }
 
-test.beforeAll(async () => {
-  await mkdir(outputDir, { recursive: true });
-});
+test.beforeAll(async () => mkdir(outputDir, { recursive: true }));
 
 test('Layout 2x2 geometry matches Legacy within two pixels', async ({ browser }) => {
   const legacyApp = await openLegacy(browser);
@@ -205,11 +220,9 @@ test('Layout 2x2 geometry matches Legacy within two pixels', async ({ browser })
     const legacy = await legacySnapshot(legacyApp.page);
     const project = await workshopProjectSnapshot(workshopApp.page);
     const workshopFrames = project.document.frames.map(normalizedGeometry);
-
     expect(legacy.source).toEqual({ width: 800, height: 800, rows: 2, cols: 2 });
     expect(workshopFrames).toHaveLength(4);
     legacy.frames.forEach((frame, index) => assertGeometryClose(frame, workshopFrames[index]));
-
     await writeFile(new URL('layout-2x2-comparison.json', outputDir), JSON.stringify({ legacy: legacy.frames, workshop: workshopFrames }, null, 2));
   } finally {
     await legacyApp.context.close();
@@ -225,7 +238,6 @@ test('default Refine output dimensions and alpha stay within RC tolerance', asyn
     await importWorkshop(workshopApp.page);
     const legacy = await legacySnapshot(legacyApp.page);
     const workshop = await workshopOutputSummaries(workshopApp.page);
-
     expect(workshop).toHaveLength(legacy.outputs.length);
     legacy.outputs.forEach((output, index) => assertOutputClose(output, workshop[index]));
     await writeFile(new URL('refine-default-comparison.json', outputDir), JSON.stringify({ legacy: legacy.outputs, workshop }, null, 2));
@@ -241,7 +253,6 @@ test('Legacy PNG names remain present in Workshop ZIP', async ({ browser }) => {
   try {
     await importLegacy(legacyApp.page);
     await importWorkshop(workshopApp.page);
-
     await legacyApp.page.locator('#lineNamingToggle').check({ force: true });
     await legacyApp.page.locator('#lineNamingToggle').dispatchEvent('change');
     const legacyNames = await legacyApp.page.evaluate(() => state.stickers.map((_item, index) => getStickerFilename(index)));
@@ -258,6 +269,7 @@ test('Legacy PNG names remain present in Workshop ZIP', async ({ browser }) => {
     await legacyApp.page.locator('#downloadZipBtn').click({ force: true });
     const legacyArchive = await parseDownloadedArchive(await legacyDownloadPromise);
 
+    await expect(workshopApp.page.locator('#packageExportBtn')).toBeEnabled();
     const workshopDownloadPromise = workshopApp.page.waitForEvent('download');
     await workshopApp.page.locator('#packageExportBtn').click();
     const workshopArchive = await parseDownloadedArchive(await workshopDownloadPromise);
@@ -266,47 +278,9 @@ test('Legacy PNG names remain present in Workshop ZIP', async ({ browser }) => {
     const workshopPngs = pngPaths(workshopArchive).map(path => path.split('/').pop()).sort();
     expect(legacyPngs).toEqual(legacyNames.slice().sort());
     for (const name of legacyNames) expect(workshopPngs).toContain(name);
-
     await writeFile(new URL('package-name-comparison.json', outputDir), JSON.stringify({ legacyPngs, workshopPngs, workshopEntries: Object.keys(workshopArchive).sort() }, null, 2));
   } finally {
     await legacyApp.context.close();
     await workshopApp.context.close();
   }
 });
-
-function canvasSummary(canvas, index) {
-  const ctx = canvas.getContext('2d');
-  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  let nonTransparent = 0;
-  let alphaTotal = 0;
-  let minX = canvas.width;
-  let minY = canvas.height;
-  let maxX = -1;
-  let maxY = -1;
-  let hash = 2166136261;
-  for (let y = 0; y < canvas.height; y += 1) {
-    for (let x = 0; x < canvas.width; x += 1) {
-      const offset = (y * canvas.width + x) * 4;
-      const alpha = image.data[offset + 3];
-      alphaTotal += alpha;
-      hash ^= image.data[offset]; hash = Math.imul(hash, 16777619);
-      hash ^= image.data[offset + 1]; hash = Math.imul(hash, 16777619);
-      hash ^= image.data[offset + 2]; hash = Math.imul(hash, 16777619);
-      hash ^= alpha; hash = Math.imul(hash, 16777619);
-      if (alpha > 0) {
-        nonTransparent += 1;
-        minX = Math.min(minX, x); minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
-      }
-    }
-  }
-  return {
-    index,
-    width: canvas.width,
-    height: canvas.height,
-    coverage: nonTransparent / Math.max(1, canvas.width * canvas.height),
-    alphaMean: alphaTotal / Math.max(1, canvas.width * canvas.height),
-    bounds: maxX >= minX ? { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 } : null,
-    rgbaHash: (hash >>> 0).toString(16).padStart(8, '0')
-  };
-}
