@@ -1,14 +1,14 @@
 # Stixio 正式版功能驗收表
 
 - 最新驗收日期：2026-06-30
-- 驗收版本：`document-project-full-completion`（合併後為 `main`）
+- 驗收版本：`destination-rules-full-completion`（合併後為 `main`）
 - 穩定備份分支：`stable-legacy`
 - 穩定版本標籤：`v1.0.0-legacy-stable`
 - 測試環境：Headless Chromium、Node.js 22
-- 測試素材：多來源 SVG 排版圖、手動遮罩、空白輸出、損壞專案與 `.stixio` 往返檔案
-- 驗收結果：**單元測試 75 / 75、Project Chromium 4 / 4，Layout／Refine／Review／Package Chromium 與 Static Build 全部通過**
+- 測試素材：多來源 SVG 排版圖、角色混合輸出、手動遮罩、損壞專案、自訂 Profile 與 `.stixio` 往返檔案
+- 本階段驗收：**單元測試 89 / 89、Destination Chromium 4 / 4、Static Build 通過**
 
-> 原始完整版本仍保留為穩定回復點。正式 Workshop 的 Layout、Refine、Review、Package 與 Document／Project 必須同時通過語法檢查、單元測試、Build 與真實 Chromium 操作驗收。
+> 原始完整版本仍保留為穩定回復點。正式 Workshop 的 Layout、Refine、Review、Package、Document／Project 與 Destination Rules 必須同時通過語法檢查、單元測試、Build 與真實 Chromium 操作驗收。
 
 ## A. 文件與程式結構
 
@@ -18,7 +18,8 @@
 | DOM ID 唯一性 | ✅ | 無重複 ID |
 | 四階段工作流程 | ✅ | Layout、Refine、Review、Package 完整存在 |
 | Project Toolbar | ✅ | 新建、儲存、另存、開啟、匯出與最近專案 |
-| 平台中立規則 | ✅ | 核心與 UI 不依賴特定販售平台名稱 |
+| Destination Profile Engine | ✅ | Profile、角色、版本與規格驗證由核心統一管理 |
+| 平台中立規則 | ✅ | Profile 可代表不同目的地，不綁死特定品牌名稱 |
 | JavaScript 語法 | ✅ | Node.js 語法檢查全部通過 |
 | Static Build | ✅ | 正式入口與所有模組可完整建置 |
 
@@ -51,31 +52,31 @@
 
 | 項目 | 結果 | 說明 |
 |---|---|---|
-| 大型輸出預覽 | ✅ | 顯示 Frame、檔名、尺寸、透明比例、內容範圍與大小 |
+| 大型輸出預覽 | ✅ | 顯示 Frame、角色、檔名、尺寸、透明比例、內容範圍與大小 |
+| 角色專屬尺寸 | ✅ | Main、Tab、Sticker 與背景角色按各自 Profile 規格檢查 |
+| 角色專屬安全區 | ✅ | 每張 Frame 使用所屬角色的 safe margin |
+| 角色專屬檔案上限 | ✅ | 每張 Frame 使用所屬角色的 maxFileSizeBytes |
 | 四種檢查背景 | ✅ | 透明格、白、黑、貼圖綠 |
-| 安全區與內容邊界 | ✅ | 可獨立顯示並依實際 Alpha 計算 |
 | 搜尋、篩選與排序 | ✅ | 錯誤、警告、核准、匯出、名稱、來源與大小 |
 | 單張與批次核准 | ✅ | Error 項目禁止核准 |
 | 問題導航 | ✅ | 可直接跳到對應 Frame |
-| 像素品質檢查 | ✅ | 空白、內容過少、碰邊、安全區與疑似背景 |
-| Package 門檻 | ✅ | 未核准或仍有 Error 時禁止封裝 |
-| Chromium 驗收 | ✅ | 背景、指南、批次操作、拖曳排序與快捷鍵通過 |
+| Package 門檻 | ✅ | 未核准、角色數量或輸出規格錯誤時禁止封裝 |
+| Chromium 驗收 | ✅ | 背景、指南、角色切換、批次操作與快捷鍵通過 |
 
 ## E. Package 全功能驗收
 
 | 項目 | 結果 | 說明 |
 |---|---|---|
 | 正式 Package 工作區 | ✅ | 顯示最終 ZIP 路徑、角色、來源、尺寸與大小 |
-| 命名模式 | ✅ | Main／Tab／Sticker 與自訂流水號 |
+| Profile 命名規則 | ✅ | 固定角色檔名、角色流水號與自訂流水號 |
+| Profile 數量規則 | ✅ | exact、min、max 與 allowedCounts 均會阻擋不合規封裝 |
+| Profile 角色規則 | ✅ | Main、Tab、Sticker、Fullscreen Background、Effect Background |
 | 資料夾結構 | ✅ | 平放、角色、來源、來源／角色雙層 |
 | 安全路徑 | ✅ | 清理非法字元、保留名稱、重複與過長路徑 |
 | Manifest | ✅ | JSON 與 CSV |
 | SHA-256 | ✅ | PNG 校驗碼與 `checksums.sha256` |
-| README | ✅ | 交付內容說明 |
-| ZIP 壓縮 | ✅ | STORE／DEFLATE 與壓縮等級 |
-| 進度與取消 | ✅ | Hash、壓縮、驗證狀態可見並可取消 |
-| 完整性驗證 | ✅ | 產生後重新讀取 ZIP 並核對內容 |
-| Chromium 驗收 | ✅ | 預檢、路徑、Manifest、ZIP 與輸出紀錄通過 |
+| ZIP 壓縮與驗證 | ✅ | STORE／DEFLATE、進度、取消與封裝後完整性檢查 |
+| Chromium 驗收 | ✅ | Profile 預檢、角色分配、路徑、Manifest 與 ZIP 通過 |
 
 ## F. Document／Project 全功能驗收
 
@@ -85,37 +86,56 @@
 | 原始來源圖片 | ✅ | 來源圖以專案資產保存並可重新載入 |
 | Refine 手動遮罩 | ✅ | 每張 Frame 的 Keep／Delete 遮罩完整還原 |
 | Review 狀態 | ✅ | 核准、排除、角色與 Frame 順序完整還原 |
-| Package 狀態 | ✅ | ZIP 名稱、根目錄、資料夾、Manifest、Checksum 與歷史 |
+| Package 狀態 | ✅ | ZIP 名稱、資料夾、Manifest、Checksum 與歷史 |
+| Destination 狀態 | ✅ | Active Profile、角色、版本與所有自訂 Profile 完整保存 |
 | `.stixio` 封裝 | ✅ | `project.json`、`assets/`、`masks/`、`preview.png` 與校驗碼 |
-| `.stixio` 完整性 | ✅ | 開啟時驗證必要檔案與 SHA-256 |
-| Schema Migration | ✅ | 1.x 專案升級到 2.0；未來版本明確阻擋 |
-| IndexedDB 專案庫 | ✅ | 儲存、載入、最近專案、複製與刪除 |
-| 自動保存 | ✅ | 編輯後自動保存草稿，重新整理後自動恢復 |
-| 新建／儲存／另存 | ✅ | 未儲存變更提示與 Ctrl／Cmd+S |
+| Schema Migration | ✅ | 舊專案缺少 Destination 狀態時自動使用 Flexible Profile |
+| IndexedDB 與自動保存 | ✅ | 最近專案、草稿恢復及 Profile 狀態一併保存 |
 | 損壞檔案保護 | ✅ | 無效、缺少素材與 checksum 錯誤不會覆蓋目前專案 |
-| 專案重新整理恢復 | ✅ | 來源、遮罩、Review 與 Package 狀態全部恢復 |
-| 真實 Chromium 驗收 | ✅ | 自動恢復、匯出匯入、最近專案與損壞檔案 4 / 4 通過 |
+| 真實 Chromium 驗收 | ✅ | 自動恢復、匯出匯入、最近專案與損壞檔案通過 |
+
+## G. Destination Rules／多 Profile 規格引擎
+
+| 項目 | 結果 | 說明 |
+|---|---|---|
+| Versioned Profile Schema | ✅ | Profile 具有 schemaVersion、key、version 與 metadata |
+| 六個內建 Profile | ✅ | Flexible、Standard、Animated、Big、Fullscreen、Effect |
+| 每角色獨立規格 | ✅ | width、height、safeMargin、maxFileSizeBytes 與命名 |
+| 數量規則 | ✅ | exact、min、max、allowedCounts |
+| Profile Registry | ✅ | 內建與自訂 Profile 共存，內建不可刪除 |
+| Profile 切換 | ✅ | 不支援的角色自動正規化，過期核准自動撤銷 |
+| 自訂尺寸相容 | ✅ | 修改內建尺寸時自動複製成 Custom Profile，不刪除原功能 |
+| JSON 編輯 | ✅ | 自訂 Profile 可完整編輯並驗證 |
+| 匯入／匯出 | ✅ | `.stixio-profile.json` 可攜式規格檔 |
+| Profile 複製／刪除 | ✅ | 可複製內建或自訂規格並管理自訂項目 |
+| 版本提示 | ✅ | 專案使用版本與目前版本不同時要求重新 Review |
+| Project 保存 | ✅ | Active／Custom Profile 隨 `.stixio` 與 IndexedDB 保存 |
+| Chromium 驗收 | ✅ | 標準角色尺寸、數量阻擋、自訂 Profile 與重載恢復 4 / 4 通過 |
 
 ## 本階段發現並修正
 
-### 執行期 Canvas 不能直接序列化
+### 所有角色錯誤共用 Sticker 尺寸
 
-來源圖片的 `HTMLImageElement` 與手動遮罩 Canvas 不可直接放進 JSON。現在 Snapshot 會移除執行期物件，來源改由資產資料保存，遮罩改為 PNG，再於開啟專案時重建 Image 與 Canvas。
+原流程以全域 `targetW／targetH` 渲染所有 Frame。現在每張 Frame 依角色取得輸出規格，因此 Main、Tab、Sticker 與特殊背景可以同時存在於同一個專案與 ZIP。
 
-### Package 設定位於獨立 Controller
+### Profile 切換後沿用過期核准
 
-Package 的交付設定原本只存在 Controller 私有狀態。現在 Controller 提供明確的 `exportState()`／`importState()`，因此 Project 可以保存並恢復完整交付設定與輸出紀錄。
+目的地、角色或尺寸改變後，原 Review 核准不再有效。切換 Profile、修改規格或改變角色時會撤銷對應核准並重新渲染與檢查。
 
-### 機器人提交不應觸發寫回循環
+### 不能為了 Profile 刪除自訂尺寸
 
-一次性遷移完成後已移除遷移腳本，Project CI 改為唯讀驗收，不再由測試流程修改正式程式。
+原本的自訂寬高與安全留白功能已保留。修改內建 Profile 時，Stixio 會先複製成 Custom Profile，再修改自訂版本，確保內建規格與舊功能都不被破壞。
+
+### 驗收流程不應修改正式程式
+
+一次性遷移完成後已刪除遷移腳本，Destination workflow 改為唯讀，只驗證正式來源檔案。
 
 ## 已知產品行為／後續改善
 
-1. 高解析多來源專案會占用較多 IndexedDB 空間；後續可加入資產去重、分塊儲存與容量管理。
-2. 自動保存目前以完整 Snapshot 為單位；大型專案後續可改為增量保存與背景 Worker。
-3. 瀏覽器清除網站資料會移除 IndexedDB 專案，因此重要專案仍應匯出 `.stixio` 備份。
-4. 多裝置同步與雲端 Workspace 尚未實作，屬於後續 Storage／Sync 階段。
+1. 內建 Profile 是可版本化的模板；正式接入特定服務前仍需依當時官方規格更新版本與來源說明。
+2. 大型混合角色專案需要多種尺寸重複渲染，後續可加入 Web Worker 與角色輸出快取。
+3. 瀏覽器清除網站資料會移除 IndexedDB 專案，因此重要自訂 Profile 與專案仍應匯出備份。
+4. 多裝置同步與雲端 Profile Registry 尚未實作，屬於後續 Storage／Sync 階段。
 
 ## 發版規則
 
