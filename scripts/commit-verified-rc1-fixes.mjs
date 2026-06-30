@@ -16,7 +16,9 @@ const paths = [
   'src/ui/destination-controller.js',
   'src/ui/stixio-workshop-app-v2.js',
   'tests/e2e/parity-layout-refine-package.spec.js',
-  'tests/e2e/parity-multisource-mask-review.spec.js'
+  'tests/e2e/parity-multisource-mask-review.spec.js',
+  'tests/e2e/parity-refine-review.spec.js',
+  'tests/e2e/parity-stress.spec.js'
 ];
 
 exec('git', ['config', 'user.name', 'github-actions[bot]']);
@@ -30,7 +32,7 @@ if (!staged) {
 }
 
 console.log(`Committing verified RC1 files:\n${staged}`);
-exec('git', ['commit', '-m', 'Preserve Legacy output identities in RC1']);
+exec('git', ['commit', '-m', 'Preserve Legacy parity behavior in RC1']);
 exec('git', ['push', 'origin', `HEAD:${branch}`]);
 
 function exec(command, args) {
