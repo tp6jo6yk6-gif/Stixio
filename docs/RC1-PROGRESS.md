@@ -12,14 +12,15 @@ Updated: 2026-06-30
 - Multiple source images with independent Layout settings
 - Manual Delete brush with Undo and Redo
 - Excluded Frames preserve their original output filenames
-
-## Batch 3 validation
-
 - Keep brush restores automatically removed pixels
-- Magic Delete removes one connected color region
 - Review white, black and checker backgrounds
 - Review safe guide toggle
-- Drag reorder followed by positional role assignment
+
+## Batch 3 retry
+
+- Magic Delete now locates the target color directly from Canvas pixels
+- Drag reorder browser scope is resolved for every geometry capture
+- Positional role assignment is compared through the final ZIP
 
 ## Next
 
