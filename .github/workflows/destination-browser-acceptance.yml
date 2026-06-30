@@ -1,0 +1,105 @@
+name: Destination Rules browser acceptance
+
+on:
+  push:
+    branches:
+      - destination-rules-full-completion
+    paths:
+      - 'src/core/destination-profiles.js'
+      - 'src/core/project-workflow.js'
+      - 'src/core/review/**'
+      - 'src/core/index.js'
+      - 'src/ui/destination-controller.js'
+      - 'src/ui/package-controller.js'
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'scripts/apply-destination-rules-completion.mjs'
+      - 'tests/destination-profiles.test.js'
+      - 'tests/destination-project-state.test.js'
+      - 'tests/e2e/destination.spec.js'
+      - 'playwright.destination.config.js'
+      - 'package.json'
+      - '.github/workflows/destination-browser-acceptance.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: destination-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  chromium-destination:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply Destination Rules completion
+        run: |
+          set -o pipefail
+          {
+            node --check scripts/apply-destination-rules-completion.mjs
+            if grep -q "DESTINATION_RULES_FULL_COMPLETION" src/ui/stixio-workshop-app-v2.js; then
+              echo "Destination Rules integration already applied."
+            else
+              node scripts/apply-destination-rules-completion.mjs
+            fi
+          } 2>&1 | tee destination-migration.log
+      - name: Install dependencies
+        run: npm install
+      - name: Check syntax, unit tests and build
+        run: |
+          set -o pipefail
+          {
+            node --check src/core/destination-profiles.js
+            node --check src/core/project-workflow.js
+            node --check src/core/review/review-engine.js
+            node --check src/core/review/review-workflow.js
+            node --check src/ui/destination-controller.js
+            node --check src/ui/package-controller.js
+            node --check src/ui/stixio-workshop-app-v2.js
+            npm test
+            npm run build
+          } 2>&1 | tee destination-ci.log
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Destination Rules browser acceptance
+        run: |
+          set -o pipefail
+          npm run test:e2e:destination 2>&1 | tee destination-browser.log
+      - name: Upload Destination Rules report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: destination-browser-report
+          path: |
+            destination-migration.log
+            destination-ci.log
+            destination-browser.log
+            src/core/project-workflow.js
+            src/core/review/review-engine.js
+            src/core/review/review-workflow.js
+            src/ui/stixio-workshop-app-v2.js
+            src/ui/package-controller.js
+            playwright-report/destination
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Commit verified Destination Rules integration
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/core/project-workflow.js src/core/review/review-engine.js src/core/review/review-workflow.js src/ui/stixio-workshop-app-v2.js src/ui/package-controller.js package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Complete Destination Rules and multi-profile workflow"
+          git push origin HEAD:${HEAD_BRANCH}
