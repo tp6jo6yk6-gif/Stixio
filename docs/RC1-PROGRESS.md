@@ -18,4 +18,4 @@ Updated: 2026-06-30
 
 ## Focused final check
 
-Review reorder now waits for both Legacy and Workshop cards before dispatching DragEvent. The test verifies DOM order, project frame order, geometry tolerance, and final ZIP names.
+Review reorder waits for both Legacy and Workshop card lists before dispatching DragEvent. The preparation script now safely emits the browser-side error message without evaluating it in Node.
