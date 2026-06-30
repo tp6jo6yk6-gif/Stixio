@@ -1,9 +1,9 @@
 name: Finalize Legacy Parity RC1
 
 on:
-  push:
+  pull_request:
     branches:
-      - workshop-parity-rc1
+      - main
   workflow_dispatch:
 
 concurrency:
