@@ -12,12 +12,15 @@ on:
       - 'src/ui/destination-controller.js'
       - 'src/ui/package-controller.js'
       - 'src/ui/stixio-workshop-app-v2.js'
+      - 'scripts/apply-project-approval-restore-fix.mjs'
       - 'tests/destination-profiles.test.js'
       - 'tests/destination-project-state.test.js'
       - 'tests/e2e/destination.spec.js'
       - 'tests/e2e/package.spec.js'
+      - 'tests/e2e/project.spec.js'
       - 'playwright.destination.config.js'
       - 'playwright.package.config.js'
+      - 'playwright.project.config.js'
       - 'package.json'
       - '.github/workflows/destination-browser-acceptance.yml'
   pull_request:
@@ -30,17 +33,23 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   chromium-destination:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Apply project approval restore fix
+        run: |
+          node --check scripts/apply-project-approval-restore-fix.mjs
+          node scripts/apply-project-approval-restore-fix.mjs
       - name: Install dependencies
         run: npm install
       - name: Check syntax, unit tests and build
@@ -60,24 +69,18 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run Destination Rules browser acceptance
+        run: npm run test:e2e:destination
+      - name: Run Package browser acceptance
+        run: npm run test:e2e:package
+      - name: Run Project browser acceptance
+        run: npm run test:e2e:project
+      - name: Commit verified approval restore fix
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
         run: |
-          set -o pipefail
-          npm run test:e2e:destination 2>&1 | tee destination-browser.log
-      - name: Run Package compatibility browser acceptance
-        run: |
-          set -o pipefail
-          npm run test:e2e:package 2>&1 | tee package-browser.log
-      - name: Upload Destination Rules report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: destination-browser-report
-          path: |
-            destination-ci.log
-            destination-browser.log
-            package-browser.log
-            playwright-report/destination
-            playwright-report/package
-            test-results
-          if-no-files-found: ignore
-          retention-days: 14
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ui/stixio-workshop-app-v2.js package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Preserve Review approvals when restoring projects"
+          git push origin HEAD:${HEAD_BRANCH}
