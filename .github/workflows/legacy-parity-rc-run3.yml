@@ -1,62 +1,50 @@
-name: Legacy Parity RC Batch 3
+name: Finalize Legacy Parity RC1
 
 on:
-  push:
-    branches:
-      - workshop-parity-rc1
-    paths:
-      - '.github/workflows/legacy-parity-rc-run3.yml'
-      - 'src/**'
-      - 'tests/e2e/parity*.spec.js'
-      - 'scripts/fix-parity-hidden-input.mjs'
-      - 'scripts/apply-rc1-parity-fixes.mjs'
-      - 'scripts/fix-parity-refine-review-spec.mjs'
-      - 'package.json'
   pull_request:
     branches:
       - workshop-parity-rc1
   workflow_dispatch:
 
 concurrency:
-  group: legacy-parity-rc-batch3-${{ github.ref }}
+  group: finalize-legacy-parity-rc1
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  chromium-parity:
+  finalize-rc1:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: workshop-parity-rc1
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Apply verified RC test preparation
+      - name: Apply verified RC1 sources
         run: |
-          node --check scripts/fix-parity-hidden-input.mjs
-          node scripts/fix-parity-hidden-input.mjs
+          node --check scripts/finalize-rc1.mjs
+          node scripts/finalize-rc1.mjs
       - name: Install dependencies
         run: npm ci
-      - name: Test and build
+      - name: Verify finalized unit tests and build
         run: |
           npm test
           npm run build
           npm run parity:extract
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run focused Review reorder parity
-        run: npx playwright test --config=playwright.parity.config.js -g "drag reorder changes geometry order"
-      - name: Upload evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: legacy-parity-rc-batch3
-          path: |
-            parity-results
-            playwright-report/parity
-            test-results
-          if-no-files-found: error
-          retention-days: 30
+      - name: Verify finalized Magic and reorder parity
+        run: npx playwright test --config=playwright.parity.config.js -g "Magic Delete|drag reorder changes geometry order"
+      - name: Commit finalized RC1
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Finalize Stixio 1.0.0 RC1 parity gate"
+          git push origin HEAD:workshop-parity-rc1
