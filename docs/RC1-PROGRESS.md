@@ -2,24 +2,18 @@
 
 Updated: 2026-06-30
 
-## Passed
+## Full parity pass
 
-- Legacy payload extraction and SHA-256 fingerprint
-- Legacy and Workshop Chromium startup
-- 2x2 Layout geometry within 1 pixel
-- Default 370x320 Refine output within RC alpha tolerance
-- Main, Tab and Sticker package names
-- Manual Delete brush with Undo and Redo
+- Legacy payload extraction and SHA-256 fingerprint: passed
+- Legacy and Workshop Chromium startup: passed
+- Layout geometry: passed within approved tolerance
+- Refine output: passed within approved tolerance
+- Package names and excluded Frame identities: passed
+- Delete, Keep, Magic, Undo and Redo: passed
+- Review backgrounds, guide and reorder: passed
+- Multiple-source projects and restore: passed
+- Destination Profile switching: passed
+- 40-output and 100-output stress tests: passed
+- 40 independent masks: passed
 
-## Fix in progress
-
-When an earlier Sticker is excluded, Legacy keeps the later Sticker filename. Workshop must preserve that Frame identity instead of compacting the remaining names.
-
-## Next
-
-- Multiple source Layout settings
-- Review selection and reorder
-- Keep and Magic tools
-- 40 and 100 output stress tests
-- Ten-source restore
-- Repeated Profile switching
+The complete Legacy parity suite passed 16 of 16 tests.
