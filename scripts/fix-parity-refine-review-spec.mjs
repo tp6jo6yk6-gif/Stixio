@@ -40,7 +40,7 @@ async function dispatchCardReorder(page, selector, fromIndex, toIndex) {
   await expect.poll(()=>page.locator(selector).count(),{timeout:12000}).toBeGreaterThanOrEqual(required);
   await page.evaluate(({ selector, fromIndex, toIndex }) => {
     const cards=[...document.querySelectorAll(selector)];
-    if(!cards[fromIndex]||!cards[toIndex])throw new Error(`Reorder cards are unavailable: ${cards.length}`);
+    if(!cards[fromIndex]||!cards[toIndex])throw new Error('Reorder cards are unavailable: '+cards.length);
     const transfer=new DataTransfer();
     cards[fromIndex].dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:transfer}));
     cards[toIndex].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));
