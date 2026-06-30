@@ -1,6 +1,6 @@
 {
   "name": "stixio",
-  "version": "0.9.0-rc.1",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "Stixio is a fast sticker production workspace for creators.",
   "type": "module",
@@ -19,7 +19,7 @@
     "test:e2e:package": "playwright test --config=playwright.package.config.js",
     "test:e2e:project": "playwright test --config=playwright.project.config.js",
     "test:e2e:destination": "playwright test --config=playwright.destination.config.js",
-    "test:e2e:parity": "playwright test --config=playwright.parity.config.js && node scripts/commit-verified-rc1-fixes.mjs",
+    "test:e2e:parity": "playwright test --config=playwright.parity.config.js",
     "ci": "npm run test && npm run build"
   },
   "devDependencies": {
