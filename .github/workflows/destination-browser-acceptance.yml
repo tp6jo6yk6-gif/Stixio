@@ -12,7 +12,6 @@ on:
       - 'src/ui/destination-controller.js'
       - 'src/ui/package-controller.js'
       - 'src/ui/stixio-workshop-app-v2.js'
-      - 'scripts/apply-project-approval-restore-fix.mjs'
       - 'tests/destination-profiles.test.js'
       - 'tests/destination-project-state.test.js'
       - 'tests/e2e/destination.spec.js'
@@ -33,7 +32,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   chromium-destination:
@@ -41,15 +40,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply project approval restore fix
-        run: |
-          node --check scripts/apply-project-approval-restore-fix.mjs
-          node scripts/apply-project-approval-restore-fix.mjs
       - name: Install dependencies
         run: npm install
       - name: Check syntax, unit tests and build
@@ -74,13 +67,16 @@ jobs:
         run: npm run test:e2e:package
       - name: Run Project browser acceptance
         run: npm run test:e2e:project
-      - name: Commit verified approval restore fix
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/ui/stixio-workshop-app-v2.js package-lock.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Preserve Review approvals when restoring projects"
-          git push origin HEAD:${HEAD_BRANCH}
+      - name: Upload cross-stage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: destination-cross-stage-report
+          path: |
+            destination-ci.log
+            playwright-report/destination
+            playwright-report/package
+            playwright-report/project
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
