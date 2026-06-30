@@ -2,6 +2,8 @@ import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const parityTestPath = 'tests/e2e/parity-layout-refine-package.spec.js';
 const secondTestPath = 'tests/e2e/parity-multisource-mask-review.spec.js';
+const refineReviewTestPath = 'tests/e2e/parity-refine-review.spec.js';
+const stressTestPath = 'tests/e2e/parity-stress.spec.js';
 const profilesPath = 'src/core/destination-profiles.js';
 const destinationControllerPath = 'src/ui/destination-controller.js';
 const appPath = 'src/ui/stixio-workshop-app-v2.js';
@@ -31,6 +33,43 @@ secondTest = secondTest.replace(
     await expect(workshopApp.page.locator('[data-review-card="true"]')).toHaveCount(5);`
 );
 await writeFile(secondTestPath, secondTest, 'utf8');
+
+let refineReviewTest = await readFile(refineReviewTestPath, 'utf8');
+refineReviewTest = refineReviewTest.replace(
+  `    await legacyApp.page.locator('#enableChroma').uncheck({ force: true });
+    await legacyApp.page.locator('#enableChroma').dispatchEvent('change');`,
+  `    await legacyApp.page.locator('#enableChroma').check({ force: true });
+    await legacyApp.page.locator('#enableChroma').dispatchEvent('change');
+    await legacyApp.page.locator('#bgColorInput').fill('#000000');
+    await legacyApp.page.locator('#bgColorInput').dispatchEvent('input');`
+);
+const legacyGeometryExpression = `state.allBoxes.map(box => [Math.round(box.cropX), Math.round(box.cropY), Math.round(box.cropW), Math.round(box.cropH)])`;
+refineReviewTest = refineReviewTest.replace(
+  `legacyApp.page.evaluate(() => geometryListForParity(state.allBoxes))`,
+  `legacyApp.page.evaluate(() => ${legacyGeometryExpression})`
+);
+refineReviewTest = refineReviewTest.replace(
+  `legacyApp.page.evaluate(() => geometryListForParity(state.allBoxes))`,
+  `legacyApp.page.evaluate(() => ${legacyGeometryExpression})`
+);
+await writeFile(refineReviewTestPath, refineReviewTest, 'utf8');
+
+let stressTest = await readFile(stressTestPath, 'utf8');
+stressTest = stressTest.replace(
+  `  return { path, snapshot: JSON.parse(archive['project.json'].value) };`,
+  `  return { path, archive, snapshot: JSON.parse(archive['project.json'].value) };`
+);
+stressTest = stressTest.replace(
+  `    const maskCount = exported.snapshot.document.frames.filter(frame => frame.custom?.protectMask?.dataUrl).length;
+    expect(maskCount).toBe(40);
+    stressResults.push({ scenario: 'forty-isolated-masks', maskCount, totalMs: Date.now() - startedAt });`,
+  `    const manifestMaskCount = exported.snapshot.document.frames.filter(frame => frame.custom?.protectMask?.assetPath).length;
+    const archiveMaskCount = Object.keys(exported.archive).filter(path => path.startsWith('masks/') && path.endsWith('.png')).length;
+    expect(manifestMaskCount).toBe(40);
+    expect(archiveMaskCount).toBe(40);
+    stressResults.push({ scenario: 'forty-isolated-masks', manifestMaskCount, archiveMaskCount, totalMs: Date.now() - startedAt });`
+);
+await writeFile(stressTestPath, stressTest, 'utf8');
 
 let profiles = await readFile(profilesPath, 'utf8');
 profiles = profiles.replace(
@@ -100,7 +139,7 @@ const artifactRoot = 'parity-results/patched-sources';
 await mkdir(`${artifactRoot}/src/core`, { recursive: true });
 await mkdir(`${artifactRoot}/src/ui`, { recursive: true });
 await mkdir(`${artifactRoot}/tests/e2e`, { recursive: true });
-for (const sourcePath of [profilesPath, destinationControllerPath, appPath, parityTestPath, secondTestPath]) {
+for (const sourcePath of [profilesPath, destinationControllerPath, appPath, parityTestPath, secondTestPath, refineReviewTestPath, stressTestPath]) {
   await copyFile(sourcePath, `${artifactRoot}/${sourcePath}`);
 }
 
