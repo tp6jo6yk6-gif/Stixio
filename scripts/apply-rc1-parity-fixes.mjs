@@ -52,6 +52,19 @@ refineReviewTest = refineReviewTest.replace(
   `legacyApp.page.evaluate(() => geometryListForParity(state.allBoxes))`,
   `legacyApp.page.evaluate(() => ${legacyGeometryExpression})`
 );
+refineReviewTest = refineReviewTest.replace(
+  `    await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));`,
+  `    await legacyApp.page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.step3-card')];
+      const source = cards[0];
+      const target = cards[2];
+      const dataTransfer = new DataTransfer();
+      source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+      source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));
+    });`
+);
 await writeFile(refineReviewTestPath, refineReviewTest, 'utf8');
 
 let stressTest = await readFile(stressTestPath, 'utf8');
