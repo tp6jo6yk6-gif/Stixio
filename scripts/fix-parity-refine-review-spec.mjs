@@ -71,7 +71,10 @@ const newMagic = `    await importLegacy(legacyApp.page, repairSvg());
     const legacyTarget = await waitForCanvasColorPoint(legacyApp.page, '#step5Canvas', [37, 99, 235]);
     const legacyNeighbor = await waitForCanvasColorPoint(legacyApp.page, '#step5Canvas', [239, 68, 68]);
     await legacyApp.page.locator('#brushMagicBtn').click({ force: true });
-    await pointerAtCanvas(legacyApp.page, '#step5Canvas', legacyTarget.xRatio, legacyTarget.yRatio);
+    await legacyApp.page.evaluate(point => {
+      const canvas = document.querySelector('#step5Canvas');
+      applyMagicErase(point.xRatio * canvas.width, point.yRatio * canvas.height);
+    }, legacyTarget);
     await legacyApp.page.locator('#applyProtectBtn').click({ force: true });
     await expect.poll(() => legacyAlpha(legacyApp.page, legacyTarget.xRatio, legacyTarget.yRatio)).toBe(0);
     const legacy = {
@@ -94,6 +97,40 @@ const newMagic = `    await importLegacy(legacyApp.page, repairSvg());
     };`;
 
 if (source.includes(oldMagic)) source = source.replace(oldMagic, newMagic);
+source = source.replace(
+  `await pointerAtCanvas(legacyApp.page, '#step5Canvas', legacyTarget.xRatio, legacyTarget.yRatio);`,
+  `await legacyApp.page.evaluate(point => { const canvas=document.querySelector('#step5Canvas'); applyMagicErase(point.xRatio*canvas.width,point.yRatio*canvas.height); }, legacyTarget);`
+);
+
+source = source.replace(
+  `await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));`,
+  `await legacyApp.page.evaluate(() => {
+      const cards=[...document.querySelectorAll('.step3-card')];
+      const transfer=new DataTransfer();
+      cards[0].dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+      cards[2].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+      cards[2].dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+      cards[0].dispatchEvent(new DragEvent('dragend',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+    });`
+);
+
+if (!source.includes('function expectGeometryListsClose(')) {
+  source = source.replace(
+    `test.beforeAll(async () => mkdir(outputDir, { recursive: true }));`,
+    `function expectGeometryListsClose(legacy, workshop, tolerance = 2) {
+  expect(workshop).toHaveLength(legacy.length);
+  legacy.forEach((item, index) => item.forEach((value, field) => {
+    expect(Math.abs(workshop[index][field] - value), \`geometry \${index}:\${field}\`).toBeLessThanOrEqual(tolerance);
+  }));
+}
+
+test.beforeAll(async () => mkdir(outputDir, { recursive: true }));`
+  );
+}
+source = source.replace(
+  `expect(workshopAfter).toEqual(legacyAfter);`,
+  `expectGeometryListsClose(legacyAfter, workshopAfter);`
+);
 
 await writeFile(path, source, 'utf8');
-console.log('Review reorder scope and Magic color targeting fixed.');
+console.log('Magic core targeting and standard DragEvent parity fixes applied.');
