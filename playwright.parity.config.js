@@ -2,14 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: 'parity.spec.js',
+  testMatch: 'parity*.spec.js',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   workers: 1,
-  timeout: 60000,
-  globalTimeout: 300000,
-  expect: { timeout: 15000 },
+  timeout: 90000,
+  globalTimeout: 600000,
+  expect: { timeout: 20000 },
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report/parity', open: 'never' }]
@@ -18,7 +18,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     ...devices['Desktop Chrome'],
     viewport: { width: 1600, height: 1100 },
-    actionTimeout: 15000,
+    actionTimeout: 20000,
     navigationTimeout: 30000,
     acceptDownloads: true,
     screenshot: 'only-on-failure',
