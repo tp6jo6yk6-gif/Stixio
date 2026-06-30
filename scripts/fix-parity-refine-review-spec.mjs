@@ -36,9 +36,11 @@ async function waitForCanvasColorPoint(page, selector, rgb) {
 }
 
 async function dispatchCardReorder(page, selector, fromIndex, toIndex) {
+  const required=Math.max(fromIndex,toIndex)+1;
+  await expect.poll(()=>page.locator(selector).count(),{timeout:12000}).toBeGreaterThanOrEqual(required);
   await page.evaluate(({ selector, fromIndex, toIndex }) => {
     const cards=[...document.querySelectorAll(selector)];
-    if(!cards[fromIndex]||!cards[toIndex])throw new Error('Reorder cards are unavailable.');
+    if(!cards[fromIndex]||!cards[toIndex])throw new Error(`Reorder cards are unavailable: ${cards.length}`);
     const transfer=new DataTransfer();
     cards[fromIndex].dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:transfer}));
     cards[toIndex].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));
@@ -63,7 +65,6 @@ source = source.replace(
   `    await pointerAtCanvas(legacyApp.page, '#step5Canvas', legacyTarget.xRatio, legacyTarget.yRatio);`,
   `    await legacyApp.page.evaluate(point => { const canvas=document.querySelector('#step5Canvas'); applyMagicErase(point.xRatio*canvas.width,point.yRatio*canvas.height); }, legacyTarget);`
 );
-
 source = source.replace(
   `    await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));`,
   `    await dispatchCardReorder(legacyApp.page,'.step3-card',0,2);`
