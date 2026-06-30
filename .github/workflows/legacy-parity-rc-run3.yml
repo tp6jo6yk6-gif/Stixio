@@ -12,6 +12,9 @@ on:
       - 'scripts/apply-rc1-parity-fixes.mjs'
       - 'scripts/fix-parity-refine-review-spec.mjs'
       - 'package.json'
+  pull_request:
+    branches:
+      - workshop-parity-rc1
   workflow_dispatch:
 
 concurrency:
