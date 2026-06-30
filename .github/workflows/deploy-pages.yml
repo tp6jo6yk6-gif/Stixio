@@ -1,4 +1,4 @@
-name: Deploy Stixio Preview
+name: Build Stixio Preview Artifact
 
 on:
   push:
@@ -17,19 +17,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: preview-artifact
   cancel-in-progress: true
 
-environment:
-  name: github-pages
-  url: ${{ steps.deployment.outputs.page_url }}
-
 jobs:
-  build-and-deploy:
+  build-preview:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,9 +39,7 @@ jobs:
         run: npm ci
 
       - name: Build static preview
-        run: |
-          npm run build
-          touch dist/.nojekyll
+        run: npm run build
 
       - name: Validate preview entry
         run: |
@@ -56,14 +48,10 @@ jobs:
           grep -q "initStixioWorkshop" dist/index.html
           grep -q "DESTINATION_RULES_FULL_COMPLETION" dist/src/ui/stixio-workshop-app-v2.js
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: stixio-workshop-preview
           path: dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          if-no-files-found: error
+          retention-days: 14
