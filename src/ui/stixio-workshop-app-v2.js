@@ -348,7 +348,7 @@ function mountDestinationController(root){
       applyDestinationProfile:(profile,role,options={})=>{
         state.settings=applyDestinationProfileToSettings(state.settings,profile,role);
         if(options.updateFrames!==false)setFrames(normalizeFramesForDestination(frames(),profile,{invalidateApproval:options.invalidateApproval!==false}));
-        clearRenderCache();renderAll();
+        clearRenderCache(options.invalidateApproval!==false);renderAll();
       },
       rerender:rerenderShell,
       downloadText:(text,name,type)=>downloadBlob(new Blob([text],{type}),name),
@@ -483,7 +483,7 @@ async function restoreProjectSnapshot(snapshot){
   resetFrameHistory();resetRefineViewport();resetReviewViewport();
   state.destinationController?.importState?.(snapshot.destinationState||null);
   state.packageController?.importState?.(snapshot.packageState||null);
-  clearRenderCache();renderAll();rerenderShell();
+  clearRenderCache(false);renderAll();rerenderShell();
 }
 
 async function resetProjectState(){
@@ -620,7 +620,7 @@ function getRenderOptions(frame=null){
 function renderFrame(frame,force=false){const source=sourceForFrame(frame);if(!source)return null;const options=getRenderOptions(frame);const key=JSON.stringify({source:source.id,geometry:frame.geometry,offsetX:frame.custom?.offsetX||0,offsetY:frame.custom?.offsetY||0,maskVersion:frame.custom?.maskVersion||0,options});if(!force&&state.rendered.has(frame.id)&&state.renderKeys.get(frame.id)===key)return state.rendered.get(frame.id);const canvas=renderWorkshopFrame(source,frame,options).canvas;state.rendered.set(frame.id,canvas);state.renderKeys.set(frame.id,key);return canvas;}
 
 function renderAll(){frames().forEach(frame=>renderFrame(frame));runReview();}
-function clearRenderCache(){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;invalidateAllReviewApprovals();}
+function clearRenderCache(invalidateApprovals=true){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;if(invalidateApprovals)invalidateAllReviewApprovals();}
 function runReview(){
   const selected=exportFrames();selected.forEach(frame=>renderFrame(frame));
   const plan=packagePlan(selected);
