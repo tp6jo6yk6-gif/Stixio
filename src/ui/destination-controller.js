@@ -3,6 +3,7 @@ import {
   DestinationProfileKeys,
   applyDestinationProfileToSettings,
   buildDestinationPackagePlan,
+  createDestinationProfile,
   createDestinationProfileRegistry,
   destinationProfileSummary,
   duplicateDestinationProfile,
@@ -232,6 +233,31 @@ export function createDestinationController(adapter, options = {}) {
     adapter.rerender();
   }
 
+  function updateActiveRoleRule(key, value) {
+    let profile = getActiveProfile();
+    if (profile.builtIn) {
+      profile = duplicateDestinationProfile(profile, { name: `${profile.name} Custom` });
+      local.registry.register(profile);
+      local.activeKey = profile.key;
+      local.notice = '內建 Profile 已複製為自訂版本，原規格未被修改。';
+    }
+    const numeric = Math.max(key === 'safeMargin' ? 0 : 1, Math.round(Number(value) || 0));
+    const roles = profile.roles.map(role => role.key === local.activeRole ? { ...role, [key]: numeric } : role);
+    const next = createDestinationProfile({
+      ...profile,
+      builtIn: false,
+      version: bumpPatchVersion(profile.version),
+      roles,
+      updatedAt: new Date().toISOString()
+    });
+    local.registry.register(next);
+    local.activeKey = next.key;
+    local.notice = `${next.name} 已更新為 v${next.version}；舊核准已撤銷。`;
+    local.error = null;
+    adapter.applyDestinationProfile(next, local.activeRole, { invalidateApproval: true });
+    adapter.rerender();
+  }
+
   function buildPlan(frames, options = {}) {
     return buildDestinationPackagePlan(frames, {
       profile: getActiveProfile(),
@@ -274,6 +300,7 @@ export function createDestinationController(adapter, options = {}) {
     getActiveProfile,
     getFrameOutput,
     buildPlan,
+    updateActiveRoleRule,
     exportState,
     importState
   };
@@ -281,4 +308,10 @@ export function createDestinationController(adapter, options = {}) {
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+}
+
+
+function bumpPatchVersion(value) {
+  const parts = String(value || '1.0.0').split('.').map(part => Math.max(0, Math.round(Number(part) || 0)));
+  return `${parts[0] || 1}.${parts[1] || 0}.${(parts[2] || 0) + 1}`;
 }

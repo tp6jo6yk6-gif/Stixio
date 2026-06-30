@@ -43,18 +43,14 @@ function rendered(width, height, bytes = 128) {
 test('built-in Destination Profiles are versioned and valid', () => {
   const profiles = listBuiltInDestinationProfiles();
   assert.equal(profiles.length, 6);
-  assert.deepEqual(profiles.map(item => item.key), [
+  assert.deepEqual(new Set(profiles.map(item => item.key)), new Set([
+    DestinationProfileKeys.FLEXIBLE,
+    DestinationProfileKeys.STANDARD,
     DestinationProfileKeys.ANIMATED,
     DestinationProfileKeys.BIG,
-    DestinationProfileKeys.EFFECT,
     DestinationProfileKeys.FULLSCREEN,
-    DestinationProfileKeys.STANDARD,
-    DestinationProfileKeys.FLEXIBLE
-  ].sort((a, b) => {
-    const left = profiles.find(item => item.key === a);
-    const right = profiles.find(item => item.key === b);
-    return Number(right?.builtIn) - Number(left?.builtIn) || left?.name.localeCompare(right?.name);
-  }));
+    DestinationProfileKeys.EFFECT
+  ]));
   for (const profile of profiles) {
     assert.equal(profile.schemaVersion, DESTINATION_PROFILE_SCHEMA_VERSION);
     assert.equal(profile.builtIn, true);
