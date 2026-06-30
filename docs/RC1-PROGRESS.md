@@ -9,17 +9,21 @@ Updated: 2026-06-30
 - 2x2 Layout geometry within 1 pixel
 - Default 370x320 Refine output within RC alpha tolerance
 - Main, Tab and Sticker package names
+- Multiple source images with independent Layout settings
 - Manual Delete brush with Undo and Redo
+- Excluded Frames preserve their original output filenames
 
-## Fix in progress
+## Batch 3 validation
 
-When an earlier Sticker is excluded, Legacy keeps the later Sticker filename. Workshop must preserve that Frame identity instead of compacting the remaining names.
+- Keep brush restores automatically removed pixels
+- Magic Delete removes one connected color region
+- Review white, black and checker backgrounds
+- Review safe guide toggle
+- Drag reorder followed by positional role assignment
 
 ## Next
 
-- Multiple source Layout settings
-- Review selection and reorder
-- Keep and Magic tools
 - 40 and 100 output stress tests
-- Ten-source restore
+- Ten-source project restore
 - Repeated Profile switching
+- Final read-only RC workflow and release report
