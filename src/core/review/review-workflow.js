@@ -32,12 +32,14 @@ export function runFullReview(frames = [], renderedMap = new Map(), options = {}
   const maxBytes = Math.max(0, Number(options.maxFileSizeKB || 0) * 1024);
   const packageItems = Array.isArray(options.packageItems) ? options.packageItems : [];
   const packageItemByFrame = new Map(packageItems.map(item => [item.artworkId, item]));
+  const outputRulesByFrame = options.outputRulesByFrame instanceof Map ? options.outputRulesByFrame : new Map();
 
   frames.forEach((frame, index) => {
     const rendered = renderedMap.get(frame.id);
     if (!rendered) return;
+    const outputRule = outputRulesByFrame.get(frame.id) || {};
     issues.push(...reviewRenderedPixels(rendered, frame, frame.name || `Frame ${index + 1}`, {
-      safeAreaMargin: options.safeAreaMargin ?? options.safeMargin ?? 0,
+      safeAreaMargin: outputRule.safeMargin ?? options.safeAreaMargin ?? options.safeMargin ?? 0,
       requireTransparency: options.requireTransparency !== false,
       blankRatioThreshold: options.blankRatioThreshold,
       lowContentRatioThreshold: options.lowContentRatioThreshold,
@@ -46,13 +48,14 @@ export function runFullReview(frames = [], renderedMap = new Map(), options = {}
     }));
 
     const bytes = estimateRenderedBytes(rendered);
-    if (maxBytes > 0 && bytes > maxBytes) {
+    const frameMaxBytes = Number(outputRule.maxFileSizeBytes || maxBytes);
+    if (frameMaxBytes > 0 && bytes > frameMaxBytes) {
       issues.push(createIssue({
         code: 'render.fileTooLarge',
-        message: `${frame.name || `Frame ${index + 1}`} is approximately ${Math.ceil(bytes / 1024)}KB, above the ${options.maxFileSizeKB}KB warning limit.`,
+        message: `${frame.name || `Frame ${index + 1}`} is approximately ${Math.ceil(bytes / 1024)}KB, above the ${Math.ceil(frameMaxBytes / 1024)}KB limit.`,
         severity: ReviewIssueSeverity.WARNING,
         frameId: frame.id,
-        metadata: { bytes, maxBytes }
+        metadata: { bytes, maxBytes: frameMaxBytes }
       }));
     }
   });

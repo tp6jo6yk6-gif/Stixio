@@ -63,10 +63,13 @@ import {
   ReviewFilterModes,
   ReviewSortModes,
   ReviewIssueSeverity,
-  createWorkshopProjectSnapshot
+  createWorkshopProjectSnapshot,
+  applyDestinationProfileToSettings,
+  normalizeFramesForDestination
 } from '../core/index.js';
 import { createPackageController } from './package-controller.js';
 import { createProjectController } from './project-controller.js';
+import { createDestinationController } from './destination-controller.js';
 
 const HANDLE_SIZE = 14;
 const MIN_FRAME_SIZE = 8;
@@ -113,7 +116,9 @@ const DEFAULT_SETTINGS = applyStickerPreset({
   packageNamingMode: PackageNamingModes.PACKAGE,
   filenamePrefix: '',
   filenameSuffix: '',
-  maxFileSizeKB: DEFAULT_MAX_FILE_SIZE_KB
+  maxFileSizeKB: DEFAULT_MAX_FILE_SIZE_KB,
+  destinationProfileKey: 'workshop-flexible',
+  destinationProfileVersion: '1.0.0'
 }, StickerCategories.NORMAL, AssetRoles.STICKER);
 
 const state = {
@@ -143,7 +148,8 @@ const state = {
   reviewPan: null,
   reviewPointerActive: false,
   packageController: null,
-  projectController: null
+  projectController: null,
+  destinationController: null
 };
 
 export function initStixioWorkshop(root = document.getElementById('app')) {
@@ -151,6 +157,7 @@ export function initStixioWorkshop(root = document.getElementById('app')) {
   document.title = `${BRAND.name} Workshop`;
   root.innerHTML = renderShell();
   bindStaticEvents(root);
+  mountDestinationController(root);
   mountPackageController(root);
   mountProjectController(root);
   refresh();
@@ -176,7 +183,7 @@ function renderShell() {
         </nav>
       </header>
       <main class="mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-5 py-6 xl:grid-cols-[360px_1fr_340px]">
-        <aside class="space-y-4">${renderImportPanel()}${renderDetectionPanel()}${renderOutputPanel()}${renderRefinePanel()}</aside>
+        <aside class="space-y-4">${renderImportPanel()}${renderDetectionPanel()}${renderDestinationPanel()}${renderOutputPanel()}${renderRefinePanel()}</aside>
         <section class="space-y-4">${renderSourceEditor()}${renderRefineEditor()}${renderReviewBoard()}${renderPackageBoard()}</section>
         <aside class="space-y-4">${renderSourceListPanel()}${renderSelectedPanel()}${renderReviewPanel()}${renderPackagePanel()}</aside>
       </main>
@@ -195,10 +202,15 @@ function renderDetectionPanel() {
   return `<section class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-emerald-600">Layout · Detection Engine</p><h2 class="mt-1 text-xl font-black">切割與智能貼合</h2><div class="mt-4 grid grid-cols-3 gap-2">${layoutButton('auto','智能')}${layoutButton('1x1','單圖')}${layoutButton('2x2','2×2')}${layoutButton('3x3','3×3')}${layoutButton('custom','自訂')}</div><div class="mt-4 grid grid-cols-2 gap-3">${numberInput('rowsInput','Rows',state.settings.rows,1,12)}${numberInput('colsInput','Cols',state.settings.cols,1,12)}${numberInput('marginXInput','Margin X',state.settings.marginX,0,500)}${numberInput('marginYInput','Margin Y',state.settings.marginY,0,500)}${numberInput('gapXInput','Gap X',state.settings.gapX,0,500)}${numberInput('gapYInput','Gap Y',state.settings.gapY,0,500)}</div><label class="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-sm font-black"><span>拖曳後智能貼合內容</span><input id="smartSnapInput" type="checkbox" ${state.settings.smartSnap?'checked':''}></label><button id="detectBtn" class="mt-4 w-full rounded-2xl bg-slate-950 py-3 text-sm font-black text-white">重新偵測目前原圖</button></section>`;
 }
 
+function renderDestinationPanel() {
+  return '<div id="destinationRulesRoot"></div>';
+}
+
 function renderOutputPanel() {
-  const presets = getStickerPresets(state.settings.stickerCategory);
-  const safeMax = Math.max(0, Math.floor(Math.min(state.settings.targetW, state.settings.targetH) / 2) - 1);
-  return `<section id="package-rules-panel" class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Rules Engine</p><h2 class="mt-1 text-xl font-black">輸出規格與對齊</h2><label class="mt-4 block text-xs font-black text-slate-500">貼圖類型<select id="categoryInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${Object.values(StickerCategories).map(value=>`<option value="${value}" ${value===state.settings.stickerCategory?'selected':''}>${categoryLabel(value)}</option>`).join('')}</select></label><label class="mt-3 block text-xs font-black text-slate-500">輸出用途<select id="presetRoleInput" class="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">${presets.map(item=>`<option value="${item.role}" ${item.role===state.settings.outputRole?'selected':''}>${item.name} · ${item.width}×${item.height}</option>`).join('')}</select></label><div class="mt-3 grid grid-cols-2 gap-3">${numberInput('targetWInput','自訂寬度',state.settings.targetW,1,8192)}${numberInput('targetHInput','自訂高度',state.settings.targetH,1,8192)}</div>${rangeInput('safeMarginInput','安全留白',state.settings.safeMargin,0,safeMax)}<div class="mt-3"><div class="mb-2 text-xs font-black text-slate-500">圖案對齊</div><div class="grid grid-cols-2 gap-2">${alignButton('center','絕對置中')}${alignButton('bottom','靠下貼齊')}</div></div><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${state.settings.targetW} × ${state.settings.targetH}px · safe ${state.settings.safeMargin}px</div></section>`;
+  const frame=selectedFrame();
+  const output=state.destinationController?.getFrameOutput?.(frame)||{role:state.settings.outputRole,width:state.settings.targetW,height:state.settings.targetH,safeMargin:state.settings.safeMargin,maxFileSizeBytes:state.settings.maxFileSizeKB*1024};
+  const safeMax=Math.max(0,Math.floor(Math.min(output.width,output.height)/2)-1);
+  return `<section id="package-rules-panel" class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Rules Engine</p><h2 class="mt-1 text-xl font-black">角色輸出與對齊</h2><div class="mt-4 grid grid-cols-2 gap-3"><div class="rounded-2xl bg-slate-50 p-3"><div class="text-[10px] font-black uppercase text-slate-400">Role</div><div class="mt-1 text-sm font-black">${roleLabel(output.role)}</div></div><div class="rounded-2xl bg-slate-50 p-3"><div class="text-[10px] font-black uppercase text-slate-400">File limit</div><div class="mt-1 text-sm font-black">≤${Math.ceil(output.maxFileSizeBytes/1024)}KB</div></div></div><div class="mt-3 grid grid-cols-2 gap-3">${numberInput('targetWInput','自訂寬度',output.width,1,8192)}${numberInput('targetHInput','自訂高度',output.height,1,8192)}</div>${rangeInput('safeMarginInput','安全留白',output.safeMargin,0,safeMax)}<div class="mt-3"><div class="mb-2 text-xs font-black text-slate-500">圖案對齊</div><div class="grid grid-cols-2 gap-2">${alignButton('center','絕對置中')}${alignButton('bottom','靠下貼齊')}</div></div><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${output.width} × ${output.height}px · safe ${output.safeMargin}px</div><p class="mt-3 text-[10px] font-bold text-slate-400">修改內建規格時會自動複製成 Custom Profile，原始 Profile 不會被覆蓋。</p></section>`;
 }
 
 function renderRefinePanel() {
@@ -260,11 +272,9 @@ function bindStaticEvents(root) {
   root.querySelector('#detectBtn').addEventListener('click', detectActiveSource);
   ['rowsInput','colsInput','marginXInput','marginYInput','gapXInput','gapYInput'].forEach(id => root.querySelector(`#${id}`).addEventListener('input', readGridSettings));
   root.querySelector('#smartSnapInput').addEventListener('change', event => { state.settings.smartSnap = event.target.checked; saveActiveSourceLayout(); });
-  root.querySelector('#categoryInput').addEventListener('change', event => changeCategory(event.target.value));
-  root.querySelector('#presetRoleInput').addEventListener('change', event => changePreset(event.target.value));
-  root.querySelector('#targetWInput').addEventListener('change', event => updateOutputDimension('targetW',event.target.value));
-  root.querySelector('#targetHInput').addEventListener('change', event => updateOutputDimension('targetH',event.target.value));
-  root.querySelector('#safeMarginInput').addEventListener('input', event => updateSafeMargin(event.target.value));
+  root.querySelector('#targetWInput')?.addEventListener('change',event=>state.destinationController?.updateActiveRoleRule('width',event.target.value));
+  root.querySelector('#targetHInput')?.addEventListener('change',event=>state.destinationController?.updateActiveRoleRule('height',event.target.value));
+  root.querySelector('#safeMarginInput')?.addEventListener('change',event=>state.destinationController?.updateActiveRoleRule('safeMargin',event.target.value));
   root.querySelectorAll('.align-btn').forEach(button => button.addEventListener('click', () => { state.settings.alignMode=button.dataset.align;clearRenderCache();renderAll();rerenderShell(); }));
   root.querySelector('#chromaEnabledInput').addEventListener('change', event => updateRefineSetting('chromaEnabled',event.target.checked));
   root.querySelector('#chromaColorInput').addEventListener('input', event => updateRefineSetting('chromaColor',hexToRgb(event.target.value)));
@@ -331,6 +341,25 @@ function bindStaticEvents(root) {
   bindGlobalEvents();
 }
 
+// DESTINATION_RULES_FULL_COMPLETION
+function mountDestinationController(root){
+  if(!state.destinationController){
+    state.destinationController=createDestinationController({
+      applyDestinationProfile:(profile,role,options={})=>{
+        state.settings=applyDestinationProfileToSettings(state.settings,profile,role);
+        if(options.updateFrames!==false)setFrames(normalizeFramesForDestination(frames(),profile,{invalidateApproval:options.invalidateApproval!==false}));
+        clearRenderCache(options.invalidateApproval!==false);renderAll();
+      },
+      rerender:rerenderShell,
+      downloadText:(text,name,type)=>downloadBlob(new Blob([text],{type}),name),
+      alert:message=>window.alert(message),
+      confirm:message=>window.confirm(message),
+      prompt:(message,value)=>window.prompt(message,value)
+    });
+  }
+  state.destinationController.mount(root);
+}
+
 function mountPackageController(root){
   if(!state.packageController){
     state.packageController=createPackageController({
@@ -340,7 +369,7 @@ function mountPackageController(root){
       getRenderedMap:()=>state.rendered,
       getSourceNames:reviewSourceNames,
       getReviewReport:()=>{runReview();return state.reviewReport;},
-      getOutputMetadata:()=>({documentId:state.document.id,documentName:state.document.name,targetW:state.settings.targetW,targetH:state.settings.targetH,category:state.settings.stickerCategory,safeMargin:state.settings.safeMargin}),
+      getOutputMetadata:()=>{const profile=state.destinationController?.getActiveProfile?.();return{documentId:state.document.id,documentName:state.document.name,targetW:state.settings.targetW,targetH:state.settings.targetH,category:state.settings.stickerCategory,safeMargin:state.settings.safeMargin,destinationKey:profile?.key||'workshop-flexible',destinationVersion:profile?.version||'1.0.0'};},
       getNamingSettings:()=>({mode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,maxFileSizeKB:state.settings.maxFileSizeKB}),
       updateNamingSetting:(key,value)=>{
         if(key==='mode')state.settings.packageNamingMode=value;
@@ -350,16 +379,27 @@ function mountPackageController(root){
         runReview();refresh();
       },
       assignRoles:mode=>{
-        const selected=exportFrames();
-        if(mode==='auto'&&selected.length<3){window.alert('至少需要 3 張輸出，才能分配 Main、Tab 與 Sticker。');return false;}
+        const selected=exportFrames(),profile=state.destinationController?.getActiveProfile?.();
+        if(!profile)return false;
+        const fallback=profile.roles.find(role=>role.key===AssetRoles.STICKER)?.key||profile.roles[0].key;
+        const required=[],optional=[];
+        profile.roles.filter(role=>role.key!==fallback).forEach(role=>{
+          const count=role.exact??(role.required?Math.max(1,role.min||1):0);
+          for(let i=0;i<count;i++)required.push(role.key);
+          if(!count&&(role.max==null||role.max>0))optional.push(role.key);
+        });
+        const minimumSticker=profile.roles.find(role=>role.key===fallback)?.min||1;
+        if(mode==='auto'&&selected.length<required.length+minimumSticker){window.alert(`此 Profile 至少需要 ${required.length+minimumSticker} 張輸出。`);return false;}
+        const optionalCapacity=Math.max(0,selected.length-required.length-minimumSticker);
+        const assignments=mode==='auto'?[...required,...optional.slice(0,optionalCapacity)]:[];
         const selectedIds=new Set(selected.map(frame=>frame.id));
         setFrames(frames().map(frame=>{
           if(!selectedIds.has(frame.id))return frame;
           const index=selected.findIndex(item=>item.id===frame.id);
-          const role=mode==='auto'?(index===0?AssetRoles.MAIN:index===1?AssetRoles.TAB:AssetRoles.STICKER):AssetRoles.STICKER;
-          return{...frame,state:{...frame.state,packageRole:role},custom:{...frame.custom,outputRole:role}};
+          const role=mode==='auto'?(assignments[index]||fallback):fallback;
+          return{...frame,state:{...frame.state,packageRole:role,reviewApproved:false},custom:{...frame.custom,outputRole:role}};
         }));
-        runReview();refresh();return true;
+        clearRenderCache();renderAll();refresh();return true;
       },
       downloadSelectedPng,
       openFrame:frameId=>{selectFrame(frameId);state.activeEditor='review';refresh();document.getElementById('stage-review')?.scrollIntoView({behavior:'smooth',block:'start'});},
@@ -405,6 +445,7 @@ async function captureProjectSnapshot(){
     activeSourceId:state.activeSourceId,
     selectedFrameId:state.selectedFrameId,
     packageState:state.packageController?.exportState?.()||null,
+    destinationState:state.destinationController?.exportState?.()||null,
     metadata:{previewDataUrl:getProjectPreviewDataUrl()}
   });
 }
@@ -440,15 +481,16 @@ async function restoreProjectSnapshot(snapshot){
   state.selectedFrameId=(snapshot.ui?.selectedFrameId&&restoredFrames.some(frame=>frame.id===snapshot.ui.selectedFrameId))?snapshot.ui.selectedFrameId:restoredFrames[0]?.id||null;
   state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;state.maskHistories.clear();state.refineAppliedAt.clear();
   resetFrameHistory();resetRefineViewport();resetReviewViewport();
+  state.destinationController?.importState?.(snapshot.destinationState||null);
   state.packageController?.importState?.(snapshot.packageState||null);
-  renderAll();rerenderShell();
+  clearRenderCache(false);renderAll();rerenderShell();
 }
 
 async function resetProjectState(){
   state.document=createDocument({name:'Sticker Package Project'});
   state.sources=new Map();state.sourceLayouts=new Map();state.selectedFrameBySource=new Map();state.activeSourceId=null;state.selectedFrameId=null;
   state.settings=cloneDefaultSettings();state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;state.maskHistories.clear();state.refineAppliedAt.clear();
-  state.packageController?.importState?.(null);resetFrameHistory();resetRefineViewport();resetReviewViewport();rerenderShell();
+  state.destinationController?.importState?.(null);state.packageController?.importState?.(null);resetFrameHistory();resetRefineViewport();resetReviewViewport();rerenderShell();
 }
 
 function renameProject(name){state.document={...state.document,name:String(name||'Untitled Project'),updatedAt:new Date().toISOString()};}
@@ -456,10 +498,10 @@ function cloneDefaultSettings(){return typeof structuredClone==='function'?struc
 function getProjectPreviewDataUrl(){const frame=selectedFrame()||frames()[0];const canvas=frame?renderFrame(frame):null;return canvas?.toDataURL?.('image/png')||activeSource()?.uri||null;}
 async function getProjectFingerprint(){
   const frameState=frames().map(frame=>({id:frame.id,sourceImageId:frame.sourceImageId,geometry:frame.geometry,state:frame.state,custom:{offsetX:frame.custom?.offsetX||0,offsetY:frame.custom?.offsetY||0,maskVersion:frame.custom?.maskVersion||0,outputRole:frame.custom?.outputRole||null}}));
-  return JSON.stringify({id:state.document.id,name:state.document.name,sources:[...state.sources.values()].map(source=>({id:source.id,name:source.name,width:source.width,height:source.height,uriLength:source.uri?.length||0})),layouts:[...state.sourceLayouts.entries()],frames:frameState,settings:state.settings,packageState:state.packageController?.exportState?.()||null});
+  return JSON.stringify({id:state.document.id,name:state.document.name,sources:[...state.sources.values()].map(source=>({id:source.id,name:source.name,width:source.width,height:source.height,uriLength:source.uri?.length||0})),layouts:[...state.sourceLayouts.entries()],frames:frameState,settings:state.settings,destinationState:state.destinationController?.exportState?.()||null,packageState:state.packageController?.exportState?.()||null});
 }
 
-function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);mountPackageController(root);mountProjectController(root);refresh();}
+function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);mountDestinationController(root);mountPackageController(root);mountProjectController(root);refresh();}
 function bindRange(root,id,key,render=true,afterChange=null){root.querySelector(`#${id}`).addEventListener('input',event=>{state.settings[key]=Number(event.target.value);const label=root.querySelector(`#${id}Value`);if(label)label.textContent=event.target.value;if(render){clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}if(afterChange)afterChange();});}
 function updateRefineSetting(key,value){state.settings[key]=value;clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}
 function scheduleRenderAll(delay=90){if(state.refineRenderTimer)clearTimeout(state.refineRenderTimer);state.refineRenderTimer=setTimeout(()=>{state.refineRenderTimer=null;clearRenderCache();renderAll();refresh();},delay);}
@@ -571,11 +613,24 @@ function selectedFrame(){return frames().find(frame=>frame.id===state.selectedFr
 function sourceForFrame(frame){return frame?state.sources.get(frame.sourceImageId)||null:null;}
 function exportFrames(){return frames().filter(frame=>frame.state?.visible!==false&&frame.state?.exportSelected!==false);}
 
-function getRenderOptions(){return{targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,alignMode:state.settings.alignMode,highQuality:true,refine:{enabled:true,chromaEnabled:state.settings.chromaEnabled,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance,exteriorOnly:state.settings.exteriorOnly,autoDespeckle:state.settings.autoDespeckle,despeckle:{minComponentSize:state.settings.despeckleMinSize},shrinkRadius:state.settings.shrinkRadius,featherRadius:state.settings.featherRadius,whiteBorder:{enabled:state.settings.whiteBorderEnabled,size:state.settings.whiteBorderSize,color:state.settings.borderColor},shadow:{enabled:false}}};}
-function renderFrame(frame,force=false){const source=sourceForFrame(frame);if(!source)return null;const key=JSON.stringify({source:source.id,geometry:frame.geometry,offsetX:frame.custom?.offsetX||0,offsetY:frame.custom?.offsetY||0,maskVersion:frame.custom?.maskVersion||0,options:getRenderOptions()});if(!force&&state.rendered.has(frame.id)&&state.renderKeys.get(frame.id)===key)return state.rendered.get(frame.id);const canvas=renderWorkshopFrame(source,frame,getRenderOptions()).canvas;state.rendered.set(frame.id,canvas);state.renderKeys.set(frame.id,key);return canvas;}
+function getRenderOptions(frame=null){
+  const output=state.destinationController?.getFrameOutput?.(frame)||{width:state.settings.targetW,height:state.settings.targetH,safeMargin:state.settings.safeMargin};
+  return{targetW:output.width,targetH:output.height,safeMargin:output.safeMargin,alignMode:state.settings.alignMode,highQuality:true,refine:{enabled:true,chromaEnabled:state.settings.chromaEnabled,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance,exteriorOnly:state.settings.exteriorOnly,autoDespeckle:state.settings.autoDespeckle,despeckle:{minComponentSize:state.settings.despeckleMinSize},shrinkRadius:state.settings.shrinkRadius,featherRadius:state.settings.featherRadius,whiteBorder:{enabled:state.settings.whiteBorderEnabled,size:state.settings.whiteBorderSize,color:state.settings.borderColor},shadow:{enabled:false}}};
+}
+function renderFrame(frame,force=false){const source=sourceForFrame(frame);if(!source)return null;const options=getRenderOptions(frame);const key=JSON.stringify({source:source.id,geometry:frame.geometry,offsetX:frame.custom?.offsetX||0,offsetY:frame.custom?.offsetY||0,maskVersion:frame.custom?.maskVersion||0,options});if(!force&&state.rendered.has(frame.id)&&state.renderKeys.get(frame.id)===key)return state.rendered.get(frame.id);const canvas=renderWorkshopFrame(source,frame,options).canvas;state.rendered.set(frame.id,canvas);state.renderKeys.set(frame.id,key);return canvas;}
+
 function renderAll(){frames().forEach(frame=>renderFrame(frame));runReview();}
-function clearRenderCache(){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;invalidateAllReviewApprovals();}
-function runReview(){const selected=exportFrames(),plan=packagePlan(selected);const report=runFullReview(frames(),state.rendered,{targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,safeAreaMargin:state.settings.safeMargin,maxFileSizeKB:state.settings.maxFileSizeKB,packageItems:plan.items,requireTransparency:true});const packageIssues=[...plan.validation.errors,...plan.validation.warnings].map(issue=>({...issue,id:issue.id||createId('issue'),frameId:issue.frameId||null,metadata:issue.metadata||{}}));const issues=[...report.issues,...packageIssues];const summary={total:issues.length,errors:issues.filter(issue=>issue.severity==='error').length,warnings:issues.filter(issue=>issue.severity==='warning').length,info:issues.filter(issue=>issue.severity==='info').length};state.reviewReport={...report,issues,summary,ready:report.allSelectedApproved&&summary.errors===0&&plan.ready,canPackage:report.allSelectedApproved&&summary.errors===0&&plan.ready,packagePlan:plan};}
+function clearRenderCache(invalidateApprovals=true){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;if(invalidateApprovals)invalidateAllReviewApprovals();}
+function runReview(){
+  const selected=exportFrames();selected.forEach(frame=>renderFrame(frame));
+  const plan=packagePlan(selected);
+  const outputRulesByFrame=new Map(plan.items.map(item=>[item.artworkId,{targetW:item.expectedWidth,targetH:item.expectedHeight,safeMargin:item.safeMargin,maxFileSizeBytes:item.maxFileSizeBytes}]));
+  const report=runFullReview(frames(),state.rendered,{targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,safeAreaMargin:state.settings.safeMargin,maxFileSizeKB:state.settings.maxFileSizeKB,outputRulesByFrame,packageItems:plan.items,requireTransparency:true});
+  const packageIssues=[...plan.validation.errors,...plan.validation.warnings].map(issue=>({...issue,id:issue.id||createId('issue'),frameId:issue.frameId||null,metadata:issue.metadata||{}}));
+  const issues=[...report.issues,...packageIssues];
+  const summary={total:issues.length,errors:issues.filter(issue=>issue.severity==='error').length,warnings:issues.filter(issue=>issue.severity==='warning').length,info:issues.filter(issue=>issue.severity==='info').length};
+  state.reviewReport={...report,issues,summary,ready:report.allSelectedApproved&&summary.errors===0&&plan.ready,canPackage:report.allSelectedApproved&&summary.errors===0&&plan.ready,packagePlan:plan};
+}
 
 function refresh(){drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();state.projectController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();const status=document.getElementById('sourceStatus');if(status){const source=activeSource();status.textContent=source?`${source.name} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames`:'尚未匯入';}const undoBtn=document.getElementById('undoBtn');const redoBtn=document.getElementById('redoBtn');if(undoBtn)undoBtn.disabled=!canUndo(state.frameHistory);if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}
 
@@ -688,11 +743,11 @@ function setPickedColor(pixel){state.settings.chromaColor=[pixel[0],pixel[1],pix
 function bindGlobalEvents(){if(state.globalEventsBound)return;state.globalEventsBound=true;window.addEventListener('keydown',event=>{if(['INPUT','TEXTAREA','SELECT'].includes(event.target?.tagName))return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();if(state.activeEditor==='refine'&&stepMaskHistory(event.shiftKey?1:-1))return;event.shiftKey?redoFrames():undoFrames();return;}if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='y'){event.preventDefault();if(state.activeEditor==='refine'&&stepMaskHistory(1))return;redoFrames();return;}if(event.code==='Space'&&state.activeEditor==='refine'){state.isSpaceDown=true;event.preventDefault();const viewport=document.getElementById('refineViewport');if(viewport)viewport.style.cursor='grab';}if(state.activeEditor==='refine'&&event.key==='0'){event.preventDefault();resetRefineViewport();}if(state.activeEditor==='refine'&&event.key==='Escape'){state.settings.maskTool='view';refreshMaskToolButtons();}if(state.activeEditor==='refine'&&(event.key==='['||event.key===']')){event.preventDefault();state.settings.maskSize=Math.max(5,Math.min(120,state.settings.maskSize+(event.key===']'?5:-5)));const input=document.getElementById('maskSizeInput');if(input)input.value=state.settings.maskSize;const label=document.getElementById('maskSizeInputValue');if(label)label.textContent=state.settings.maskSize;updateBrushCursor();}if(state.activeEditor==='review'&&event.key==='ArrowLeft'){event.preventDefault();navigateReview(-1);}if(state.activeEditor==='review'&&event.key==='ArrowRight'){event.preventDefault();navigateReview(1);}if(state.activeEditor==='review'&&event.key.toLowerCase()==='a'){event.preventDefault();setCurrentReviewApproval(true);}if(state.activeEditor==='review'&&event.key.toLowerCase()==='x'){event.preventDefault();const item=selectedReviewItem();if(item){replaceFrame({...item.frame,state:{...item.frame.state,exportSelected:!item.exportSelected}},{preserveReview:true});runReview();refresh();}}if(state.activeEditor==='review'&&event.key==='0'){event.preventDefault();resetReviewViewport();}});window.addEventListener('keyup',event=>{if(event.code==='Space'){state.isSpaceDown=false;state.refinePan=null;const viewport=document.getElementById('refineViewport');if(viewport)viewport.style.cursor=state.settings.maskTool==='view'?'grab':'';}});}
 
 
-function availableRoleOptions(){return getAvailableAssetRoles(state.settings.stickerCategory);}
+function availableRoleOptions(){return state.destinationController?.getActiveProfile?.().roles.map(role=>role.key)||getAvailableAssetRoles(state.settings.stickerCategory);}
 function packageRole(frame){return frame.state?.packageRole||frame.custom?.outputRole||AssetRoles.STICKER;}
-function roleLabel(role){return({sticker:'Sticker',main:'Main',tab:'Tab',background:'全螢幕背景','effect-background':'特效背景'})[role]||role;}
-function currentRules(){return createPlatformNeutralRules({category:state.settings.stickerCategory,targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,namingMode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,maxFileSizeKB:state.settings.maxFileSizeKB});}
-function packagePlan(list=frames()){return buildWorkshopPackagePlan(list,{category:state.settings.stickerCategory,namingMode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,destinationKey:'workshop'});}
+function roleLabel(role){const profile=state.destinationController?.getActiveProfile?.();return profile?.roles.find(item=>item.key===role)?.label||({sticker:'Sticker',main:'Main',tab:'Tab',background:'全螢幕背景','effect-background':'特效背景'})[role]||role;}
+function currentRules(){return state.destinationController?.getActiveProfile?.()||createPlatformNeutralRules({category:state.settings.stickerCategory,targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,namingMode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,maxFileSizeKB:state.settings.maxFileSizeKB});}
+function packagePlan(list=frames()){return state.destinationController?.buildPlan?.(list,{namingMode:state.settings.packageNamingMode==='sequential'?'sequential':'profile',prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,renderedMap:state.rendered})||buildWorkshopPackagePlan(list,{category:state.settings.stickerCategory,namingMode:state.settings.packageNamingMode,prefix:state.settings.filenamePrefix,suffix:state.settings.filenameSuffix,destinationKey:'workshop'});}
 function packageItemFor(frame,list=frames()){return packagePlan(list).items.find(item=>item.artworkId===frame.id)||null;}
 
 function reviewSourceNames(){return new Map([...state.sources.values()].map(source=>[source.id,source.name]));}
@@ -711,7 +766,7 @@ function renderReviewGrid(){
     card.querySelector('.preview').addEventListener('click',()=>{state.activeEditor='review';selectFrame(frame.id);resetReviewViewport();refresh();});
     card.querySelector('.export-check').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}},{preserveReview:true});runReview();refresh();});
     card.querySelector('.review-approve').addEventListener('click',()=>toggleFrameReviewApproval(frame.id));
-    card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value},custom:{...frame.custom,outputRole:event.target.value}},{preserveReview:true});runReview();refresh();});
+    card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value,reviewApproved:false},custom:{...frame.custom,outputRole:event.target.value}});clearFrameRender(frame.id);renderFrame(frame,true);runReview();refresh();});
     card.querySelector('.single-download').addEventListener('click',()=>downloadFramePng(frame));
     card.addEventListener('dragstart',()=>state.draggedReviewFrameId=frame.id);card.addEventListener('dragover',event=>{if(canReorder)event.preventDefault();});card.addEventListener('drop',()=>{if(canReorder)reorderFrame(state.draggedReviewFrameId,frame.id);});grid.appendChild(card);
   });
@@ -719,16 +774,17 @@ function renderReviewGrid(){
 function applyReviewBackground(element){if(!element)return;const style=getReviewBackgroundStyle(state.settings.reviewBackground);element.style.background=style.background;element.style.backgroundSize=style.backgroundSize||'';element.dataset.reviewBackground=state.settings.reviewBackground;}
 function renderLargeReview(){
   const stage=document.getElementById('reviewHeroStage'),image=document.getElementById('reviewHeroImage'),guide=document.getElementById('reviewSafeGuide'),bounds=document.getElementById('reviewContentBounds'),meta=document.getElementById('reviewHeroMeta');if(!stage||!image||!guide||!bounds||!meta)return;
-  const frame=selectedFrame()||frames()[0];applyReviewBackground(stage);stage.style.aspectRatio=`${state.settings.targetW}/${state.settings.targetH}`;
+  const frame=selectedFrame()||frames()[0],output=state.destinationController?.getFrameOutput?.(frame)||{width:state.settings.targetW,height:state.settings.targetH,safeMargin:state.settings.safeMargin};applyReviewBackground(stage);stage.style.aspectRatio=`${output.width}/${output.height}`;
   if(!frame){image.removeAttribute('src');guide.classList.add('hidden');bounds.classList.add('hidden');meta.innerHTML='<div class="text-slate-400">尚無預覽</div>';return;}
   const canvas=renderFrame(frame),item=allReviewItems().find(entry=>entry.frameId===frame.id),analysis=analyzeRenderedCanvas(canvas);image.src=canvas.toDataURL('image/png');
-  const top=state.settings.safeMargin/state.settings.targetH*100,left=state.settings.safeMargin/state.settings.targetW*100;guide.style.top=`${top}%`;guide.style.bottom=`${top}%`;guide.style.left=`${left}%`;guide.style.right=`${left}%`;guide.classList.toggle('hidden',!state.settings.showSafeGuide);
+  const top=output.safeMargin/output.height*100,left=output.safeMargin/output.width*100;guide.style.top=`${top}%`;guide.style.bottom=`${top}%`;guide.style.left=`${left}%`;guide.style.right=`${left}%`;guide.classList.toggle('hidden',!state.settings.showSafeGuide);
   if(analysis.bounds){bounds.style.left=`${analysis.bounds.x/analysis.width*100}%`;bounds.style.top=`${analysis.bounds.y/analysis.height*100}%`;bounds.style.width=`${analysis.bounds.width/analysis.width*100}%`;bounds.style.height=`${analysis.bounds.height/analysis.height*100}%`;bounds.classList.toggle('hidden',!state.settings.showContentBounds);}else bounds.classList.add('hidden');
   const issueBadges=(item?.issues||[]).filter(issue=>issue.code!=='review.pendingApproval').map(issue=>`<div class="mt-2 rounded-xl ${issue.severity==='error'?'bg-rose-500/20 text-rose-200':issue.severity==='warning'?'bg-amber-500/20 text-amber-100':'bg-white/10'} p-2 text-xs">${escapeHtml(reviewIssueText(issue))}</div>`).join('');
-  meta.innerHTML=`<div class="text-xs font-black uppercase tracking-widest text-sky-300">Selected Review</div><div class="mt-2 break-all text-lg font-black">${escapeHtml(frame.name)}</div><div class="mt-1 break-all font-mono text-xs text-slate-300">${escapeHtml(item?.fileName||"")}</div><div class="mt-3 rounded-2xl bg-white/10 p-3">${state.settings.targetW}×${state.settings.targetH}px<br>safe ${state.settings.safeMargin}px<br>內容 ${analysis.bounds?analysis.bounds.width+'×'+analysis.bounds.height:'無'}<br>透明 ${Math.round((analysis.transparentRatio||0)*100)}%<br>${item?.kb||0}KB</div><button id="reviewHeroApproveBtn" class="mt-3 w-full rounded-xl ${item?.approved?'bg-emerald-500':'bg-emerald-300 text-slate-950'} py-2 text-xs font-black">${item?.approved?'已核准｜點擊撤銷':'核准目前 Frame'}</button><label class="mt-2 flex items-center justify-between rounded-xl bg-white/10 p-2 text-xs font-black"><span>加入匯出</span><input id="reviewHeroExportInput" type="checkbox" ${item?.exportSelected?'checked':''}></label>${issueBadges||'<div class="mt-3 rounded-xl bg-emerald-500/20 p-2 text-xs text-emerald-200">沒有像素錯誤</div>'}`;
+  meta.innerHTML=`<div class="text-xs font-black uppercase tracking-widest text-sky-300">Selected Review</div><div class="mt-2 break-all text-lg font-black">${escapeHtml(frame.name)}</div><div class="mt-1 break-all font-mono text-xs text-slate-300">${escapeHtml(item?.fileName||'')}</div><div class="mt-3 rounded-2xl bg-white/10 p-3">${roleLabel(packageRole(frame))}<br>${output.width}×${output.height}px<br>safe ${output.safeMargin}px<br>內容 ${analysis.bounds?analysis.bounds.width+'×'+analysis.bounds.height:'無'}<br>透明 ${Math.round((analysis.transparentRatio||0)*100)}%<br>${item?.kb||0}KB</div><button id="reviewHeroApproveBtn" class="mt-3 w-full rounded-xl ${item?.approved?'bg-emerald-500':'bg-emerald-300 text-slate-950'} py-2 text-xs font-black">${item?.approved?'已核准｜點擊撤銷':'核准目前 Frame'}</button><label class="mt-2 flex items-center justify-between rounded-xl bg-white/10 p-2 text-xs font-black"><span>加入匯出</span><input id="reviewHeroExportInput" type="checkbox" ${item?.exportSelected?'checked':''}></label>${issueBadges||'<div class="mt-3 rounded-xl bg-emerald-500/20 p-2 text-xs text-emerald-200">沒有像素錯誤</div>'}`;
   document.getElementById('reviewHeroApproveBtn')?.addEventListener('click',()=>toggleFrameReviewApproval(frame.id));document.getElementById('reviewHeroExportInput')?.addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}},{preserveReview:true});runReview();refresh();});updateReviewTransform();
 }
-function reviewIssueText(issue){const labels={'render.blank':'空白或全透明','render.lowContent':'可見內容過少','render.edgeTouch':'內容碰到輸出邊界','render.safeMargin':'侵入安全留白','render.opaqueBackground':'疑似背景未移除','render.fileTooLarge':'檔案過大','package.duplicateFilename':'重複檔名','review.pendingApproval':'尚未核准','render.sizeMismatch':'輸出尺寸不符','render.missing':'尚未渲染'};return labels[issue.code]||issue.message||issue.code;}
+
+function reviewIssueText(issue){const labels={'render.blank':'空白或全透明','render.lowContent':'可見內容過少','render.edgeTouch':'內容碰到輸出邊界','render.safeMargin':'侵入安全留白','render.opaqueBackground':'疑似背景未移除','render.fileTooLarge':'檔案過大','package.duplicateFilename':'重複檔名','review.pendingApproval':'尚未核准','render.sizeMismatch':'輸出尺寸不符','render.missing':'尚未渲染','destination.role.exact':'角色數量不符','destination.role.min':'角色數量不足','destination.role.max':'角色數量過多','destination.role.allowedCount':'貼圖數量不符合 Profile','destination.output.size':'角色輸出尺寸不符','destination.output.fileSize':'檔案超過 Profile 上限','destination.package.empty':'沒有可輸出檔案'};return labels[issue.code]||issue.message||issue.code;}
 function renderReviewProgress(){const holder=document.getElementById('reviewProgressBar');if(!holder)return;const progress=getReviewProgress(allReviewItems());holder.innerHTML=`<div class="flex items-center justify-between text-xs font-black"><span>已核准 ${progress.approved}/${progress.selected}</span><span>${progress.percent}% · 錯誤 ${progress.withErrors} · 警告 ${progress.withWarnings} · 排除 ${progress.excluded}</span></div><div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full ${progress.ready?'bg-emerald-500':'bg-sky-500'}" style="width:${progress.percent}%"></div></div>`;}
 function renderReviewInspector(){const gate=document.getElementById('reviewGateStatus'),list=document.getElementById('reviewIssueList');if(!gate||!list)return;runReview();const report=state.reviewReport,progress=getReviewProgress(allReviewItems());gate.innerHTML=`<div class="rounded-2xl ${report.canPackage?'bg-emerald-500/20 text-emerald-200':'bg-white/10'} p-3"><div class="text-2xl font-black">${progress.approved}/${progress.selected}</div><div class="text-xs">已核准 · ${report.summary.errors} errors · ${report.summary.warnings} warnings</div><div class="mt-2 text-xs font-black">${report.canPackage?'✓ Review 完成，可進入 Package':'尚未通過品質門檻'}</div></div>`;const issues=report.issues.filter(issue=>issue.code!=='review.pendingApproval');if(!issues.length){list.innerHTML='<div class="rounded-xl bg-emerald-500/20 p-3 text-xs text-emerald-200">沒有自動檢查問題</div>';return;}list.innerHTML=issues.map(issue=>`<button data-review-issue-frame="${issue.frameId||''}" class="block w-full rounded-xl ${issue.severity==='error'?'bg-rose-500/20 text-rose-100':issue.severity==='warning'?'bg-amber-500/20 text-amber-100':'bg-white/10'} p-3 text-left text-xs"><span class="font-black">${issue.severity.toUpperCase()}</span><br>${escapeHtml(reviewIssueText(issue))}</button>`).join('');list.querySelectorAll('[data-review-issue-frame]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.reviewIssueFrame){selectFrame(button.dataset.reviewIssueFrame);state.activeEditor='review';resetReviewViewport();refresh();document.getElementById('stage-review')?.scrollIntoView({behavior:'smooth',block:'start'});}}));}
 function refreshReviewControls(){const filter=document.getElementById('reviewFilterInput'),sort=document.getElementById('reviewSortInput');if(filter)filter.value=state.settings.reviewFilter;if(sort)sort.value=state.settings.reviewSort;document.querySelectorAll('.review-bg').forEach(button=>button.classList.toggle('ring-2',button.dataset.reviewBg===state.settings.reviewBackground));const exportButton=document.getElementById('exportZipBtn');if(exportButton){exportButton.disabled=!state.reviewReport?.canPackage;exportButton.classList.toggle('opacity-40',exportButton.disabled);exportButton.title=exportButton.disabled?'Review 尚未核准或仍有錯誤':'';}}

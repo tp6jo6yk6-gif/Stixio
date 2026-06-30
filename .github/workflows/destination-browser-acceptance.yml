@@ -1,0 +1,82 @@
+name: Destination Rules browser acceptance
+
+on:
+  push:
+    branches:
+      - destination-rules-full-completion
+    paths:
+      - 'src/core/destination-profiles.js'
+      - 'src/core/project-workflow.js'
+      - 'src/core/review/**'
+      - 'src/core/index.js'
+      - 'src/ui/destination-controller.js'
+      - 'src/ui/package-controller.js'
+      - 'src/ui/stixio-workshop-app-v2.js'
+      - 'tests/destination-profiles.test.js'
+      - 'tests/destination-project-state.test.js'
+      - 'tests/e2e/destination.spec.js'
+      - 'tests/e2e/package.spec.js'
+      - 'tests/e2e/project.spec.js'
+      - 'playwright.destination.config.js'
+      - 'playwright.package.config.js'
+      - 'playwright.project.config.js'
+      - 'package.json'
+      - '.github/workflows/destination-browser-acceptance.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: destination-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-destination:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Check syntax, unit tests and build
+        run: |
+          set -o pipefail
+          {
+            node --check src/core/destination-profiles.js
+            node --check src/core/project-workflow.js
+            node --check src/core/review/review-engine.js
+            node --check src/core/review/review-workflow.js
+            node --check src/ui/destination-controller.js
+            node --check src/ui/package-controller.js
+            node --check src/ui/stixio-workshop-app-v2.js
+            npm test
+            npm run build
+          } 2>&1 | tee destination-ci.log
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Destination Rules browser acceptance
+        run: npm run test:e2e:destination
+      - name: Run Package browser acceptance
+        run: npm run test:e2e:package
+      - name: Run Project browser acceptance
+        run: npm run test:e2e:project
+      - name: Upload cross-stage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: destination-cross-stage-report
+          path: |
+            destination-ci.log
+            playwright-report/destination
+            playwright-report/package
+            playwright-report/project
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14

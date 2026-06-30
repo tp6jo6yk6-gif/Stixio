@@ -13,6 +13,7 @@ export function createWorkshopProjectSnapshot({
   activeSourceId = null,
   selectedFrameId = null,
   packageState = null,
+  destinationState = null,
   metadata = {},
   now = new Date()
 } = {}) {
@@ -38,6 +39,7 @@ export function createWorkshopProjectSnapshot({
       selectedFrameId
     },
     packageState: cloneSerializable(packageState),
+    destinationState: cloneSerializable(destinationState),
     metadata: {
       generator: 'Stixio Workshop',
       generatorVersion: '0.9.0-beta',
@@ -108,6 +110,7 @@ export function migrateWorkshopProject(input) {
       activeSourceId: source.ui?.activeSourceId || source.activeSourceId || null,
       selectedFrameId: source.ui?.selectedFrameId || source.selectedFrameId || null,
       packageState: source.packageState || null,
+      destinationState: source.destinationState || null,
       metadata: { ...(source.metadata || {}), migratedFrom: version },
       now: source.updatedAt || new Date()
     });
@@ -121,6 +124,8 @@ export function migrateWorkshopProject(input) {
     sources: normalizeSources(source.sources || []),
     sourceLayouts: normalizeEntries(source.sourceLayouts || []),
     selectedFrameBySource: normalizeEntries(source.selectedFrameBySource || []),
+    packageState: cloneSerializable(source.packageState || null),
+    destinationState: cloneSerializable(source.destinationState || null),
     ui: {
       activeSourceId: source.ui?.activeSourceId || null,
       selectedFrameId: source.ui?.selectedFrameId || null

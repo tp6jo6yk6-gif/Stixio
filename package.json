@@ -17,6 +17,7 @@
     "test:e2e:review": "playwright test --config=playwright.review.config.js",
     "test:e2e:package": "playwright test --config=playwright.package.config.js",
     "test:e2e:project": "playwright test --config=playwright.project.config.js",
+    "test:e2e:destination": "playwright test --config=playwright.destination.config.js",
     "ci": "npm run test && npm run build"
   },
   "devDependencies": {

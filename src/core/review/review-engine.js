@@ -63,6 +63,7 @@ export function reviewFrames(frames = [], renderedMap = new Map(), options = {})
   const targetW = options.targetW || 370;
   const targetH = options.targetH || 320;
   const maxFrames = options.maxFrames || null;
+  const outputRulesByFrame = options.outputRulesByFrame instanceof Map ? options.outputRulesByFrame : new Map();
 
   if (!frames.length) {
     issues.push(createIssue({
@@ -119,10 +120,13 @@ export function reviewFrames(frames = [], renderedMap = new Map(), options = {})
       return;
     }
 
-    if (rendered.width !== targetW || rendered.height !== targetH) {
+    const outputRule = outputRulesByFrame.get(frame.id) || {};
+    const expectedW = outputRule.targetW || targetW;
+    const expectedH = outputRule.targetH || targetH;
+    if (rendered.width !== expectedW || rendered.height !== expectedH) {
       issues.push(createIssue({
         code: 'render.sizeMismatch',
-        message: `${frame.name || `Frame ${index + 1}`} render size is ${rendered.width}×${rendered.height}, expected ${targetW}×${targetH}.`,
+        message: `${frame.name || `Frame ${index + 1}`} render size is ${rendered.width}×${rendered.height}, expected ${expectedW}×${expectedH}.`,
         severity: ReviewIssueSeverity.ERROR,
         frameId: frame.id
       }));
