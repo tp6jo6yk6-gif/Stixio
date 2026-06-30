@@ -54,10 +54,12 @@ refineReviewTest = refineReviewTest.replace(
 );
 refineReviewTest = refineReviewTest.replace(
   `    await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));`,
-  `    await legacyApp.page.evaluate(() => {
+  `    await expect.poll(() => legacyApp.page.locator('.step3-card').count(), { timeout: 12000 }).toBe(4);
+    await legacyApp.page.evaluate(() => {
       const cards = [...document.querySelectorAll('.step3-card')];
       const source = cards[0];
       const target = cards[2];
+      if (!source || !target) throw new Error(\`Legacy reorder cards unavailable: \${cards.length}\`);
       const dataTransfer = new DataTransfer();
       source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
       target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
