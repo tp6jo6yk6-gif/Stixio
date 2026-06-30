@@ -382,15 +382,21 @@ function mountPackageController(root){
         const selected=exportFrames(),profile=state.destinationController?.getActiveProfile?.();
         if(!profile)return false;
         const fallback=profile.roles.find(role=>role.key===AssetRoles.STICKER)?.key||profile.roles[0].key;
-        const required=[];
-        profile.roles.filter(role=>role.key!==fallback).forEach(role=>{const count=role.exact??(role.required?1:0);for(let i=0;i<count;i++)required.push(role.key);});
+        const required=[],optional=[];
+        profile.roles.filter(role=>role.key!==fallback).forEach(role=>{
+          const count=role.exact??(role.required?Math.max(1,role.min||1):0);
+          for(let i=0;i<count;i++)required.push(role.key);
+          if(!count&&(role.max==null||role.max>0))optional.push(role.key);
+        });
         const minimumSticker=profile.roles.find(role=>role.key===fallback)?.min||1;
         if(mode==='auto'&&selected.length<required.length+minimumSticker){window.alert(`此 Profile 至少需要 ${required.length+minimumSticker} 張輸出。`);return false;}
+        const optionalCapacity=Math.max(0,selected.length-required.length-minimumSticker);
+        const assignments=mode==='auto'?[...required,...optional.slice(0,optionalCapacity)]:[];
         const selectedIds=new Set(selected.map(frame=>frame.id));
         setFrames(frames().map(frame=>{
           if(!selectedIds.has(frame.id))return frame;
           const index=selected.findIndex(item=>item.id===frame.id);
-          const role=mode==='auto'?(required[index]||fallback):fallback;
+          const role=mode==='auto'?(assignments[index]||fallback):fallback;
           return{...frame,state:{...frame.state,packageRole:role,reviewApproved:false},custom:{...frame.custom,outputRole:role}};
         }));
         clearRenderCache();renderAll();refresh();return true;

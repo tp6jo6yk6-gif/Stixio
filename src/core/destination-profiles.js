@@ -418,7 +418,7 @@ function destinationFileName(roleRule, index, extension, globalPrefix = '', glob
 }
 
 function sequentialFileName(index, extension, prefix = '', suffix = '') {
-  const name = `${String(prefix || '').trim()}${prefix ? '_' : ''}${String(index).padStart(3, '0')}${suffix ? `_${String(suffix).trim()}` : ''}.${extension}`;
+  const name = `${String(prefix || '').trim()}${prefix ? '_' : ''}${String(index)}${suffix ? `_${String(suffix).trim()}` : ''}.${extension}`;
   return name.replace(/\s+/g, '-');
 }
 
