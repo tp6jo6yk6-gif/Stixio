@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const outputDir = new URL('../../.parity/', import.meta.url);
+const outputDir = new URL('../../parity-results/', import.meta.url);
 
 const signalGroups = {
   import: ['import', 'upload', 'open', '匯入', '上傳', '選擇圖片', '拖放'],
@@ -30,15 +30,14 @@ test('capture legacy and Workshop runtime inventories', async ({ browser }) => {
       return !text.includes('正在還原 Stixio') && controls > 0;
     }, null, { timeout: 30000 })
   );
+  await writeFile(new URL('legacy-runtime-inventory.json', outputDir), JSON.stringify(legacy, null, 2));
 
-  const workshop = await captureRuntime(browser, '/index.html', 'workshop', async page => {
+  const workshop = await captureRuntime(browser, '/tests/fixtures/layout-harness.html', 'workshop', async page => {
     await page.waitForSelector('#app', { state: 'attached', timeout: 20000 });
     await page.waitForSelector('#fileInput', { state: 'attached', timeout: 20000 });
     await page.waitForSelector('#stage-review', { state: 'attached', timeout: 20000 });
     await page.waitForSelector('#stage-package', { state: 'attached', timeout: 20000 });
   });
-
-  await writeFile(new URL('legacy-runtime-inventory.json', outputDir), JSON.stringify(legacy, null, 2));
   await writeFile(new URL('workshop-runtime-inventory.json', outputDir), JSON.stringify(workshop, null, 2));
 
   const matrix = Object.fromEntries(Object.keys(signalGroups).map(key => [key, {
@@ -67,7 +66,7 @@ async function captureRuntime(browser, path, name, ready) {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
 
-  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(path, { waitUntil: 'commit', timeout: 30000 });
   await ready(page);
   await page.waitForTimeout(750);
   await page.screenshot({ path: new URL(`${name}-initial.png`, outputDir).pathname, fullPage: true });
