@@ -7,7 +7,7 @@ import part3 from '../src/legacy/payload-3.js';
 import part4 from '../src/legacy/payload-4.js';
 import part5 from '../src/legacy/payload-5.js';
 
-const outputDir = new URL('../.parity/', import.meta.url);
+const outputDir = new URL('../parity-results/', import.meta.url);
 await mkdir(outputDir, { recursive: true });
 
 const compressed = Buffer.from(part1 + part2 + part3 + part4 + part5, 'base64');
