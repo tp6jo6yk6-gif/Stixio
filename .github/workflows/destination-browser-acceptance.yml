@@ -12,11 +12,12 @@ on:
       - 'src/ui/destination-controller.js'
       - 'src/ui/package-controller.js'
       - 'src/ui/stixio-workshop-app-v2.js'
-      - 'scripts/apply-destination-package-compatibility.mjs'
       - 'tests/destination-profiles.test.js'
       - 'tests/destination-project-state.test.js'
       - 'tests/e2e/destination.spec.js'
+      - 'tests/e2e/package.spec.js'
       - 'playwright.destination.config.js'
+      - 'playwright.package.config.js'
       - 'package.json'
       - '.github/workflows/destination-browser-acceptance.yml'
   pull_request:
@@ -29,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   chromium-destination:
@@ -37,15 +38,9 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply Package compatibility
-        run: |
-          node --check scripts/apply-destination-package-compatibility.mjs
-          node scripts/apply-destination-package-compatibility.mjs
       - name: Install dependencies
         run: npm install
       - name: Check syntax, unit tests and build
@@ -86,13 +81,3 @@ jobs:
             test-results
           if-no-files-found: ignore
           retention-days: 14
-      - name: Commit verified Package compatibility
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/core/destination-profiles.js src/ui/stixio-workshop-app-v2.js package-lock.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Preserve Package behavior with Destination Profiles"
-          git push origin HEAD:${HEAD_BRANCH}
