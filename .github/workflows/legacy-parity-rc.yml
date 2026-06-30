@@ -1,0 +1,68 @@
+name: Legacy Parity RC
+
+on:
+  push:
+    branches:
+      - release/workshop-parity-rc1
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: legacy-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  parity-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract and fingerprint Legacy baseline
+        run: |
+          set -o pipefail
+          npm run parity:extract 2>&1 | tee parity-extract.log
+
+      - name: Run unit tests and static build
+        run: |
+          set -o pipefail
+          {
+            npm test
+            npm run build
+          } 2>&1 | tee parity-ci.log
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture runtime inventories
+        run: |
+          set -o pipefail
+          npm run test:e2e:parity 2>&1 | tee parity-browser.log
+
+      - name: Upload Legacy parity baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-parity-baseline
+          path: |
+            .parity
+            parity-extract.log
+            parity-ci.log
+            parity-browser.log
+            playwright-report/parity
+            test-results
+          if-no-files-found: error
+          retention-days: 30
