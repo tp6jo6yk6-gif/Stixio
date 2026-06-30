@@ -142,13 +142,14 @@ export function createProjectController(adapter, options = {}) {
     const suggested = `${current.name || 'Untitled Project'} Copy`;
     const name = adapter.prompt('另存新專案名稱', suggested);
     if (!name) return;
+    const copyId = createId('project');
     const copy = {
       ...current,
-      id: createId('project'),
+      id: copyId,
       name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      document: { ...current.document, id: createId('doc'), name }
+      document: { ...current.document, id: copyId, name }
     };
     await restoreSnapshot(copy, { status: '已另存新專案', saveToLibrary: true });
   }

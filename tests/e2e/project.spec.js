@@ -181,14 +181,14 @@ test.describe('Document and Project browser acceptance', () => {
     await page.locator('[data-project-duplicate]').click();
     await expect(page.locator('[data-project-open]')).toHaveCount(2);
 
-    const duplicateOpen = page.locator('[data-project-open]').nth(1);
-    await duplicateOpen.click();
-    await expect(page.locator('#projectNameInput')).toHaveValue(/Copy/);
+    const duplicateCard = page.locator('article').filter({ hasText: 'Library Project Copy' });
+    await duplicateCard.locator('[data-project-open]').click();
+    await expect(page.locator('#projectNameInput')).toHaveValue('Library Project Copy');
     await expect(page.locator('[data-review-card="true"]')).toHaveCount(4);
 
     await page.locator('#projectRecentBtn').click();
     page.once('dialog', dialog => dialog.accept());
-    await page.locator('[data-project-delete]').nth(1).click();
+    await page.locator('article').filter({ hasText: 'Library Project Copy' }).locator('[data-project-delete]').click();
     await expect(page.locator('[data-project-open]')).toHaveCount(1);
   });
 
@@ -205,7 +205,9 @@ test.describe('Document and Project browser acceptance', () => {
       mimeType: 'application/zip',
       buffer: Buffer.from('not a project archive')
     });
-    await expect.poll(() => dialogs.length).toBe(1);
+    await expect.poll(() => dialogs.length).toBe(2);
+    expect(dialogs.some(message => message.includes('尚未儲存'))).toBe(true);
+    expect(dialogs.some(message => message.includes('valid .stixio'))).toBe(true);
     await expect(page.locator('#projectNameInput')).toHaveValue('Safe Project');
     await expect(page.locator('[data-review-card="true"]')).toHaveCount(4);
     await expect(page.locator('#projectProgress')).toContainText('無法開啟專案');

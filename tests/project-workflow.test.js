@@ -225,11 +225,12 @@ test('Memory project storage supports save, recent list, duplicate, autosave and
 });
 
 test('Project summary is compact and suitable for recent project cards', () => {
-  const summary = projectSummary(workshopSnapshot());
+  const snapshot = workshopSnapshot();
+  const summary = projectSummary(snapshot);
   assert.deepEqual(summary, {
     id: 'doc-1',
     name: 'Project Alpha',
-    createdAt: workshopSnapshot().createdAt,
+    createdAt: snapshot.createdAt,
     updatedAt: '2026-06-30T00:00:00.000Z',
     sourceCount: 1,
     frameCount: 1,
