@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   finalize-rc1:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
