@@ -40,6 +40,8 @@ jobs:
           npm run parity:extract
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Diagnose finalized Workshop startup
+        run: node scripts/diagnose-rc1-startup.mjs
       - name: Run complete browser acceptance and parity gate
         run: |
           npm run test:e2e:layout
@@ -66,6 +68,14 @@ jobs:
             parity-results
             playwright-report
             test-results
+            rc1-startup-diagnostic.json
+            rc1-startup-diagnostic.png
+            index.html
+            package.json
+            package-lock.json
+            src/ui/stixio-workshop-app-v2.js
+            src/ui/destination-controller.js
+            src/core/destination-profiles.js
             docs/LEGACY-PARITY-RC1.md
             docs/RC1-PROGRESS.md
           if-no-files-found: ignore
