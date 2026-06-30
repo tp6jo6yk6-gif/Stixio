@@ -35,83 +35,44 @@ async function waitForCanvasColorPoint(page, selector, rgb) {
   return findCanvasColorPoint(page, selector, rgb);
 }
 
+async function dispatchCardReorder(page, selector, fromIndex, toIndex) {
+  await page.evaluate(({ selector, fromIndex, toIndex }) => {
+    const cards=[...document.querySelectorAll(selector)];
+    if(!cards[fromIndex]||!cards[toIndex])throw new Error('Reorder cards are unavailable.');
+    const transfer=new DataTransfer();
+    cards[fromIndex].dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+    cards[toIndex].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+    cards[toIndex].dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+    cards[fromIndex].dispatchEvent(new DragEvent('dragend',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+  }, { selector, fromIndex, toIndex });
+}
+
 async function parseArchive(download) {`
   );
 }
 
-const oldMagic = `    await importLegacy(legacyApp.page, repairSvg());
-    await legacyApp.page.locator('#executeProcessBtn').click({ force: true });
-    await legacyApp.page.locator('#enableChroma').uncheck({ force: true });
-    await legacyApp.page.locator('#enableChroma').dispatchEvent('change');
-    await expect.poll(() => legacyAlpha(legacyApp.page, 0.29, 0.26)).toBeGreaterThan(0);
-    await legacyApp.page.locator('#brushMagicBtn').click({ force: true });
-    await pointerAtCanvas(legacyApp.page, '#step5Canvas', 0.29, 0.26);
-    await legacyApp.page.locator('#applyProtectBtn').click({ force: true });
-    await expect.poll(() => legacyAlpha(legacyApp.page, 0.29, 0.26)).toBe(0);
-    const legacy = {
-      target: await legacyAlpha(legacyApp.page, 0.29, 0.26),
-      neighbor: await legacyAlpha(legacyApp.page, 0.55, 0.3)
-    };
-
-    await importWorkshop(workshopApp.page, repairSvg());
-    await workshopApp.page.locator('#chromaEnabledInput').uncheck();
-    await workshopApp.page.locator('[data-mask-tool="magic"]').click();
-    await workshopApp.page.locator('[data-magic-action="delete"]').click();
-    await pointerAtCanvas(workshopApp.page, '#refineCanvas', 0.23, 0.23);
-    await expect.poll(() => workshopAlpha(workshopApp.page, 0.29, 0.26)).toBe(0);
-    const workshop = {
-      target: await workshopAlpha(workshopApp.page, 0.29, 0.26),
-      neighbor: await workshopAlpha(workshopApp.page, 0.55, 0.3)
-    };`;
-
-const newMagic = `    await importLegacy(legacyApp.page, repairSvg());
-    await legacyApp.page.locator('#executeProcessBtn').click({ force: true });
-    await legacyApp.page.locator('#enableChroma').uncheck({ force: true });
-    await legacyApp.page.locator('#enableChroma').dispatchEvent('change');
-    const legacyTarget = await waitForCanvasColorPoint(legacyApp.page, '#step5Canvas', [37, 99, 235]);
-    const legacyNeighbor = await waitForCanvasColorPoint(legacyApp.page, '#step5Canvas', [239, 68, 68]);
-    await legacyApp.page.locator('#brushMagicBtn').click({ force: true });
-    await legacyApp.page.evaluate(point => {
-      const canvas = document.querySelector('#step5Canvas');
-      applyMagicErase(point.xRatio * canvas.width, point.yRatio * canvas.height);
-    }, legacyTarget);
-    await legacyApp.page.locator('#applyProtectBtn').click({ force: true });
-    await expect.poll(() => legacyAlpha(legacyApp.page, legacyTarget.xRatio, legacyTarget.yRatio)).toBe(0);
-    const legacy = {
-      target: await legacyAlpha(legacyApp.page, legacyTarget.xRatio, legacyTarget.yRatio),
-      neighbor: await legacyAlpha(legacyApp.page, legacyNeighbor.xRatio, legacyNeighbor.yRatio)
-    };
-
-    await importWorkshop(workshopApp.page, repairSvg());
-    await workshopApp.page.locator('#chromaEnabledInput').uncheck();
-    const workshopClick = await waitForCanvasColorPoint(workshopApp.page, '#refineCanvas', [37, 99, 235]);
-    const workshopTarget = await waitForCanvasColorPoint(workshopApp.page, '#refineOutputCanvas', [37, 99, 235]);
-    const workshopNeighbor = await waitForCanvasColorPoint(workshopApp.page, '#refineOutputCanvas', [239, 68, 68]);
-    await workshopApp.page.locator('[data-mask-tool="magic"]').click();
-    await workshopApp.page.locator('[data-magic-action="delete"]').click();
-    await pointerAtCanvas(workshopApp.page, '#refineCanvas', workshopClick.xRatio, workshopClick.yRatio);
-    await expect.poll(() => workshopAlpha(workshopApp.page, workshopTarget.xRatio, workshopTarget.yRatio)).toBe(0);
-    const workshop = {
-      target: await workshopAlpha(workshopApp.page, workshopTarget.xRatio, workshopTarget.yRatio),
-      neighbor: await workshopAlpha(workshopApp.page, workshopNeighbor.xRatio, workshopNeighbor.yRatio)
-    };`;
-
-if (source.includes(oldMagic)) source = source.replace(oldMagic, newMagic);
+source = source.replaceAll(
+  `    await legacyApp.page.locator('#enableChroma').uncheck({ force: true });\n    await legacyApp.page.locator('#enableChroma').dispatchEvent('change');\n`,
+  ''
+);
+source = source.replaceAll(
+  `    await workshopApp.page.locator('#chromaEnabledInput').uncheck();\n`,
+  ''
+);
 source = source.replace(
-  `await pointerAtCanvas(legacyApp.page, '#step5Canvas', legacyTarget.xRatio, legacyTarget.yRatio);`,
-  `await legacyApp.page.evaluate(point => { const canvas=document.querySelector('#step5Canvas'); applyMagicErase(point.xRatio*canvas.width,point.yRatio*canvas.height); }, legacyTarget);`
+  `    await pointerAtCanvas(legacyApp.page, '#step5Canvas', legacyTarget.xRatio, legacyTarget.yRatio);`,
+  `    await legacyApp.page.evaluate(point => { const canvas=document.querySelector('#step5Canvas'); applyMagicErase(point.xRatio*canvas.width,point.yRatio*canvas.height); }, legacyTarget);`
 );
 
 source = source.replace(
-  `await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));`,
-  `await legacyApp.page.evaluate(() => {
-      const cards=[...document.querySelectorAll('.step3-card')];
-      const transfer=new DataTransfer();
-      cards[0].dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:transfer}));
-      cards[2].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));
-      cards[2].dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
-      cards[0].dispatchEvent(new DragEvent('dragend',{bubbles:true,cancelable:true,dataTransfer:transfer}));
-    });`
+  `    await legacyApp.page.locator('.step3-card').nth(0).dragTo(legacyApp.page.locator('.step3-card').nth(2));`,
+  `    await dispatchCardReorder(legacyApp.page,'.step3-card',0,2);`
+);
+source = source.replace(
+  `    await workshopApp.page.locator('[data-review-card="true"]').nth(0).dragTo(workshopApp.page.locator('[data-review-card="true"]').nth(2));`,
+  `    const workshopIdsBefore=await workshopApp.page.locator('[data-review-card="true"]').evaluateAll(cards=>cards.map(card=>card.dataset.frameId));
+    await dispatchCardReorder(workshopApp.page,'[data-review-card="true"]',0,2);
+    await expect.poll(()=>workshopApp.page.locator('[data-review-card="true"]').evaluateAll(cards=>cards.map(card=>card.dataset.frameId))).not.toEqual(workshopIdsBefore);`
 );
 
 if (!source.includes('function expectGeometryListsClose(')) {
@@ -133,4 +94,4 @@ source = source.replace(
 );
 
 await writeFile(path, source, 'utf8');
-console.log('Magic core targeting and standard DragEvent parity fixes applied.');
+console.log('Magic and Review reorder parity interactions stabilized.');
