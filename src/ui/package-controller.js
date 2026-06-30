@@ -307,7 +307,22 @@ export function createPackageController(adapter) {
     return { status: PackageJobStatuses.IDLE, stage: PackageJobStatuses.IDLE, progress: 0, current: null, controller: null, result: null, error: null };
   }
 
-  return { mount, refresh, exportPackage, cancelExport, getSnapshot: createSnapshot };
+  function exportState() {
+    return {
+      settings: cloneProjectValue(local.settings),
+      history: cloneProjectValue(local.history)
+    };
+  }
+
+  function importState(value = null) {
+    const next = value || {};
+    local.settings = createPackageDeliverySettings(next.settings || {});
+    local.history = Array.isArray(next.history) ? cloneProjectValue(next.history).slice(0, 20) : [];
+    local.job = createIdleJob();
+    refresh();
+  }
+
+  return { mount, refresh, exportPackage, cancelExport, getSnapshot: createSnapshot, exportState, importState };
 }
 
 function metric(value, label, className) {
@@ -330,4 +345,10 @@ function setControlChecked(id, value) {
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+}
+
+
+function cloneProjectValue(value) {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
 }

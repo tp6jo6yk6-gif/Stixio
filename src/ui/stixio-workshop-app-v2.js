@@ -62,9 +62,11 @@ import {
   nextReviewFrameId,
   ReviewFilterModes,
   ReviewSortModes,
-  ReviewIssueSeverity
+  ReviewIssueSeverity,
+  createWorkshopProjectSnapshot
 } from '../core/index.js';
 import { createPackageController } from './package-controller.js';
+import { createProjectController } from './project-controller.js';
 
 const HANDLE_SIZE = 14;
 const MIN_FRAME_SIZE = 8;
@@ -140,7 +142,8 @@ const state = {
   reviewView: createRefineViewState({ minZoom: 0.25, maxZoom: 4 }),
   reviewPan: null,
   reviewPointerActive: false,
-  packageController: null
+  packageController: null,
+  projectController: null
 };
 
 export function initStixioWorkshop(root = document.getElementById('app')) {
@@ -149,6 +152,7 @@ export function initStixioWorkshop(root = document.getElementById('app')) {
   root.innerHTML = renderShell();
   bindStaticEvents(root);
   mountPackageController(root);
+  mountProjectController(root);
   refresh();
 }
 
@@ -163,6 +167,7 @@ function renderShell() {
           </div>
           <div class="flex items-center gap-2"><button id="undoBtn" class="rounded-xl bg-white px-3 py-2 text-xs font-black">Undo</button><button id="redoBtn" class="rounded-xl bg-white px-3 py-2 text-xs font-black">Redo</button><button id="exportZipBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white">Package · Export ZIP</button></div>
         </div>
+        <div id="projectToolbarRoot"></div>
         <nav aria-label="Workshop workflow" class="mx-auto grid max-w-[1600px] grid-cols-2 gap-2 px-5 pb-4 md:grid-cols-4">
           ${stageLink('layout','Layout','匯入與版面切割','bg-slate-950 text-white','text-emerald-300')}
           ${stageLink('refine','Refine','細部修補','border border-slate-900/10 bg-white','text-rose-500')}
@@ -368,7 +373,93 @@ function mountPackageController(root){
   state.packageController.mount(root);
 }
 
-function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);mountPackageController(root);refresh();}
+// DOCUMENT_PROJECT_FULL_COMPLETION
+function mountProjectController(root){
+  if(!state.projectController){
+    state.projectController=createProjectController({
+      captureProjectSnapshot,
+      restoreProjectSnapshot,
+      resetProject:resetProjectState,
+      renameProject,
+      getProjectInfo:()=>({id:state.document.id,name:state.document.name,updatedAt:state.document.updatedAt}),
+      getProjectFingerprint,
+      isProjectEmpty:()=>state.sources.size===0&&frames().length===0,
+      getProjectPreviewDataUrl,
+      getJSZipClass:()=>window.JSZip,
+      downloadBlob,
+      alert:message=>window.alert(message),
+      confirm:message=>window.confirm(message),
+      prompt:(message,value)=>window.prompt(message,value)
+    });
+  }
+  state.projectController.mount(root);
+}
+
+async function captureProjectSnapshot(){
+  return createWorkshopProjectSnapshot({
+    document:state.document,
+    settings:state.settings,
+    sources:state.sources,
+    sourceLayouts:state.sourceLayouts,
+    selectedFrameBySource:state.selectedFrameBySource,
+    activeSourceId:state.activeSourceId,
+    selectedFrameId:state.selectedFrameId,
+    packageState:state.packageController?.exportState?.()||null,
+    metadata:{previewDataUrl:getProjectPreviewDataUrl()}
+  });
+}
+
+async function restoreProjectSnapshot(snapshot){
+  const restoredSources=new Map();
+  for(const source of snapshot.sources||[]){
+    if(!source.uri)throw new Error(`來源圖片缺失：${source.name||source.id}`);
+    const img=await loadImage(source.uri);
+    restoredSources.set(source.id,{...source,img,fileName:source.fileName||source.name});
+  }
+  const restoredFrames=[];
+  for(const frame of snapshot.document?.frames||[]){
+    const custom={...(frame.custom||{})};
+    const mask=custom.protectMask;
+    delete custom.protectMask;
+    if(mask?.dataUrl){
+      const maskImage=await loadImage(mask.dataUrl);
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Number(mask.width)||maskImage.width||Math.round(frame.geometry?.width)||1);
+      canvas.height=Math.max(1,Number(mask.height)||maskImage.height||Math.round(frame.geometry?.height)||1);
+      canvas.getContext('2d').drawImage(maskImage,0,0,canvas.width,canvas.height);
+      custom.protectMaskCanvas=canvas;
+    }
+    restoredFrames.push({...frame,custom});
+  }
+  state.document={...snapshot.document,id:snapshot.id||snapshot.document.id,name:snapshot.name||snapshot.document.name,frames:restoredFrames,sourceRefs:(snapshot.sources||[]).map(source=>{const{img,...ref}=source;return ref;})};
+  state.sources=restoredSources;
+  state.sourceLayouts=new Map(snapshot.sourceLayouts||[]);
+  state.selectedFrameBySource=new Map(snapshot.selectedFrameBySource||[]);
+  state.settings={...cloneDefaultSettings(),...(snapshot.settings||{})};
+  state.activeSourceId=snapshot.ui?.activeSourceId&&restoredSources.has(snapshot.ui.activeSourceId)?snapshot.ui.activeSourceId:[...restoredSources.keys()][0]||null;
+  state.selectedFrameId=(snapshot.ui?.selectedFrameId&&restoredFrames.some(frame=>frame.id===snapshot.ui.selectedFrameId))?snapshot.ui.selectedFrameId:restoredFrames[0]?.id||null;
+  state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;state.maskHistories.clear();state.refineAppliedAt.clear();
+  resetFrameHistory();resetRefineViewport();resetReviewViewport();
+  state.packageController?.importState?.(snapshot.packageState||null);
+  renderAll();rerenderShell();
+}
+
+async function resetProjectState(){
+  state.document=createDocument({name:'Sticker Package Project'});
+  state.sources=new Map();state.sourceLayouts=new Map();state.selectedFrameBySource=new Map();state.activeSourceId=null;state.selectedFrameId=null;
+  state.settings=cloneDefaultSettings();state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;state.maskHistories.clear();state.refineAppliedAt.clear();
+  state.packageController?.importState?.(null);resetFrameHistory();resetRefineViewport();resetReviewViewport();rerenderShell();
+}
+
+function renameProject(name){state.document={...state.document,name:String(name||'Untitled Project'),updatedAt:new Date().toISOString()};}
+function cloneDefaultSettings(){return typeof structuredClone==='function'?structuredClone(DEFAULT_SETTINGS):JSON.parse(JSON.stringify(DEFAULT_SETTINGS));}
+function getProjectPreviewDataUrl(){const frame=selectedFrame()||frames()[0];const canvas=frame?renderFrame(frame):null;return canvas?.toDataURL?.('image/png')||activeSource()?.uri||null;}
+async function getProjectFingerprint(){
+  const frameState=frames().map(frame=>({id:frame.id,sourceImageId:frame.sourceImageId,geometry:frame.geometry,state:frame.state,custom:{offsetX:frame.custom?.offsetX||0,offsetY:frame.custom?.offsetY||0,maskVersion:frame.custom?.maskVersion||0,outputRole:frame.custom?.outputRole||null}}));
+  return JSON.stringify({id:state.document.id,name:state.document.name,sources:[...state.sources.values()].map(source=>({id:source.id,name:source.name,width:source.width,height:source.height,uriLength:source.uri?.length||0})),layouts:[...state.sourceLayouts.entries()],frames:frameState,settings:state.settings,packageState:state.packageController?.exportState?.()||null});
+}
+
+function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);mountPackageController(root);mountProjectController(root);refresh();}
 function bindRange(root,id,key,render=true,afterChange=null){root.querySelector(`#${id}`).addEventListener('input',event=>{state.settings[key]=Number(event.target.value);const label=root.querySelector(`#${id}Value`);if(label)label.textContent=event.target.value;if(render){clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}if(afterChange)afterChange();});}
 function updateRefineSetting(key,value){state.settings[key]=value;clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}
 function scheduleRenderAll(delay=90){if(state.refineRenderTimer)clearTimeout(state.refineRenderTimer);state.refineRenderTimer=setTimeout(()=>{state.refineRenderTimer=null;clearRenderCache();renderAll();refresh();},delay);}
@@ -486,7 +577,7 @@ function renderAll(){frames().forEach(frame=>renderFrame(frame));runReview();}
 function clearRenderCache(){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;invalidateAllReviewApprovals();}
 function runReview(){const selected=exportFrames(),plan=packagePlan(selected);const report=runFullReview(frames(),state.rendered,{targetW:state.settings.targetW,targetH:state.settings.targetH,safeMargin:state.settings.safeMargin,safeAreaMargin:state.settings.safeMargin,maxFileSizeKB:state.settings.maxFileSizeKB,packageItems:plan.items,requireTransparency:true});const packageIssues=[...plan.validation.errors,...plan.validation.warnings].map(issue=>({...issue,id:issue.id||createId('issue'),frameId:issue.frameId||null,metadata:issue.metadata||{}}));const issues=[...report.issues,...packageIssues];const summary={total:issues.length,errors:issues.filter(issue=>issue.severity==='error').length,warnings:issues.filter(issue=>issue.severity==='warning').length,info:issues.filter(issue=>issue.severity==='info').length};state.reviewReport={...report,issues,summary,ready:report.allSelectedApproved&&summary.errors===0&&plan.ready,canPackage:report.allSelectedApproved&&summary.errors===0&&plan.ready,packagePlan:plan};}
 
-function refresh(){drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();const status=document.getElementById('sourceStatus');if(status){const source=activeSource();status.textContent=source?`${source.name} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames`:'尚未匯入';}const undoBtn=document.getElementById('undoBtn');const redoBtn=document.getElementById('redoBtn');if(undoBtn)undoBtn.disabled=!canUndo(state.frameHistory);if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}
+function refresh(){drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();state.projectController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();const status=document.getElementById('sourceStatus');if(status){const source=activeSource();status.textContent=source?`${source.name} · ${frames().filter(frame=>frame.sourceImageId===source.id).length} Frames`:'尚未匯入';}const undoBtn=document.getElementById('undoBtn');const redoBtn=document.getElementById('redoBtn');if(undoBtn)undoBtn.disabled=!canUndo(state.frameHistory);if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}
 
 function renderSourceList(){
   const holder=document.getElementById('sourceList');if(!holder)return;
