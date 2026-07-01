@@ -1,0 +1,56 @@
+name: Sync Stixio 1.0.0 Version
+
+on:
+  push:
+    branches:
+      - release/1.0.0
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-stixio-1.0.0-version
+  cancel-in-progress: false
+
+jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/1.0.0
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Synchronize version metadata
+        run: node scripts/sync-release-version.mjs
+
+      - name: Verify synchronized versions
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const versions = [pkg.version, lock.version, lock.packages?.['']?.version];
+          if (versions.some(version => version !== '1.0.0')) {
+            throw new Error(`Version synchronization failed: ${versions.join(', ')}`);
+          }
+          NODE
+
+      - name: Commit synchronized release version
+        run: |
+          git add package.json package-lock.json src/ui/beta-hardening.js src/core/project-workflow.js
+          if git diff --cached --quiet; then
+            echo 'Release version is already synchronized.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Synchronize Stixio 1.0.0 version metadata'
+          git push origin HEAD:release/1.0.0
