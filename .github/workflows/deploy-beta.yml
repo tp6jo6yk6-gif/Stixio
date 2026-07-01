@@ -1,0 +1,66 @@
+name: Deploy Stixio Beta
+
+on:
+  workflow_run:
+    workflows:
+      - Legacy Parity Release Gate
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stixio-beta-deployment
+  cancel-in-progress: true
+
+jobs:
+  deploy-beta:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    environment:
+      name: beta
+    steps:
+      - name: Checkout verified source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Beta
+        run: npm run build
+
+      - name: Validate Beta build
+        run: |
+          test -f dist/index.html
+          test -f dist/public/robots.txt
+          grep -q 'noindex,nofollow' dist/index.html
+          grep -q 'initStixioWorkshop' dist/index.html
+          grep -q 'DESTINATION_RULES_FULL_COMPLETION' dist/src/ui/stixio-workshop-app-v2.js
+
+      - name: Validate Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing CLOUDFLARE_API_TOKEN'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=stixio-beta --branch=main --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
