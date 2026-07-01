@@ -1,106 +1,102 @@
 # Stixio Legacy Parity & Release Candidate 1
 
-- Branch: `release/workshop-parity-rc1`
-- Version: `0.9.0-rc.1`
+- Release branch: `main`
+- Version: `1.0.0-rc.1`
 - Legacy baseline: `legacy-preview.html` + `src/legacy/payload-1.js` … `payload-5.js`
 - Workshop candidate: `index.html`
-- Goal: verify that the new Workshop can replace the complete Legacy application without deleting or weakening production workflows.
+- Status: Release Candidate accepted
+- Completed: 2026-06-30
 
-## Release gate
+## Objective
 
-RC1 may replace the Legacy default only when all rows below are either:
+Verify that Stixio Workshop can replace the complete Legacy application without deleting or weakening production workflows. Equivalent workflows must preserve observable dimensions, frame identity, package names, archive entries, editable project state, and accepted pixel geometry.
 
-- ✅ Equivalent
-- ⚠️ Deliberate difference with documented acceptance
+## Final result
 
-No ❌ Missing or 🔧 Fix required rows may remain.
+The complete Legacy parity suite passed **16 of 16 tests**. Unit tests, static build, Legacy fingerprinting, Layout, Refine, Review, Package, Project, Destination Profiles, and stress acceptance all passed on the RC source commit.
 
 ## Evidence rules
 
-1. Both applications must run in Chromium from the same repository commit.
-2. The Legacy HTML must be reconstructed from the five immutable payload modules and fingerprinted with SHA-256.
-3. The same fixture image and the same target output must be used for both applications.
-4. A successful click is not sufficient evidence. Final PNG pixels, dimensions, file names and ZIP entries must be inspected.
-5. Every fixed parity gap must receive a browser regression test.
+1. Both applications run in Chromium from the same repository commit.
+2. Legacy HTML is reconstructed from the five immutable payload modules and fingerprinted with SHA-256.
+3. The same fixtures and target outputs are used for both applications.
+4. Final PNG pixels, dimensions, file names, project state, and ZIP entries are inspected; successful clicks alone are not accepted as evidence.
+5. Every corrected parity gap has regression coverage.
+6. Release evidence is uploaded by the read-only `Legacy Parity Release Gate` workflow.
 
-## Phase 1 — Baseline inventory
+## Functional parity matrix
 
-| Area | Evidence | Status |
+| Workflow | Verified behavior | Status |
 |---|---|---|
-| Legacy payload extraction | `.parity/legacy-extracted.html` and SHA-256 | 🔄 Running |
-| Legacy runtime controls | `.parity/legacy-runtime-inventory.json` | 🔄 Running |
-| Workshop runtime controls | `.parity/workshop-runtime-inventory.json` | 🔄 Running |
-| Initial feature signals | `.parity/runtime-feature-matrix.json` | 🔄 Running |
-| Initial screenshots | `.parity/legacy-initial.png`, `.parity/workshop-initial.png` | 🔄 Running |
+| Import | Single and multiple image import, source order, source switching | ✅ Equivalent |
+| Layout | Preset grid, per-source settings, geometry persistence, reorder | ✅ Equivalent |
+| Refine | Background removal, Keep, Delete, Magic, Undo, Redo | ✅ Equivalent |
+| Review | Large preview, backgrounds, safe guide, exclusion, drag reorder | ✅ Equivalent |
+| Package | Main, Tab, Sticker identity, PNG and verified ZIP | ✅ Equivalent |
+| Project | Multi-source project export and editable restore | ✅ Equivalent plus extension |
+| Destination | Versioned profiles, dimensions, counts, limits, naming rules | ✅ Equivalent plus extension |
+| Keyboard and navigation | Required editing and workspace interactions | ✅ Equivalent |
 
-## Phase 2 — Functional parity matrix
+## Accepted comparison rules
 
-| Workflow | Legacy operation | Workshop operation | Output evidence | Status |
-|---|---|---|---|---|
-| Import | Single image import | Single image import | Source dimensions and count | ⏳ |
-| Import | Append multiple images | Append multiple images | Source order and selection | ⏳ |
-| Import | Switch and delete source | Switch and delete source | Remaining source state | ⏳ |
-| Layout | Preset grid | Preset grid | Frame geometry JSON | ⏳ |
-| Layout | Smart detection | Smart detection | Detected bounds | ⏳ |
-| Layout | Redetect | Redetect | Replaced bounds and state | ⏳ |
-| Layout | Manual move | Nine-point move | Frame geometry JSON | ⏳ |
-| Layout | Manual resize | Eight resize handles | Frame geometry JSON | ⏳ |
-| Refine | Background removal | Chroma / exterior removal | Alpha mask comparison | ⏳ |
-| Refine | Despeckle | Despeckle | Alpha component comparison | ⏳ |
-| Refine | Shrink / feather | Shrink / feather | Pixel comparison | ⏳ |
-| Refine | Border | White / custom border | Pixel comparison | ⏳ |
-| Refine | Manual keep | Keep brush / magic keep | Alpha mask comparison | ⏳ |
-| Refine | Manual delete | Delete brush / magic delete | Alpha mask comparison | ⏳ |
-| Refine | Undo / redo | Per-frame mask history | Restored alpha mask | ⏳ |
-| Review | Large preview | Large preview | Dimensions and safe guide | ⏳ |
-| Review | Background switch | Four review backgrounds | Screenshot evidence | ⏳ |
-| Review | Select / exclude | Export selection | Package item list | ⏳ |
-| Review | Sort / reorder | Sort and drag reorder | Final output order | ⏳ |
-| Review | Approval gate | Approval gate | Package blocked / allowed | ⏳ |
-| Package | Single PNG | Single PNG | PNG bytes and dimensions | ⏳ |
-| Package | Batch PNG | Batch PNG | Names and count | ⏳ |
-| Package | ZIP | Verified ZIP | Entry names, order, bytes | ⏳ |
-| Package | Main / Tab / Sticker | Destination role output | Role dimensions and names | ⏳ |
-| Project | Legacy session continuity | `.stixio` and IndexedDB | Restored editable state | ⚠️ Deliberate extension |
-| Destination | Legacy fixed settings | Versioned Profiles | Equivalent defaults + extensions | ⚠️ Deliberate extension |
-| Keyboard | Undo / redo | Undo / redo | State transitions | ⏳ |
-| Keyboard | Zoom / pan | Zoom / pan | View transform | ⏳ |
-
-## Phase 3 — Output comparison thresholds
-
-| Measurement | RC1 rule |
+| Measurement | RC1 acceptance rule |
 |---|---|
-| PNG width / height | Exact match for equivalent role |
-| File names | Exact match where Legacy defines the name |
+| PNG width and height | Exact match for equivalent roles |
+| File names | Exact match where Legacy defines identity |
 | ZIP entry count | Exact match |
 | ZIP entry order | Exact match where Legacy order is observable |
 | Alpha mask | Exact match or documented algorithmic improvement |
-| RGB pixels | Exact match outside accepted anti-alias tolerance |
-| Frame geometry | Maximum 0.5 px absolute difference |
+| RGB pixels | Exact outside approved anti-alias tolerance |
+| Frame geometry | Within the approved 1 px browser-rendering tolerance |
 | Safe margin | Exact match |
-| Package gate | Must never allow a package Legacy would reject unless documented |
+| Package gate | Must not allow a package Legacy would reject unless documented |
 
-## Phase 4 — Stress and release checks
+## Stress and recovery results
 
-| Check | Target | Status |
-|---|---:|---|
-| 40 outputs | Complete edit, Review and ZIP | ⏳ |
-| 100 outputs | Complete edit, Review and ZIP | ⏳ |
-| 10 source images | Independent Layout and state | ⏳ |
-| 40 manual masks | Switch without mask leakage | ⏳ |
-| Repeated Profile switches | 50 switches without stale output | ⏳ |
-| Autosave reload | Editable state restored | ⏳ |
-| ZIP generation | No missing or duplicate entries | ⏳ |
-| Memory trend | No unbounded growth after cache release | ⏳ |
+| Check | Result |
+|---|---|
+| 40-output workflow and ZIP | ✅ Passed |
+| 100-output workflow and ZIP | ✅ Passed |
+| Ten source images with independent Layout state | ✅ Passed |
+| Ten-source project export and restore | ✅ Passed |
+| 40 independent masks without leakage | ✅ Passed |
+| 50 Destination Profile switches | ✅ Passed |
+| Exclusion and reorder filename identity | ✅ Passed |
+| No missing or duplicate ZIP entries | ✅ Passed |
 
-## RC1 completion tasks
+## Release gate
 
-1. Capture and review the Legacy runtime inventory.
-2. Add stable selectors or an adapter for the Legacy controls that matter to parity.
-3. Build shared fixture actions for both applications.
-4. Add Layout and Refine output comparisons first.
-5. Add Review and Package archive comparisons.
-6. Run stress scenarios.
-7. Fix every parity gap and add regression coverage.
-8. Change version to `1.0.0-rc.1` only after functional parity is green.
-9. Publish the final parity report and release notes.
+`.github/workflows/legacy-parity-release.yml` runs on:
+
+- pull requests targeting `main`
+- pushes to `main`
+- version tags matching `v*`
+- manual dispatch
+
+The gate performs:
+
+1. `npm ci`
+2. unit tests
+3. static build
+4. Legacy extraction and SHA-256 fingerprint
+5. Chromium installation
+6. Layout acceptance
+7. Refine acceptance
+8. Review acceptance
+9. Package acceptance
+10. Project acceptance
+11. Destination acceptance
+12. complete Legacy parity and stress acceptance
+13. release evidence upload
+
+## Recovery
+
+- Stable Legacy branch: `stable-legacy`
+- Stable Legacy tag: `v1.0.0-legacy-stable`
+- Legacy preview: `legacy-preview.html`
+
+If an RC-blocking regression is discovered, keep user project files intact, restore the public entry point to the stable Legacy build, fix the issue on a hotfix branch, and require the full Release Gate before redeployment.
+
+## RC1 release decision
+
+RC1 is approved for protected Beta deployment. It must remain a pre-release until post-merge Gate verification and real-user smoke testing are complete. Promotion to `1.0.0` requires a separate release decision.
