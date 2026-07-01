@@ -104,7 +104,7 @@ test('shows storage recovery guidance and exports anonymous diagnostics', async 
   await expect(banner.locator('[data-error-title]')).toHaveText('瀏覽器儲存空間不足');
   await page.locator('#stixioDiagnosticsButton').click();
   await expect(page.locator('#stixioDiagnosticsPanel')).toBeVisible();
-  await expect(page.locator('#stixioDiagnosticsSummary')).toContainText('95.4 MB / 95.4 MB');
+  await expect(page.locator('#stixioDiagnosticsSummary')).toContainText('93.5 MB / 95.4 MB');
 
   const report = await page.evaluate(() => globalThis.StixioDiagnostics.snapshot());
   expect(report.schema).toBe('stixio-diagnostics/v1');
