@@ -79,6 +79,12 @@ npm run build
 npm run preview
 ```
 
+## Release verification
+
+The `Legacy Parity Release Gate` runs for pull requests to `main`, pushes to `main`, version tags, and manual dispatch. It verifies unit tests, the static build, the immutable Legacy fingerprint, all acceptance suites, and full Legacy parity and stress coverage.
+
+RC1 passed 16 of 16 Legacy parity tests, including 40- and 100-output packages, ten-source project restore, 40 isolated masks, and repeated Destination Profile switching.
+
 ## Deferred until after M1
 
 - Google Drive sync
@@ -103,4 +109,4 @@ Beta should remain noindex and may be protected with Cloudflare Access.
 
 ## Version
 
-Current version: `0.9.0-beta`
+Current version: `1.0.0-rc.1`
