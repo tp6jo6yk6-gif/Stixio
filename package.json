@@ -7,7 +7,7 @@
   "scripts": {
     "prepare:vendor": "node scripts/prepare-vendor.mjs",
     "prepare:styles": "npx --yes tailwindcss@3.4.17 -c ./tailwind.config.cjs -i ./src/styles/tailwind.css -o ./public/vendor/tailwind-3.4.17.css --minify",
-    "prepare:app": "npx --yes esbuild@0.24.2 ./src/ui/stixio-browser-entry.js --bundle --platform=browser --format=iife --target=es2020 --outfile=./public/app/stixio-workshop-1.0.0.js --minify --sourcemap",
+    "prepare:app": "node scripts/apply-progressive-bootstrap.mjs && npx --yes esbuild@0.24.2 ./src/ui/stixio-browser-entry.js --bundle --platform=browser --format=iife --target=es2020 --outfile=./public/app/stixio-workshop-1.0.0.js --minify --sourcemap",
     "postinstall": "npm run prepare:vendor && npm run prepare:styles && npm run prepare:app",
     "dev": "npx serve .",
     "preview:local": "npx serve . -l 4173",
