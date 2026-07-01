@@ -4,23 +4,9 @@ const path = 'src/ui/stixio-workshop-app-v2.js';
 const marker = '// BETA_PROGRESSIVE_BOOTSTRAP';
 const source = await readFile(path, 'utf8');
 
-function watchdogHelper(name) {
+function schedulerHelper(name) {
   return `function ${name}() {
-  return new Promise(resolve => {
-    let completed = false;
-    const finish = () => {
-      if (completed) return;
-      completed = true;
-      clearTimeout(fallback);
-      resolve();
-    };
-    const fallback = setTimeout(finish, 250);
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => setTimeout(finish, 0));
-    } else {
-      setTimeout(finish, 0);
-    }
-  });
+  return new Promise(resolve => setTimeout(resolve, 0));
 }`;
 }
 
@@ -30,13 +16,13 @@ if (source.includes(marker)) {
     throw new Error('Progressive Workshop bootstrap marker exists but its scheduling helper is missing.');
   }
   const [, helperName] = existingHelperMatch;
-  const nextSource = source.replace(existingHelperMatch[0], watchdogHelper(helperName));
+  const nextSource = source.replace(existingHelperMatch[0], schedulerHelper(helperName));
   if (nextSource === source) {
-    console.log('Progressive Workshop bootstrap watchdog already present.');
+    console.log('Progressive Workshop bootstrap scheduler already present.');
     process.exit(0);
   }
   await writeFile(path, nextSource);
-  console.log('Progressive Workshop bootstrap watchdog refreshed.');
+  console.log('Progressive Workshop bootstrap scheduler refreshed.');
   process.exit(0);
 }
 
@@ -68,9 +54,9 @@ export async function initStixioWorkshopProgressive(
   const runStage = async (name, action) => {
     document.documentElement.dataset.stixioBootStage = name;
     onStage?.(name);
-    await nextBootstrapFrame();
+    await nextBootstrapTurn();
     action();
-    await nextBootstrapFrame();
+    await nextBootstrapTurn();
   };
 
   await runStage('shell', () => { root.innerHTML = renderShell(); });
@@ -83,7 +69,7 @@ export async function initStixioWorkshopProgressive(
   return root;
 }
 
-${watchdogHelper('nextBootstrapFrame')}`;
+${schedulerHelper('nextBootstrapTurn')}`;
 
 await writeFile(path, source.replace(synchronousInit, progressiveInit));
-console.log('Progressive Workshop bootstrap installed with watchdog.');
+console.log('Progressive Workshop bootstrap installed with timer scheduling.');
