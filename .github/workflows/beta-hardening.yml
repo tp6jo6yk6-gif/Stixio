@@ -32,7 +32,7 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies and compile local assets
         run: npm ci
 
       - name: Unit tests and static build
@@ -40,13 +40,14 @@ jobs:
           npm test
           npm run build
 
-      - name: Verify local runtime assets
+      - name: Verify compiled local runtime assets
         run: |
-          test -s public/vendor/tailwindcss-browser-4.3.2.js
+          test -s public/vendor/tailwind-3.4.17.css
           test -s public/vendor/jszip-3.10.1.min.js
           test -s public/icons/stixio-icon.svg
           test -s public/icons/stixio-maskable.svg
-          ! grep -Eiq 'https://(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)' dist/index.html
+          grep -q '.sticky' public/vendor/tailwind-3.4.17.css
+          ! grep -Eiq 'tailwindcss-browser|https://(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)' dist/index.html
 
       - name: Install Chromium Firefox and WebKit
         run: npx playwright install --with-deps chromium firefox webkit
@@ -64,5 +65,6 @@ jobs:
             test-results
             dist/manifest.json
             dist/public/icons
+            dist/public/vendor/tailwind-3.4.17.css
           if-no-files-found: ignore
           retention-days: 30
