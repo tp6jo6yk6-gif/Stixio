@@ -37,9 +37,9 @@ export async function initStixioWorkshopProgressive(
   const runStage = async (name, action) => {
     document.documentElement.dataset.stixioBootStage = name;
     onStage?.(name);
-    await nextBootstrapFrame();
+    await nextBootstrapTurn();
     action();
-    await nextBootstrapFrame();
+    await nextBootstrapTurn();
   };
 
   await runStage('shell', () => { root.innerHTML = renderShell(); });
@@ -52,13 +52,8 @@ export async function initStixioWorkshopProgressive(
   return root;
 }
 
-function nextBootstrapFrame() {
-  return new Promise(resolve => {
-    const schedule = typeof requestAnimationFrame === 'function'
-      ? requestAnimationFrame
-      : callback => setTimeout(callback, 0);
-    schedule(() => setTimeout(resolve, 0));
-  });
+function nextBootstrapTurn() {
+  return new Promise(resolve => setTimeout(resolve, 0));
 }`;
 
 await writeFile(path, source.replace(synchronousInit, progressiveInit));
