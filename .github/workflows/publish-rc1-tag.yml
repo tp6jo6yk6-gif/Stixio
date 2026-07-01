@@ -1,0 +1,46 @@
+name: Publish Stixio RC1 Tag
+
+on:
+  workflow_run:
+    workflows:
+      - Legacy Parity Release Gate
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-stixio-rc1-tag
+  cancel-in-progress: false
+
+jobs:
+  publish-tag:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verified main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify RC version
+        run: |
+          test "$(node -p "require('./package.json').version")" = "1.0.0-rc.1"
+
+      - name: Create RC1 tag if missing
+        env:
+          TAG_NAME: v1.0.0-rc.1
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            echo "$TAG_NAME already exists; leaving it unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" "$VERIFIED_SHA" -m "Stixio 1.0.0 RC1"
+          git push origin "$TAG_NAME"
