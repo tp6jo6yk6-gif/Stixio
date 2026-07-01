@@ -31,7 +31,7 @@ async function bootstrap() {
   try {
     await initStixioWorkshopProgressive(root, { onStage: setStage });
     setStage('ux');
-    await nextFrame();
+    await nextTurn();
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
     document.documentElement.dataset.stixioReady = 'true';
@@ -48,6 +48,6 @@ async function bootstrap() {
   }
 }
 
-function nextFrame() {
-  return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+function nextTurn() {
+  return new Promise(resolve => setTimeout(resolve, 0));
 }
