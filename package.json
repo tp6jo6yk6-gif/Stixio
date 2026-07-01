@@ -1,13 +1,13 @@
 {
   "name": "stixio",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Stixio is a fast sticker production workspace for creators.",
   "type": "module",
   "scripts": {
     "prepare:vendor": "node scripts/prepare-vendor.mjs",
     "prepare:styles": "npx --yes tailwindcss@3.4.17 -c ./tailwind.config.cjs -i ./src/styles/tailwind.css -o ./public/vendor/tailwind-3.4.17.css --minify",
-    "prepare:app": "node scripts/apply-progressive-bootstrap.mjs",
+    "prepare:app": "npx --yes esbuild@0.24.2 ./src/ui/stixio-browser-entry.js --bundle --platform=browser --format=iife --target=es2020 --outfile=./public/app/stixio-workshop-1.0.0.js --minify --sourcemap",
     "postinstall": "npm run prepare:vendor && npm run prepare:styles && npm run prepare:app",
     "dev": "npx serve .",
     "preview:local": "npx serve . -l 4173",
@@ -25,6 +25,7 @@
     "test:e2e:destination": "playwright test --config=playwright.destination.config.js",
     "test:e2e:parity": "playwright test --config=playwright.parity.config.js",
     "test:e2e:smoke": "playwright test --config=playwright.smoke.config.js",
+    "test:release": "node --test tests/**/*.test.js && npm run build && npm run test:e2e:smoke",
     "ci": "npm run test && npm run build"
   },
   "devDependencies": {
