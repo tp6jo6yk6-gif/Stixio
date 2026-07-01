@@ -163,6 +163,41 @@ export function initStixioWorkshop(root = document.getElementById('app')) {
   refresh();
 }
 
+// BETA_PROGRESSIVE_BOOTSTRAP
+export async function initStixioWorkshopProgressive(
+  root = document.getElementById('app'),
+  { onStage = null } = {}
+) {
+  if (!root) throw new Error('Stixio root element not found.');
+  document.title = `${BRAND.name} Workshop`;
+
+  const runStage = async (name, action) => {
+    document.documentElement.dataset.stixioBootStage = name;
+    onStage?.(name);
+    await nextBootstrapFrame();
+    action();
+    await nextBootstrapFrame();
+  };
+
+  await runStage('shell', () => { root.innerHTML = renderShell(); });
+  await runStage('events', () => bindStaticEvents(root));
+  await runStage('destination', () => mountDestinationController(root));
+  await runStage('package', () => mountPackageController(root));
+  await runStage('project', () => mountProjectController(root));
+  await runStage('refresh', refresh);
+  document.documentElement.dataset.stixioBootStage = 'ready';
+  return root;
+}
+
+function nextBootstrapFrame() {
+  return new Promise(resolve => {
+    const schedule = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : callback => setTimeout(callback, 0);
+    schedule(() => setTimeout(resolve, 0));
+  });
+}
+
 function renderShell() {
   return `
     <div class="min-h-screen bg-[#f6f3ec] text-slate-950">

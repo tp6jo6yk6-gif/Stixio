@@ -1,0 +1,70 @@
+name: Beta Hardening
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies and compile local assets
+        run: npm ci
+
+      - name: Unit tests and static build
+        run: |
+          npm test
+          npm run build
+
+      - name: Verify compiled local runtime assets
+        run: |
+          test -s public/vendor/tailwind-3.4.17.css
+          test -s public/vendor/jszip-3.10.1.min.js
+          test -s public/icons/stixio-icon.svg
+          test -s public/icons/stixio-maskable.svg
+          grep -q '.sticky' public/vendor/tailwind-3.4.17.css
+          ! grep -Eiq 'tailwindcss-browser|https://(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)' dist/index.html
+
+      - name: Install Chromium Firefox and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Cross-browser Beta smoke
+        run: npm run test:e2e:smoke
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stixio-beta-hardening-evidence
+          path: |
+            playwright-report-smoke
+            test-results
+            dist/manifest.json
+            dist/public/icons
+            dist/public/vendor/tailwind-3.4.17.css
+          if-no-files-found: ignore
+          retention-days: 30

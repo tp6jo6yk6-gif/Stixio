@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="stixio-version" content="1.0.0-rc.1">
+  <meta name="stixio-build" content="__STIXIO_BUILD_SHA__">
   <title>Stixio Workshop</title>
   <meta name="description" content="Stixio Workshop 是一套模組化貼圖製作工作區，支援多圖匯入、智能裁切、去背修補、規格預覽與打包輸出。">
   <meta name="application-name" content="Stixio Workshop">
@@ -12,19 +15,63 @@
   <meta property="og:description" content="Create, refine, review and package sticker artwork in one workspace.">
   <meta property="og:type" content="website">
   <link rel="manifest" href="./manifest.json">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="icon" href="./public/icons/stixio-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./public/icons/stixio-icon.svg">
+  <link rel="stylesheet" href="./public/vendor/tailwind-3.4.17.css">
+  <script defer src="./public/vendor/jszip-3.10.1.min.js"></script>
+  <style>
+    #stixioBootStatus{min-height:100vh;display:grid;place-items:center;background:#f6f3ec;color:#0f172a;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    #stixioBootStatus>div{width:min(420px,calc(100vw - 40px));padding:28px;border-radius:24px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.12);text-align:center}
+    #stixioBootStatus strong{display:block;font-size:22px}#stixioBootStatus p{margin:8px 0 0;color:#64748b;font-size:14px;line-height:1.6}
+    #stixioBootStatus[data-error="true"]>div{border:2px solid #fb7185}
+  </style>
 </head>
 <body class="bg-[#f6f3ec]">
-  <div id="app"></div>
-  <script type="module">
-    import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js';
-    import { enhanceWorkshopUx } from './src/ui/workshop-ux.js';
-    import { bridgeWorkshopLegacyControls } from './src/ui/workshop-ux-bridge.js';
-    const root = document.getElementById('app');
-    initStixioWorkshop(root);
-    enhanceWorkshopUx(root);
-    bridgeWorkshopLegacyControls(root);
+  <div id="app">
+    <div id="stixioBootStatus" role="status" aria-live="polite">
+      <div><strong>Stixio Workshop</strong><p>正在載入本地工作區…</p></div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const root = document.getElementById('app');
+      const stageLabels = {
+        modules: '正在載入本地程式…', shell: '正在建立工作區…', events: '正在啟用操作控制…',
+        destination: '正在載入輸出規格…', package: '正在準備打包工具…', project: '正在連接專案儲存…', refresh: '正在完成工作區…'
+      };
+      const setStage = stage => {
+        document.documentElement.dataset.stixioBootStage = stage;
+        const message = document.querySelector('#stixioBootStatus p');
+        if (message) message.textContent = stageLabels[stage] || `正在啟動：${stage}`;
+      };
+
+      setStage('modules');
+      Promise.all([
+        import('./src/ui/stixio-workshop-app-v2.js'),
+        import('./src/ui/workshop-ux.js'),
+        import('./src/ui/workshop-ux-bridge.js'),
+        import('./src/ui/beta-hardening.js')
+      ]).then(async ([workshop, ux, bridge, hardening]) => {
+        const diagnostics = hardening.installBetaHardening();
+        try {
+          await workshop.initStixioWorkshopProgressive(root, { onStage: setStage });
+          ux.enhanceWorkshopUx(root);
+          bridge.bridgeWorkshopLegacyControls(root);
+          document.documentElement.dataset.stixioReady = 'true';
+          document.documentElement.dataset.stixioBootStage = 'ready';
+          window.dispatchEvent(new CustomEvent('stixio:ready'));
+        } catch (error) {
+          document.documentElement.dataset.stixioBootError = 'true';
+          diagnostics?.reportError(error, { source: `bootstrap:${document.documentElement.dataset.stixioBootStage || 'unknown'}`, userVisible: true });
+          throw error;
+        }
+      }).catch(error => {
+        console.error('Stixio bootstrap failed.', error);
+        const stage = document.documentElement.dataset.stixioBootStage || 'unknown';
+        document.documentElement.dataset.stixioBootError = 'true';
+        root.innerHTML = `<div id="stixioBootStatus" data-error="true" role="alert"><div><strong>Stixio 無法啟動</strong><p>啟動階段：${stage}。請重新整理；若問題持續，請保留此畫面並聯絡測試管理者。</p></div></div>`;
+      });
+    }, { once: true });
   </script>
 </body>
 </html>

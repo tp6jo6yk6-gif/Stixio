@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Stixio maskable icon</title>
+  <desc id="desc">適合自適應裁切的 Stixio 翡翠色 S 標誌</desc>
+  <rect width="512" height="512" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="190" fill="#111827"/>
+  <circle cx="256" cy="256" r="156" fill="#d1fae5" opacity=".1"/>
+  <path d="M337 182c-22-16-47-24-77-24-45 0-73 19-73 47 0 24 19 37 65 47 63 13 94 39 94 86 0 55-45 91-115 91-44 0-83-13-112-36l33-46c24 18 51 28 81 28 35 0 56-13 56-33 0-18-15-29-55-38-69-16-103-44-103-93 0-57 48-99 121-99 43 0 80 11 111 34l-26 36Z" fill="#6ee7b7"/>
+  <circle cx="350" cy="146" r="22" fill="#fbbf24"/>
+</svg>
