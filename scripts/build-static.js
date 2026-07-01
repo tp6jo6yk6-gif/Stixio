@@ -29,10 +29,13 @@ const indexHtml = (await readFile(indexPath, 'utf8')).replaceAll('__STIXIO_BUILD
 if (/https:\/\/(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)/i.test(indexHtml)) {
   throw new Error('Runtime CDN dependency detected in dist/index.html.');
 }
+if (/tailwindcss-browser/i.test(indexHtml)) {
+  throw new Error('Tailwind browser runtime detected in dist/index.html; use compiled local CSS.');
+}
 await writeFile(indexPath, indexHtml);
 
 const requiredFiles = [
-  `${dist}/public/vendor/tailwindcss-browser-4.3.2.js`,
+  `${dist}/public/vendor/tailwind-3.4.17.css`,
   `${dist}/public/vendor/jszip-3.10.1.min.js`,
   `${dist}/public/icons/stixio-icon.svg`,
   `${dist}/public/icons/stixio-maskable.svg`,
@@ -40,6 +43,11 @@ const requiredFiles = [
 ];
 for (const path of requiredFiles) {
   if (!existsSync(path)) throw new Error(`Static build is missing required Beta asset: ${path}`);
+}
+
+const compiledCss = await readFile(`${dist}/public/vendor/tailwind-3.4.17.css`, 'utf8');
+for (const token of ['.sticky', '.bg-\\[\\#f6f3ec\\]', '.font-black']) {
+  if (!compiledCss.includes(token)) throw new Error(`Compiled Tailwind CSS is missing required selector ${token}.`);
 }
 
 console.log(`Stixio static build complete (${buildSha.slice(0, 12)}).`);
