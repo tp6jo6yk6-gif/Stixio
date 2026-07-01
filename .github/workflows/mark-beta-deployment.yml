@@ -1,0 +1,42 @@
+name: Mark Successful Beta Deployment
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy Stixio Beta
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mark-stixio-beta-deployment
+  cancel-in-progress: false
+
+jobs:
+  mark-beta:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Mark successful Beta deployment
+        env:
+          TAG_NAME: beta-v1.0.0-rc.1
+          DEPLOYED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            echo "$TAG_NAME already exists; leaving it unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" "$DEPLOYED_SHA" -m "Stixio Beta deployment for 1.0.0 RC1"
+          git push origin "$TAG_NAME"
