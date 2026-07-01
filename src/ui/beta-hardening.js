@@ -13,7 +13,7 @@ const state = {
   storage: null,
   lastObservedError: null,
   mutationObserver: null,
-  version: '1.0.0-rc.1',
+  version: '1.0.0',
   build: 'development',
   ui: null
 };

@@ -42,7 +42,7 @@ export function createWorkshopProjectSnapshot({
     destinationState: cloneSerializable(destinationState),
     metadata: {
       generator: 'Stixio Workshop',
-      generatorVersion: '0.9.0-beta',
+      generatorVersion: '1.0.0',
       ...cloneSerializable(metadata)
     }
   };
