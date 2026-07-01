@@ -6,14 +6,19 @@ This hardening pass prepares Stixio `1.0.0-rc.1` for protected Beta testing.
 
 ### Local runtime dependencies
 
-The Workshop no longer loads Tailwind or JSZip from a public runtime CDN. `npm run prepare:vendor` downloads the exact pinned npm release archives, verifies both archive and extracted bundle SHA-256 fingerprints, and writes the browser bundles to `public/vendor`.
+The Workshop no longer loads Tailwind or JSZip from a public runtime CDN.
+
+- `npm run prepare:styles` runs the exact Tailwind CSS `3.4.17` CLI at build time and writes the compiled stylesheet to `public/vendor/tailwind-3.4.17.css`.
+- `npm run prepare:vendor` downloads the exact JSZip `3.10.1` npm archive, verifies the archive and extracted browser bundle SHA-256 fingerprints, and writes it to `public/vendor/jszip-3.10.1.min.js`.
+- The browser loads only the compiled local CSS and the verified local JSZip bundle. It does not run a Tailwind browser compiler.
 
 The static build fails when:
 
-- a required vendor bundle is missing
+- the compiled Tailwind stylesheet is missing or lacks required selectors
+- the verified JSZip bundle is missing
 - a PWA icon is missing
 - the diagnostic module is missing
-- a known public runtime CDN URL remains in `dist/index.html`
+- a Tailwind browser runtime or known public runtime CDN URL remains in `dist/index.html`
 
 ### Cross-browser smoke coverage
 
@@ -23,7 +28,7 @@ The static build fails when:
 - Firefox
 - WebKit
 
-The suite verifies local runtime assets, the Workshop shell, JSZip, Tailwind-generated styles, the PWA manifest and icons, unsupported image rejection, damaged `.stixio` rejection, storage recovery guidance, and anonymous diagnostics.
+The suite verifies compiled local styles, the Workshop shell, JSZip, the PWA manifest and icons, unsupported image rejection, damaged `.stixio` rejection, storage recovery guidance, and anonymous diagnostics.
 
 ### Project and file safety
 
@@ -63,6 +68,7 @@ The manifest includes an ordinary SVG icon and a maskable SVG icon. Both are loc
 
 ```bash
 npm run prepare:vendor
+npm run prepare:styles
 npm test
 npm run build
 npx playwright install chromium firefox webkit
@@ -71,4 +77,4 @@ npm run test:e2e:smoke
 
 ## Release policy
 
-The full `Legacy Parity Release Gate` runs cross-browser Beta smoke before the existing Layout, Refine, Review, Package, Project, Destination, Legacy parity, and stress suites. The Cloudflare Beta deployment also refuses a build that contains a known runtime CDN URL or lacks hardened local assets.
+The full `Legacy Parity Release Gate` runs cross-browser Beta smoke before the existing Layout, Refine, Review, Package, Project, Destination, Legacy parity, and stress suites. The Cloudflare Beta deployment refuses a build that contains a Tailwind browser compiler, a known runtime CDN URL, or missing hardened local assets.
