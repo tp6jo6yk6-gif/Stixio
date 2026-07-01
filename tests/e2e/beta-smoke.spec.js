@@ -20,14 +20,15 @@ test('runs the local runtime, PWA, import, and damaged-project smoke path', asyn
   const runtime = await page.evaluate(() => ({
     jszipVersion: globalThis.JSZip?.version || null,
     scriptSources: [...document.scripts].map(script => script.src).filter(Boolean),
+    stylesheets: [...document.querySelectorAll('link[rel="stylesheet"]')].map(link => link.href),
     headerPosition: getComputedStyle(document.querySelector('header')).position,
     headingWeight: getComputedStyle(document.querySelector('h1')).fontWeight,
     diagnostics: globalThis.StixioDiagnostics?.snapshot?.()
   }));
   expect(runtime.jszipVersion).toBe('3.10.1');
-  expect(runtime.scriptSources.some(source => source.includes('/public/vendor/tailwindcss-browser-4.3.2.js'))).toBe(true);
-  expect(runtime.scriptSources.some(source => source.includes('/public/vendor/jszip-3.10.1.min.js'))).toBe(true);
-  expect(runtime.scriptSources.some(source => REMOTE_RUNTIME_HOSTS.test(source))).toBe(false);
+  expect(runtime.stylesheets.some(href => href.includes('/public/vendor/tailwind-3.4.17.css'))).toBe(true);
+  expect(runtime.scriptSources.some(source => source.includes('tailwindcss-browser'))).toBe(false);
+  expect([...runtime.scriptSources, ...runtime.stylesheets].some(source => REMOTE_RUNTIME_HOSTS.test(source))).toBe(false);
   expect(runtime.headerPosition).toBe('sticky');
   expect(Number(runtime.headingWeight)).toBeGreaterThanOrEqual(700);
   expect(runtime.diagnostics.app.version).toBe('1.0.0-rc.1');
