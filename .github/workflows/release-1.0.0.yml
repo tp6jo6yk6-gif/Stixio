@@ -55,12 +55,24 @@ jobs:
 
       - name: Verify production bundle and local runtime
         run: |
-          test -s dist/public/app/stixio-workshop-1.0.0.js
-          test -s dist/public/app/stixio-workshop-1.0.0.js.map
-          test -s dist/public/vendor/tailwind-3.4.17.css
-          test -s dist/public/vendor/jszip-3.10.1.min.js
-          ! grep -Eiq 'tailwindcss-browser|https://(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)' dist/index.html
-          ! grep -Eiq 'import\(["'"']\./src/' dist/index.html
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const required = [
+            'dist/public/app/stixio-workshop-1.0.0.js',
+            'dist/public/app/stixio-workshop-1.0.0.js.map',
+            'dist/public/vendor/tailwind-3.4.17.css',
+            'dist/public/vendor/jszip-3.10.1.min.js'
+          ];
+          for (const path of required) {
+            if (!fs.existsSync(path) || fs.statSync(path).size === 0) throw new Error(`Missing release asset: ${path}`);
+          }
+          const index = fs.readFileSync('dist/index.html', 'utf8');
+          if (!index.includes('stixio-workshop-1.0.0.js')) throw new Error('Release bundle is not referenced.');
+          if (index.includes('tailwindcss-browser')) throw new Error('Tailwind browser runtime remains.');
+          if (index.includes("import('./src/") || index.includes('import("./src/')) throw new Error('Unbundled runtime imports remain.');
+          const blockedHosts = ['cdn.tailwindcss.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com'];
+          if (blockedHosts.some(host => index.includes(host))) throw new Error('A runtime CDN dependency remains.');
+          NODE
 
       - name: Install Chromium Firefox and WebKit
         run: npx playwright install --with-deps chromium firefox webkit
