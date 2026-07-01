@@ -8,6 +8,8 @@ async function openWorkshop(page) {
     if (REMOTE_RUNTIME_HOSTS.test(request.url())) remoteRequests.push(request.url());
   });
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#stixioBootStatus')).toBeVisible();
+  await page.waitForFunction(() => document.documentElement.dataset.stixioReady === 'true', null, { timeout: 15_000 });
   await expect(page.locator('h1')).toContainText('Stixio');
   await expect(page.locator('#stixioDiagnosticsButton')).toBeVisible();
   return remoteRequests;
