@@ -1,17 +1,22 @@
-import { initStixioWorkshop } from './stixio-workshop-app-v2.js';
+import { initStixioWorkshopProgressive } from './stixio-workshop-app-v2.js';
 import { enhanceWorkshopUx } from './workshop-ux.js';
 import { bridgeWorkshopLegacyControls } from './workshop-ux-bridge.js';
 import { installBetaHardening } from './beta-hardening.js';
 
 const stageLabels = {
   shell: '正在建立工作區…',
+  events: '正在啟用操作控制…',
+  destination: '正在載入輸出規格…',
+  package: '正在準備打包工具…',
+  project: '正在連接專案儲存…',
+  refresh: '正在完成工作區…',
   ux: '正在啟用操作體驗…',
   ready: '工作區已就緒'
 };
 
-bootstrap();
+void bootstrap();
 
-function bootstrap() {
+async function bootstrap() {
   const root = document.getElementById('app');
   const diagnostics = installBetaHardening({ version: '1.0.0' });
   const html = document.documentElement;
@@ -28,20 +33,17 @@ function bootstrap() {
     if (html.dataset.stixioReady === 'true' || html.dataset.stixioBootError === 'true') return;
     html.dataset.stixioBootError = 'true';
     const stage = html.dataset.stixioBootStage || 'unknown';
-    const error = new Error(`Stixio bootstrap watchdog timed out at stage ${stage}.`);
+    const error = new Error(`Stixio bootstrap stalled at stage ${stage}.`);
     diagnostics?.reportError(error, { source: `bootstrap-watchdog:${stage}`, userVisible: true });
-    console.error('Stixio bootstrap watchdog timed out.', error);
-  }, 10_000);
+    console.error('Stixio bootstrap stalled.', error);
+  }, 15_000);
 
   try {
-    setStage('shell');
-    initStixioWorkshop(root);
+    await initStixioWorkshopProgressive(root, { onStage: setStage });
     setStage('ux');
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
-    if (html.dataset.stixioBootError === 'true') {
-      throw new Error('Stixio bootstrap exceeded the watchdog deadline.');
-    }
+    if (html.dataset.stixioBootError === 'true') throw new Error('Stixio bootstrap did not finish.');
     html.dataset.stixioReady = 'true';
     html.dataset.stixioBootStage = 'ready';
     window.dispatchEvent(new CustomEvent('stixio:ready'));
