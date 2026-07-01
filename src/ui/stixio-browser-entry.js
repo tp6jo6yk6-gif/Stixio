@@ -9,11 +9,7 @@ const stageLabels = {
   ready: '工作區已就緒'
 };
 
-if (document.readyState === 'complete') {
-  bootstrap();
-} else {
-  window.addEventListener('load', bootstrap, { once: true });
-}
+bootstrap();
 
 function bootstrap() {
   const root = document.getElementById('app');
