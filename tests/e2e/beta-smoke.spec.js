@@ -4,15 +4,17 @@ const REMOTE_RUNTIME_HOSTS = /cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.
 
 async function openWorkshop(page) {
   const remoteRequests = [];
+  const unbundledModuleRequests = [];
   page.on('request', request => {
-    if (REMOTE_RUNTIME_HOSTS.test(request.url())) remoteRequests.push(request.url());
+    const url = request.url();
+    if (REMOTE_RUNTIME_HOSTS.test(url)) remoteRequests.push(url);
+    if (/\/src\/.*\.js(?:$|\?)/.test(url)) unbundledModuleRequests.push(url);
   });
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('#stixioBootStatus')).toBeVisible();
   await page.waitForFunction(() => {
     const root = document.documentElement.dataset;
     return root.stixioReady === 'true' || root.stixioBootError === 'true';
-  }, null, { timeout: 30_000 });
+  }, null, { timeout: 15_000 });
   const boot = await page.evaluate(() => ({
     ready: document.documentElement.dataset.stixioReady || null,
     error: document.documentElement.dataset.stixioBootError || null,
@@ -22,12 +24,13 @@ async function openWorkshop(page) {
   expect(boot, `Workshop bootstrap failed at stage ${boot.stage}: ${boot.text}`).toMatchObject({ ready: 'true', error: null, stage: 'ready' });
   await expect(page.locator('h1')).toContainText('Stixio');
   await expect(page.locator('#stixioDiagnosticsButton')).toBeVisible();
-  return remoteRequests;
+  return { remoteRequests, unbundledModuleRequests };
 }
 
-test('runs the complete Beta smoke path', async ({ page, request }) => {
-  const remoteRequests = await openWorkshop(page);
-  expect(remoteRequests).toEqual([]);
+test('runs the complete 1.0.0 release smoke path', async ({ page, request }) => {
+  const requests = await openWorkshop(page);
+  expect(requests.remoteRequests).toEqual([]);
+  expect(requests.unbundledModuleRequests).toEqual([]);
 
   const runtime = await page.evaluate(() => ({
     jszipVersion: globalThis.JSZip?.version || null,
@@ -39,11 +42,12 @@ test('runs the complete Beta smoke path', async ({ page, request }) => {
   }));
   expect(runtime.jszipVersion).toBe('3.10.1');
   expect(runtime.stylesheets.some(href => href.includes('/public/vendor/tailwind-3.4.17.css'))).toBe(true);
+  expect(runtime.scriptSources.some(source => source.includes('/public/app/stixio-workshop-1.0.0.js'))).toBe(true);
   expect(runtime.scriptSources.some(source => source.includes('tailwindcss-browser'))).toBe(false);
   expect([...runtime.scriptSources, ...runtime.stylesheets].some(source => REMOTE_RUNTIME_HOSTS.test(source))).toBe(false);
   expect(runtime.headerPosition).toBe('sticky');
   expect(Number(runtime.headingWeight)).toBeGreaterThanOrEqual(700);
-  expect(runtime.diagnostics.app.version).toBe('1.0.0-rc.1');
+  expect(runtime.diagnostics.app.version).toBe('1.0.0');
   expect(runtime.diagnostics.runtime.features.jszip).toBe(true);
 
   const manifestResponse = await request.get('/manifest.json');
