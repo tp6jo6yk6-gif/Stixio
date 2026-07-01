@@ -8,14 +8,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const VENDOR_ASSETS = Object.freeze([
   {
-    name: '@tailwindcss/browser 4.3.2',
-    url: 'https://registry.npmjs.org/@tailwindcss/browser/-/browser-4.3.2.tgz',
-    archiveSha256: 'c595ead3047e4198c132761f9505d406de24ecb5409dd74824b9376882119a72',
-    archivePath: 'package/dist/index.global.js',
-    outputPath: 'public/vendor/tailwindcss-browser-4.3.2.js',
-    outputSha256: '0bc32045dd897c063f4966c608bbbe373e035fcafcb3dd8ee3b315d5e6165410'
-  },
-  {
     name: 'JSZip 3.10.1',
     url: 'https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz',
     archiveSha256: '5117f4a2a645aeb307bf3b829c575ad58135cc97e75291e594532ab5b5b21b23',
