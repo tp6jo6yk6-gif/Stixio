@@ -5,10 +5,11 @@
   "description": "Stixio is a fast sticker production workspace for creators.",
   "type": "module",
   "scripts": {
-    "dev": "npx serve .",
-    "preview:local": "npx serve . -l 4173",
-    "preview:test": "serve . -l 4173",
-    "build": "node scripts/build-static.js",
+    "prepare:vendor": "node scripts/prepare-vendor.mjs",
+    "dev": "npm run prepare:vendor && npx serve .",
+    "preview:local": "npm run prepare:vendor && npx serve . -l 4173",
+    "preview:test": "npm run prepare:vendor && serve . -l 4173",
+    "build": "npm run prepare:vendor && node scripts/build-static.js",
     "preview": "npx serve dist",
     "preview:build": "npm run build && npx serve dist -l 4173",
     "parity:extract": "node scripts/extract-legacy-html.mjs",
@@ -20,6 +21,7 @@
     "test:e2e:project": "playwright test --config=playwright.project.config.js",
     "test:e2e:destination": "playwright test --config=playwright.destination.config.js",
     "test:e2e:parity": "playwright test --config=playwright.parity.config.js",
+    "test:e2e:smoke": "playwright test --config=playwright.smoke.config.js",
     "ci": "npm run test && npm run build"
   },
   "devDependencies": {
