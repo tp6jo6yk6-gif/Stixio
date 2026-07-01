@@ -37,6 +37,7 @@ export function installBetaHardening({ version, build } = {}) {
     hide: state.ui.hide,
     snapshot: diagnosticsSnapshot,
     inspectProjectArchive: inspectStixioProjectArchive,
+    refreshStorage: refreshStorageEstimate,
     getErrors: () => state.errors.map(item => ({ ...item }))
   };
   globalThis.StixioDiagnostics = api;
@@ -126,6 +127,7 @@ async function refreshStorageEstimate() {
     reportError(error, { source: 'storage-estimate', severity: 'warning', userVisible: false });
   }
   state.ui.render();
+  return state.storage;
 }
 
 function validateRuntimeAssets() {
