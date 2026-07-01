@@ -131,8 +131,8 @@ async function refreshStorageEstimate() {
 function validateRuntimeAssets() {
   const missing = [];
   if (!globalThis.JSZip) missing.push('JSZip');
-  const scripts = [...document.scripts].map(script => script.src).filter(Boolean);
-  if (!scripts.some(src => src.includes('tailwindcss-browser-4.3.2.js'))) missing.push('Tailwind browser bundle');
+  const stylesheets = [...document.querySelectorAll('link[rel="stylesheet"]')].map(link => link.href).filter(Boolean);
+  if (!stylesheets.some(href => href.includes('tailwind-3.4.17.css'))) missing.push('compiled Tailwind CSS');
   if (missing.length) {
     const error = new Error(`缺少必要資源：${missing.join('、')}`);
     error.name = 'RuntimeAssetError';
