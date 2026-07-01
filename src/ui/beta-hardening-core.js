@@ -28,7 +28,7 @@ export function classifyStixioFailure(error, context = {}) {
   if (/quota|storage|indexeddb|disk|space|容量|空間/.test(haystack)) {
     return { ...defaults, code: 'STORAGE_UNAVAILABLE', title: '瀏覽器儲存空間不足', recovery: '請先匯出 .stixio 備份，清理瀏覽器網站資料或磁碟空間，再重新開啟專案。' };
   }
-  if (/checksum|corrupt|invalid .*stixio|project archive|project\.json|manifest|schema|zip.*invalid|crc/.test(haystack)) {
+  if (/checksum|corrupt|invalid .*stixio|project\s*archive|project\s*manifest|project\s*checksum|project\s*validation|project\s*version|project\s*path|project\.json|manifest|schema|zip.*invalid|crc|專案.*(損壞|缺少|無效|校驗|不安全)/.test(haystack)) {
     return { ...defaults, code: 'PROJECT_DAMAGED', title: '專案檔案可能已損壞', recovery: '請保留原始檔案，嘗試較早的備份或最近自動保存版本。不要覆蓋原檔。' };
   }
   if (/jszip|vendor|tailwind|script.*load|failed to fetch dynamically imported/.test(haystack)) {
