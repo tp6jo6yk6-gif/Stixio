@@ -10,12 +10,12 @@ const stageLabels = {
 };
 
 if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', () => void bootstrap(), { once: true });
+  window.addEventListener('DOMContentLoaded', bootstrap, { once: true });
 } else {
-  setTimeout(() => void bootstrap(), 0);
+  bootstrap();
 }
 
-async function bootstrap() {
+function bootstrap() {
   const root = document.getElementById('app');
   const diagnostics = installBetaHardening({ version: '1.0.0' });
   const html = document.documentElement;
@@ -41,7 +41,6 @@ async function bootstrap() {
     setStage('shell');
     initStixioWorkshop(root);
     setStage('ux');
-    await nextTurn();
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
     if (html.dataset.stixioBootError === 'true') {
@@ -61,8 +60,4 @@ async function bootstrap() {
   } finally {
     clearTimeout(watchdog);
   }
-}
-
-function nextTurn() {
-  return new Promise(resolve => setTimeout(resolve, 0));
 }
