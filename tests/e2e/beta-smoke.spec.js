@@ -12,6 +12,7 @@ async function openWorkshop(page) {
   });
   await page.goto('/index.html', { waitUntil: 'commit' });
   await expect(page.locator('#fileInput')).toBeAttached({ timeout: 15_000 });
+  await expect(page.locator('html')).toHaveAttribute('data-stixio-ready', 'true', { timeout: 20_000 });
   const boot = await page.evaluate(() => ({
     ready: document.documentElement.dataset.stixioReady || null,
     error: document.documentElement.dataset.stixioBootError || null,
