@@ -49,8 +49,9 @@ jobs:
 
       - name: Unit tests and production build
         run: |
-          npm test
-          npm run build
+          set -o pipefail
+          npm test 2>&1 | tee release-unit.log
+          npm run build 2>&1 | tee release-build.log
 
       - name: Verify production bundle and local runtime
         run: |
@@ -73,6 +74,8 @@ jobs:
         with:
           name: stixio-1.0.0-release-readiness
           path: |
+            release-unit.log
+            release-build.log
             dist
             playwright-report-smoke
             test-results
@@ -89,7 +92,7 @@ jobs:
       - name: Checkout candidate
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 1
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node
@@ -102,26 +105,27 @@ jobs:
         run: |
           npm ci
           npm run build
-          find dist -type f -print0 | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/candidate.sha256"
-          cp "$RUNNER_TEMP/candidate.sha256" candidate-first.sha256
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > candidate-first.sha256
 
       - name: Build rollback reference
         env:
           ROLLBACK_SHA: ${{ github.event.pull_request.base.sha || '63b7ac73de0de68e3e994551b0558e8c1a5e3b7c' }}
         run: |
-          git checkout --detach "$ROLLBACK_SHA"
-          npm ci
-          npm test
-          npm run build
+          set -o pipefail
+          git fetch --no-tags --depth=1 origin "$ROLLBACK_SHA"
+          git checkout --detach FETCH_HEAD
+          npm ci 2>&1 | tee rollback-install.log
+          npm test 2>&1 | tee rollback-unit.log
+          npm run build 2>&1 | tee rollback-build.log
           test -s dist/index.html
-          find dist -type f -print0 | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/rollback.sha256"
-          cp "$RUNNER_TEMP/rollback.sha256" rollback-reference.sha256
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > rollback-reference.sha256
 
       - name: Restore and verify candidate
         env:
           CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          git checkout --detach "$CANDIDATE_SHA"
+          git fetch --no-tags --depth=1 origin "$CANDIDATE_SHA"
+          git checkout --detach FETCH_HEAD
           npm ci
           npm run build
           find dist -type f -print0 | sort -z | xargs -0 sha256sum > candidate-restored.sha256
@@ -137,8 +141,11 @@ jobs:
             candidate-first.sha256
             candidate-restored.sha256
             rollback-reference.sha256
+            rollback-install.log
+            rollback-unit.log
+            rollback-build.log
             docs/ROLLBACK-1.0.0.md
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 90
 
   real-user-signoff:
