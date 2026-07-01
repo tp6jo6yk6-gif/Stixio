@@ -191,10 +191,19 @@ export async function initStixioWorkshopProgressive(
 
 function nextBootstrapFrame() {
   return new Promise(resolve => {
-    const schedule = typeof requestAnimationFrame === 'function'
-      ? requestAnimationFrame
-      : callback => setTimeout(callback, 0);
-    schedule(() => setTimeout(resolve, 0));
+    let completed = false;
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      clearTimeout(fallback);
+      resolve();
+    };
+    const fallback = setTimeout(finish, 250);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => setTimeout(finish, 0));
+    } else {
+      setTimeout(finish, 0);
+    }
   });
 }
 
