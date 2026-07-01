@@ -3,7 +3,9 @@ name: Legacy Parity Release Gate
 on:
   push:
     branches:
-      - workshop-parity-rc1
+      - main
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - main
