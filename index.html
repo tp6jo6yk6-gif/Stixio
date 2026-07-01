@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="stixio-version" content="1.0.0-rc.1">
+  <meta name="stixio-build" content="__STIXIO_BUILD_SHA__">
   <title>Stixio Workshop</title>
   <meta name="description" content="Stixio Workshop 是一套模組化貼圖製作工作區，支援多圖匯入、智能裁切、去背修補、規格預覽與打包輸出。">
   <meta name="application-name" content="Stixio Workshop">
@@ -12,8 +15,10 @@
   <meta property="og:description" content="Create, refine, review and package sticker artwork in one workspace.">
   <meta property="og:type" content="website">
   <link rel="manifest" href="./manifest.json">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="icon" href="./public/icons/stixio-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./public/icons/stixio-icon.svg">
+  <script src="./public/vendor/tailwindcss-browser-4.3.2.js"></script>
+  <script src="./public/vendor/jszip-3.10.1.min.js"></script>
 </head>
 <body class="bg-[#f6f3ec]">
   <div id="app"></div>
@@ -21,10 +26,17 @@
     import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js';
     import { enhanceWorkshopUx } from './src/ui/workshop-ux.js';
     import { bridgeWorkshopLegacyControls } from './src/ui/workshop-ux-bridge.js';
+    import { installBetaHardening } from './src/ui/beta-hardening.js';
+
+    const diagnostics = installBetaHardening();
     const root = document.getElementById('app');
-    initStixioWorkshop(root);
-    enhanceWorkshopUx(root);
-    bridgeWorkshopLegacyControls(root);
+    try {
+      initStixioWorkshop(root);
+      enhanceWorkshopUx(root);
+      bridgeWorkshopLegacyControls(root);
+    } catch (error) {
+      diagnostics?.reportError(error, { source: 'bootstrap', userVisible: true });
+    }
   </script>
 </body>
 </html>
