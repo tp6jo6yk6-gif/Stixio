@@ -9,7 +9,17 @@ async function openWorkshop(page) {
   });
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#stixioBootStatus')).toBeVisible();
-  await page.waitForFunction(() => document.documentElement.dataset.stixioReady === 'true', null, { timeout: 25_000 });
+  await page.waitForFunction(() => {
+    const root = document.documentElement.dataset;
+    return root.stixioReady === 'true' || root.stixioBootError === 'true';
+  }, null, { timeout: 30_000 });
+  const boot = await page.evaluate(() => ({
+    ready: document.documentElement.dataset.stixioReady || null,
+    error: document.documentElement.dataset.stixioBootError || null,
+    stage: document.documentElement.dataset.stixioBootStage || null,
+    text: document.body.innerText.slice(0, 500)
+  }));
+  expect(boot, `Workshop bootstrap failed at stage ${boot.stage}: ${boot.text}`).toMatchObject({ ready: 'true', error: null, stage: 'ready' });
   await expect(page.locator('h1')).toContainText('Stixio');
   await expect(page.locator('#stixioDiagnosticsButton')).toBeVisible();
   return remoteRequests;
