@@ -10,11 +10,11 @@ async function openWorkshop(page) {
     if (REMOTE_RUNTIME_HOSTS.test(url)) remoteRequests.push(url);
     if (/\/src\/.*\.js(?:$|\?)/.test(url)) unbundledModuleRequests.push(url);
   });
-  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'commit' });
   await page.waitForFunction(() => {
     const root = document.documentElement.dataset;
     return root.stixioReady === 'true' || root.stixioBootError === 'true';
-  }, null, { timeout: 15_000 });
+  }, null, { timeout: 15_000, polling: 100 });
   const boot = await page.evaluate(() => ({
     ready: document.documentElement.dataset.stixioReady || null,
     error: document.documentElement.dataset.stixioBootError || null,
