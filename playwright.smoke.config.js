@@ -5,10 +5,10 @@ export default defineConfig({
   testMatch: /beta-smoke\.spec\.js/,
   timeout: 45_000,
   expect: { timeout: 10_000 },
-  fullyParallel: false,
+  fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 3 : undefined,
   reporter: process.env.CI
     ? [['line'], ['html', { outputFolder: 'playwright-report-smoke', open: 'never' }]]
     : 'line',
