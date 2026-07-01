@@ -9,10 +9,10 @@ const stageLabels = {
   ready: '工作區已就緒'
 };
 
-if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', bootstrap, { once: true });
-} else {
+if (document.readyState === 'complete') {
   bootstrap();
+} else {
+  window.addEventListener('load', bootstrap, { once: true });
 }
 
 function bootstrap() {
