@@ -49,6 +49,7 @@ test('large Review Grid is virtualized and uses Blob-backed worker thumbnails', 
     const sources = await cards.locator('.preview img').evaluateAll(images => images.map(image => image.getAttribute('src')));
     return sources.some(source => source?.startsWith('blob:'));
   }, { timeout: 15_000 }).toBe(true);
+  await expect(page.locator('html')).toHaveAttribute('data-stixio-image-worker', 'active', { timeout: 15_000 });
 
   const firstWindowIds = await cards.evaluateAll(nodes => nodes.map(node => node.dataset.frameId));
   await page.locator('[data-review-virtual-spacer="true"]').last().scrollIntoViewIfNeeded();
