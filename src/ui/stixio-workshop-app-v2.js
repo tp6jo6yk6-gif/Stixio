@@ -372,6 +372,7 @@ function bindStaticEvents(root) {
   bindRefineCanvas(root.querySelector('#refineCanvas'));
   bindRefineViewport(root.querySelector('#refineViewport'));
   bindGlobalEvents();
+  installProjectDirtyEventTracking(root);
 }
 
 // DESTINATION_RULES_FULL_COMPLETION
@@ -834,6 +835,19 @@ function refreshMaskHistoryButtons(){const undoButton=document.getElementById('m
 function pickColorFromSource(point){const source=activeSource();if(!source)return;const canvas=document.getElementById('sourceCanvas'),pixel=canvas.getContext('2d').getImageData(Math.floor(point.x),Math.floor(point.y),1,1).data;setPickedColor(pixel);}
 function pickColorFromRefine(point){const frame=selectedFrame();if(!frame)return;const raw=createRawCropCanvas(frame),pixel=raw.getContext('2d').getImageData(Math.floor(point.x),Math.floor(point.y),1,1).data;setPickedColor(pixel);}
 function setPickedColor(pixel){state.settings.chromaColor=[pixel[0],pixel[1],pixel[2]];state.settings.maskTool='view';const input=document.getElementById('chromaColorInput');if(input)input.value=rgbToHex(state.settings.chromaColor);clearRenderCache();renderAll();refresh();}
+// PROJECT_DIRTY_EVENTS_V1
+function installProjectDirtyEventTracking(root){
+  if(!root||root.dataset.projectDirtyTracking==='true')return;
+  root.dataset.projectDirtyTracking='true';
+  const markDirty=event=>{
+    const target=event.target;
+    if(!(target instanceof Element)||target.closest('#projectToolbarRoot'))return;
+    if(!target.matches('input,select,textarea'))return;
+    state.projectController?.markDirty('自動保存排程中');
+  };
+  root.addEventListener('input',markDirty,true);
+  root.addEventListener('change',markDirty,true);
+}
 function bindGlobalEvents(){if(state.globalEventsBound)return;state.globalEventsBound=true;window.addEventListener('keydown',event=>{if(['INPUT','TEXTAREA','SELECT'].includes(event.target?.tagName))return;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();if(state.activeEditor==='refine'&&stepMaskHistory(event.shiftKey?1:-1))return;event.shiftKey?redoFrames():undoFrames();return;}if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='y'){event.preventDefault();if(state.activeEditor==='refine'&&stepMaskHistory(1))return;redoFrames();return;}if(event.code==='Space'&&state.activeEditor==='refine'){state.isSpaceDown=true;event.preventDefault();const viewport=document.getElementById('refineViewport');if(viewport)viewport.style.cursor='grab';}if(state.activeEditor==='refine'&&event.key==='0'){event.preventDefault();resetRefineViewport();}if(state.activeEditor==='refine'&&event.key==='Escape'){state.settings.maskTool='view';refreshMaskToolButtons();}if(state.activeEditor==='refine'&&(event.key==='['||event.key===']')){event.preventDefault();state.settings.maskSize=Math.max(5,Math.min(120,state.settings.maskSize+(event.key===']'?5:-5)));const input=document.getElementById('maskSizeInput');if(input)input.value=state.settings.maskSize;const label=document.getElementById('maskSizeInputValue');if(label)label.textContent=state.settings.maskSize;updateBrushCursor();}if(state.activeEditor==='review'&&event.key==='ArrowLeft'){event.preventDefault();navigateReview(-1);}if(state.activeEditor==='review'&&event.key==='ArrowRight'){event.preventDefault();navigateReview(1);}if(state.activeEditor==='review'&&event.key.toLowerCase()==='a'){event.preventDefault();setCurrentReviewApproval(true);}if(state.activeEditor==='review'&&event.key.toLowerCase()==='x'){event.preventDefault();const item=selectedReviewItem();if(item){replaceFrame({...item.frame,state:{...item.frame.state,exportSelected:!item.exportSelected}},{preserveReview:true});runReview();refresh();}}if(state.activeEditor==='review'&&event.key==='0'){event.preventDefault();resetReviewViewport();}});window.addEventListener('keyup',event=>{if(event.code==='Space'){state.isSpaceDown=false;state.refinePan=null;const viewport=document.getElementById('refineViewport');if(viewport)viewport.style.cursor=state.settings.maskTool==='view'?'grab':'';}});}
 
 
