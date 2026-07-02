@@ -15,6 +15,7 @@ async function main() {
   await import('./apply-project-lazy-initialize-fix.mjs');
   await import('./apply-workshop-ux-observer-fix.mjs');
   await import('./apply-workshop-performance-fix.mjs');
+  await import('./apply-project-dirty-events-fix.mjs');
 
   const source = await readFile(path, 'utf8');
   const existingHelperMatch = source.match(/function (nextBootstrap(?:Frame|Turn))\(\) \{[\s\S]*?\n\}/);
