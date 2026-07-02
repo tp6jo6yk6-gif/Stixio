@@ -106,11 +106,18 @@ function applyExperience(root, collapsed) {
   const workspace = root.querySelector('[data-workflow-managed="true"]');
   if (!workspace) return;
 
+  removeStaleEmptyGuides(root, workspace);
   const stageId = workspace.dataset.activeStage || 'layout';
   ensureCollapseControls(workspace);
-  applyEmptyState(root, workspace, stageId, collectMetrics(root));
+  applyEmptyState(workspace, stageId, collectMetrics(root));
   applyCollapsedColumns(workspace, collapsed);
   ensureMobileNavigation(root, stageId);
+}
+
+function removeStaleEmptyGuides(root, workspace) {
+  root.querySelectorAll('[data-workflow-empty]').forEach(guide => {
+    if (!workspace.contains(guide)) guide.remove();
+  });
 }
 
 function ensureCollapseControls(workspace) {
@@ -142,13 +149,13 @@ function applyCollapsedColumns(workspace, collapsed) {
   }
 }
 
-function applyEmptyState(root, workspace, stageId, metrics) {
+function applyEmptyState(workspace, stageId, metrics) {
   const nextState = getWorkflowEmptyState(stageId, metrics);
   const currentStage = workspace.dataset.emptyStage || '';
   const existingGuide = workspace.querySelector('[data-workflow-empty]');
 
   if (!nextState) {
-    if (currentStage || existingGuide) clearEmptyState(workspace);
+    if (currentStage || existingGuide || workspace.querySelector('[data-empty-panel-hidden], [data-empty-hidden]')) clearEmptyState(workspace);
     return;
   }
 
