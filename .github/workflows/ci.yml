@@ -18,7 +18,11 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Test
+      - name: Unit tests
         run: npm test
       - name: Build
         run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Workflow browser tests
+        run: npm run test:e2e:workflow
