@@ -1,10 +1,7 @@
-import './apply-package-empty-bootstrap-fix.mjs';
-import './apply-empty-workspace-refresh-fix.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const path = 'src/ui/stixio-workshop-app-v2.js';
 const marker = '// BETA_PROGRESSIVE_BOOTSTRAP';
-const source = await readFile(path, 'utf8');
 
 function schedulerHelper(name) {
   return `function ${name}() {
@@ -12,23 +9,29 @@ function schedulerHelper(name) {
 }`;
 }
 
-const existingHelperMatch = source.match(/function (nextBootstrap(?:Frame|Turn))\(\) \{[\s\S]*?\n\}/);
-if (source.includes(marker)) {
-  if (!existingHelperMatch) {
-    throw new Error('Progressive Workshop bootstrap marker exists but its scheduling helper is missing.');
-  }
-  const [, helperName] = existingHelperMatch;
-  const nextSource = source.replace(existingHelperMatch[0], schedulerHelper(helperName));
-  if (nextSource === source) {
-    console.log('Progressive Workshop bootstrap scheduler already present.');
-    process.exit(0);
-  }
-  await writeFile(path, nextSource);
-  console.log('Progressive Workshop bootstrap scheduler refreshed.');
-  process.exit(0);
-}
+async function main() {
+  await import('./apply-package-empty-bootstrap-fix.mjs');
+  await import('./apply-empty-workspace-refresh-fix.mjs');
 
-const synchronousInit = `export function initStixioWorkshop(root = document.getElementById('app')) {
+  const source = await readFile(path, 'utf8');
+  const existingHelperMatch = source.match(/function (nextBootstrap(?:Frame|Turn))\(\) \{[\s\S]*?\n\}/);
+
+  if (source.includes(marker)) {
+    if (!existingHelperMatch) {
+      throw new Error('Progressive Workshop bootstrap marker exists but its scheduling helper is missing.');
+    }
+    const [, helperName] = existingHelperMatch;
+    const nextSource = source.replace(existingHelperMatch[0], schedulerHelper(helperName));
+    if (nextSource !== source) {
+      await writeFile(path, nextSource);
+      console.log('Progressive Workshop bootstrap scheduler refreshed.');
+    } else {
+      console.log('Progressive Workshop bootstrap scheduler already present.');
+    }
+    return;
+  }
+
+  const synchronousInit = `export function initStixioWorkshop(root = document.getElementById('app')) {
   if (!root) throw new Error('Stixio root element not found.');
   document.title = \`${'${BRAND.name}'} Workshop\`;
   root.innerHTML = renderShell();
@@ -39,11 +42,11 @@ const synchronousInit = `export function initStixioWorkshop(root = document.getE
   refresh();
 }`;
 
-if (!source.includes(synchronousInit)) {
-  throw new Error('Unable to locate the synchronous Workshop initializer.');
-}
+  if (!source.includes(synchronousInit)) {
+    throw new Error('Unable to locate the synchronous Workshop initializer.');
+  }
 
-const progressiveInit = `${synchronousInit}
+  const progressiveInit = `${synchronousInit}
 
 ${marker}
 export async function initStixioWorkshopProgressive(
@@ -73,5 +76,8 @@ export async function initStixioWorkshopProgressive(
 
 ${schedulerHelper('nextBootstrapTurn')}`;
 
-await writeFile(path, source.replace(synchronousInit, progressiveInit));
-console.log('Progressive Workshop bootstrap installed with timer scheduling.');
+  await writeFile(path, source.replace(synchronousInit, progressiveInit));
+  console.log('Progressive Workshop bootstrap installed with timer scheduling.');
+}
+
+await main();
