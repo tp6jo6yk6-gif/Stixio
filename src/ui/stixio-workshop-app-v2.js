@@ -131,6 +131,9 @@ const state = {
   rendered: new Map(),
   renderKeys: new Map(),
   reviewReport: null,
+  reviewItemsCache: null,
+  reviewThumbnails: new Map(),
+  reviewThumbnailPromises: new Map(),
   settings: { ...DEFAULT_SETTINGS },
   frameDrag: null,
   maskStroke: null,
@@ -636,8 +639,10 @@ function detectSource(sourceId) {
   resetFrameHistory(); clearRenderCache(); renderAll();
 }
 
+// WORKSHOP_PERFORMANCE_OPTIMIZATIONS_V1
 function frames(){return state.document.frames;}
-function setFrames(next){state.document=setDocumentFrames(state.document,next);}
+function invalidateReviewCaches(){state.reviewReport=null;state.reviewItemsCache=null;}
+function setFrames(next){state.document=setDocumentFrames(state.document,next);invalidateReviewCaches();state.projectController?.markDirty('自動保存排程中');}
 function activeSource(){return state.sources.get(state.activeSourceId)||null;}
 function selectedFrame(){return frames().find(frame=>frame.id===state.selectedFrameId)||null;}
 function sourceForFrame(frame){return frame?state.sources.get(frame.sourceImageId)||null:null;}
@@ -650,8 +655,11 @@ function getRenderOptions(frame=null){
 function renderFrame(frame,force=false){const source=sourceForFrame(frame);if(!source)return null;const options=getRenderOptions(frame);const key=JSON.stringify({source:source.id,geometry:frame.geometry,offsetX:frame.custom?.offsetX||0,offsetY:frame.custom?.offsetY||0,maskVersion:frame.custom?.maskVersion||0,options});if(!force&&state.rendered.has(frame.id)&&state.renderKeys.get(frame.id)===key)return state.rendered.get(frame.id);const canvas=renderWorkshopFrame(source,frame,options).canvas;state.rendered.set(frame.id,canvas);state.renderKeys.set(frame.id,key);return canvas;}
 
 function renderAll(){frames().forEach(frame=>renderFrame(frame));runReview();}
-function clearRenderCache(invalidateApprovals=true){state.rendered.clear();state.renderKeys.clear();state.reviewReport=null;if(invalidateApprovals)invalidateAllReviewApprovals();}
-function runReview(){
+function revokeReviewThumbnail(frameId){const cached=state.reviewThumbnails.get(frameId);if(cached?.url)URL.revokeObjectURL(cached.url);state.reviewThumbnails.delete(frameId);state.reviewThumbnailPromises.delete(frameId);}
+function clearReviewThumbnailCache(){for(const cached of state.reviewThumbnails.values())if(cached?.url)URL.revokeObjectURL(cached.url);state.reviewThumbnails.clear();state.reviewThumbnailPromises.clear();}
+function clearRenderCache(invalidateApprovals=true){state.rendered.clear();state.renderKeys.clear();clearReviewThumbnailCache();invalidateReviewCaches();if(invalidateApprovals)invalidateAllReviewApprovals();}
+function runReview(force=false){
+  if(!force&&state.reviewReport)return state.reviewReport;
   const selected=exportFrames();selected.forEach(frame=>renderFrame(frame));
   const plan=packagePlan(selected);
   const outputRulesByFrame=new Map(plan.items.map(item=>[item.artworkId,{targetW:item.expectedWidth,targetH:item.expectedHeight,safeMargin:item.safeMargin,maxFileSizeBytes:item.maxFileSizeBytes}]));
@@ -660,6 +668,8 @@ function runReview(){
   const issues=[...report.issues,...packageIssues];
   const summary={total:issues.length,errors:issues.filter(issue=>issue.severity==='error').length,warnings:issues.filter(issue=>issue.severity==='warning').length,info:issues.filter(issue=>issue.severity==='info').length};
   state.reviewReport={...report,issues,summary,ready:report.allSelectedApproved&&summary.errors===0&&plan.ready,canPackage:report.allSelectedApproved&&summary.errors===0&&plan.ready,packagePlan:plan};
+  state.reviewItemsCache=null;
+  return state.reviewReport;
 }
 
 // EMPTY_WORKSPACE_REFRESH_FIX_V2
@@ -675,7 +685,7 @@ function refresh(){
     document.documentElement.dataset.stixioBootStage='refresh-empty';
     return;
   }
-  drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();state.projectController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();refreshCommonControls();
+  runReview();drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();state.projectController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();refreshCommonControls();
 }
 
 function renderEmptyReviewState(){
@@ -746,7 +756,7 @@ function drawFrameOverlay(ctx,frame,selected){const g=frame.geometry;ctx.save();
 function bindSourceCanvas(canvas){canvas.addEventListener('pointerdown',sourcePointerDown);canvas.addEventListener('pointermove',sourcePointerMove);canvas.addEventListener('pointerup',sourcePointerUp);canvas.addEventListener('pointerleave',sourcePointerUp);}
 function sourcePointerDown(event){state.activeEditor='layout';const source=activeSource();if(!source)return;const point=canvasPoint(event);if(state.settings.maskTool==='picker'){pickColorFromSource(point);return;}const hit=hitTestFrame(point);if(!hit)return;selectFrame(hit.frame.id);state.frameDrag={frameId:hit.frame.id,handle:hit.handle,start:point,startGeometry:{...hit.frame.geometry},before:frameSnapshot()};event.currentTarget.setPointerCapture?.(event.pointerId);refresh();}
 function sourcePointerMove(event){if(!state.frameDrag)return;const point=canvasPoint(event);const drag=state.frameDrag;const frame=frames().find(item=>item.id===drag.frameId);if(!frame)return;const dx=point.x-drag.start.x,dy=point.y-drag.start.y;const geometry=resizeGeometry(drag.startGeometry,drag.handle,dx,dy);replaceFrame({...frame,geometry:clampGeometry(geometry,activeSource())});drawSourceCanvas();}
-function sourcePointerUp(){if(!state.frameDrag)return;const drag=state.frameDrag;state.frameDrag=null;let frame=frames().find(item=>item.id===drag.frameId);if(frame&&sourceLayout(frame.sourceImageId).smartSnap)frame=smartSnapFrameToContent(sourceForFrame(frame),frame,{searchPadding:12,padding:4,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance});if(frame){const mask=frame.custom?.protectMaskCanvas;if(mask&&(mask.width!==Math.round(frame.geometry.width)||mask.height!==Math.round(frame.geometry.height)))frame={...frame,custom:{...frame.custom,protectMaskCanvas:resizeMaskCanvas(mask,frame.geometry.width,frame.geometry.height),maskVersion:(frame.custom.maskVersion||0)+1}};replaceFrame(frame);}commitFrameChange(drag.handle==='move'?'Move Frame':'Resize Frame',drag.before,frameSnapshot());clearRenderCache();renderAll();refresh();}
+function sourcePointerUp(){if(!state.frameDrag)return;const drag=state.frameDrag;state.frameDrag=null;let frame=frames().find(item=>item.id===drag.frameId);if(frame&&sourceLayout(frame.sourceImageId).smartSnap)frame=smartSnapFrameToContent(sourceForFrame(frame),frame,{searchPadding:12,padding:4,chromaColor:state.settings.chromaColor,tolerance:state.settings.tolerance});if(frame){const mask=frame.custom?.protectMaskCanvas;if(mask&&(mask.width!==Math.round(frame.geometry.width)||mask.height!==Math.round(frame.geometry.height)))frame={...frame,custom:{...frame.custom,protectMaskCanvas:resizeMaskCanvas(mask,frame.geometry.width,frame.geometry.height),maskVersion:(frame.custom.maskVersion||0)+1}};replaceFrame(frame);}commitFrameChange(drag.handle==='move'?'Move Frame':'Resize Frame',drag.before,frameSnapshot());renderSingleFrameChange(drag.frameId);}
 function canvasPoint(event){const canvas=event.currentTarget,rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height};}
 function hitTestFrame(point){const list=frames().filter(frame=>frame.sourceImageId===state.activeSourceId);const selected=selectedFrame();if(selected&&selected.sourceImageId===state.activeSourceId){const handle=hitHandle(point,selected.geometry);if(handle)return{frame:selected,handle};}for(let index=list.length-1;index>=0;index--){const frame=list[index],g=frame.geometry;if(point.x>=g.x&&point.x<=g.x+g.width&&point.y>=g.y&&point.y<=g.y+g.height)return{frame,handle:'move'};}return null;}
 function handlePoints(g){return[{name:'nw',x:g.x,y:g.y},{name:'n',x:g.x+g.width/2,y:g.y},{name:'ne',x:g.x+g.width,y:g.y},{name:'e',x:g.x+g.width,y:g.y+g.height/2},{name:'se',x:g.x+g.width,y:g.y+g.height},{name:'s',x:g.x+g.width/2,y:g.y+g.height},{name:'sw',x:g.x,y:g.y+g.height},{name:'w',x:g.x,y:g.y+g.height/2}];}
@@ -806,7 +816,8 @@ function resetSelectedRefine(){const frame=selectedFrame();if(!frame)return;cons
 function resetRefineSettings(){['chromaEnabled','chromaColor','tolerance','exteriorOnly','autoDespeckle','despeckleMinSize','shrinkRadius','featherRadius','whiteBorderEnabled','whiteBorderSize','borderColor'].forEach(key=>state.settings[key]=Array.isArray(DEFAULT_SETTINGS[key])?[...DEFAULT_SETTINGS[key]]:DEFAULT_SETTINGS[key]);clearRenderCache();renderAll();rerenderShell();}
 function renderSelectedRefineNow(refreshUi=true){const frame=selectedFrame();if(!frame)return;clearFrameRender(frame.id);renderFrame(frame,true);runReview();if(refreshUi)refresh();else{drawRefineCanvas();renderLargeReview();renderReviewSummary();}}
 function applySelectedRefine(){const frame=selectedFrame();if(!frame)return;renderSelectedRefineNow(false);state.refineAppliedAt.set(frame.id,Date.now());refresh();}
-function clearFrameRender(frameId){state.rendered.delete(frameId);state.renderKeys.delete(frameId);invalidateFrameReviewApproval(frameId);}
+function clearFrameRender(frameId){state.rendered.delete(frameId);state.renderKeys.delete(frameId);revokeReviewThumbnail(frameId);invalidateReviewCaches();invalidateFrameReviewApproval(frameId);}
+function renderSingleFrameChange(frameId){clearFrameRender(frameId);const frame=frames().find(item=>item.id===frameId);if(frame)renderFrame(frame,true);runReview();refresh();}
 function invalidateAllReviewApprovals(){setFrames(frames().map(frame=>frame.state?.reviewApproved?setFrameReviewApproval(frame,false):frame));}
 function invalidateFrameReviewApproval(frameId){setFrames(frames().map(frame=>frame.id===frameId&&frame.state?.reviewApproved?setFrameReviewApproval(frame,false):frame));}
 function setRefineZoom(value,anchor={x:0,y:0}){state.refineView=zoomRefineView(state.refineView,value,anchor);state.settings.refineZoom=state.refineView.zoom;updateRefineTransform();}
@@ -834,9 +845,13 @@ function packagePlan(list=frames()){return state.destinationController?.buildPla
 function packageItemFor(frame,list=frames()){return packagePlan(list).items.find(item=>item.artworkId===frame.id)||null;}
 
 function reviewSourceNames(){return new Map([...state.sources.values()].map(source=>[source.id,source.name]));}
-function allReviewItems(){runReview();const plan=state.reviewReport?.packagePlan||packagePlan(exportFrames());return buildReviewItems({frames:frames(),renderedMap:state.rendered,issues:state.reviewReport?.issues||[],packageItems:plan.items,sourceNames:reviewSourceNames()});}
+function allReviewItems(){if(state.reviewItemsCache)return state.reviewItemsCache;const report=runReview();const plan=report?.packagePlan||packagePlan(exportFrames());state.reviewItemsCache=buildReviewItems({frames:frames(),renderedMap:state.rendered,issues:report?.issues||[],packageItems:plan.items,sourceNames:reviewSourceNames()});return state.reviewItemsCache;}
 function visibleReviewItems(){return sortReviewItems(filterReviewItems(allReviewItems(),{filter:state.settings.reviewFilter,query:state.settings.reviewSearch}),state.settings.reviewSort);}
 function selectedReviewItem(){return allReviewItems().find(item=>item.frameId===state.selectedFrameId)||null;}
+const EMPTY_REVIEW_THUMBNAIL='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+function reviewThumbnailKey(frame){return state.renderKeys.get(frame.id)||frameReviewSignature(frame);}
+function getReviewThumbnailUrl(frame,canvas){const key=reviewThumbnailKey(frame),cached=state.reviewThumbnails.get(frame.id);if(cached?.key===key)return Promise.resolve(cached.url);const pending=state.reviewThumbnailPromises.get(frame.id);if(pending?.key===key)return pending.promise;const promise=new Promise(resolve=>{canvas.toBlob(blob=>{state.reviewThumbnailPromises.delete(frame.id);if(!blob||reviewThumbnailKey(frame)!==key){resolve(EMPTY_REVIEW_THUMBNAIL);return;}const previous=state.reviewThumbnails.get(frame.id);if(previous?.url)URL.revokeObjectURL(previous.url);const url=URL.createObjectURL(blob);state.reviewThumbnails.set(frame.id,{key,url});resolve(url);},'image/png');});state.reviewThumbnailPromises.set(frame.id,{key,promise});return promise;}
+function attachReviewThumbnail(image,frame,canvas){if(!image)return;const key=reviewThumbnailKey(frame);image.src=EMPTY_REVIEW_THUMBNAIL;void getReviewThumbnailUrl(frame,canvas).then(url=>{if(image.isConnected&&reviewThumbnailKey(frame)===key)image.src=url;});}
 function renderReviewGrid(){
   const grid=document.getElementById('reviewGrid');if(!grid)return;
   if(!frames().length){grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';return;}
@@ -844,8 +859,8 @@ function renderReviewGrid(){
   if(!items.length){grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">沒有符合篩選條件的 Frame</div>';return;}
   grid.innerHTML='';const roles=availableRoleOptions();
   const canReorder=state.settings.reviewSort===ReviewSortModes.FRAME_ORDER&&state.settings.reviewFilter===ReviewFilterModes.ALL&&!state.settings.reviewSearch;
-  items.forEach(item=>{const frame=item.frame,canvas=renderFrame(frame),card=document.createElement('article');card.draggable=canReorder;card.dataset.frameId=frame.id;card.dataset.sourceId=frame.sourceImageId;card.dataset.reviewCard='true';card.dataset.reviewSeverity=item.highestSeverity||'clean';card.dataset.reviewApproved=String(item.approved);card.dataset.exportSelected=String(item.exportSelected);const severityClass=item.hasErrors?'border-rose-500 bg-rose-50':item.hasWarnings?'border-amber-400 bg-amber-50':item.approved?'border-emerald-400 bg-emerald-50':frame.id===state.selectedFrameId?'border-sky-400 bg-sky-50':'border-slate-200 bg-white';card.className=`rounded-3xl border p-2 transition ${severityClass}`;const dataUrl=canvas.toDataURL('image/png');const badge=item.hasErrors?'錯誤':item.hasWarnings?'警告':item.approved?'已核准':'待核准';card.innerHTML=`<button class="preview relative block aspect-[370/320] w-full overflow-hidden rounded-2xl"><img src="${dataUrl}" class="h-full w-full object-contain"><span class="absolute left-2 top-2 rounded-full bg-slate-950/80 px-2 py-1 text-[10px] font-black text-white">${badge}</span></button><div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black">#${item.index+1} · ${item.kb}KB</span><label class="flex items-center gap-1 text-[10px] font-black"><input class="export-check" type="checkbox" ${item.exportSelected?'checked':''}>匯出</label></div><div class="mt-1 truncate text-xs font-black" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div><div class="mt-1 truncate text-[10px] text-slate-400">${escapeHtml(item.sourceName)} · ${escapeHtml(item.fileName||'不匯出')}</div><div class="mt-2 flex gap-2"><button class="review-approve flex-1 rounded-xl ${item.approved?'bg-emerald-500 text-white':'bg-slate-100'} py-2 text-xs font-black">${item.approved?'撤銷核准':'核准'}</button><button class="single-download rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">PNG</button></div><select class="role-select mt-2 w-full rounded-xl bg-slate-100 px-2 py-1 text-xs font-black">${roles.map(role=>`<option value="${role}" ${packageRole(frame)===role?'selected':''}>${roleLabel(role)}</option>`).join('')}</select>`;
-    applyReviewBackground(card.querySelector('.preview'));
+  items.forEach(item=>{const frame=item.frame,canvas=renderFrame(frame),card=document.createElement('article');card.draggable=canReorder;card.dataset.frameId=frame.id;card.dataset.sourceId=frame.sourceImageId;card.dataset.reviewCard='true';card.dataset.reviewSeverity=item.highestSeverity||'clean';card.dataset.reviewApproved=String(item.approved);card.dataset.exportSelected=String(item.exportSelected);const severityClass=item.hasErrors?'border-rose-500 bg-rose-50':item.hasWarnings?'border-amber-400 bg-amber-50':item.approved?'border-emerald-400 bg-emerald-50':frame.id===state.selectedFrameId?'border-sky-400 bg-sky-50':'border-slate-200 bg-white';card.className=`rounded-3xl border p-2 transition ${severityClass}`;const badge=item.hasErrors?'錯誤':item.hasWarnings?'警告':item.approved?'已核准':'待核准';card.innerHTML=`<button class="preview relative block aspect-[370/320] w-full overflow-hidden rounded-2xl"><img class="h-full w-full object-contain" alt=""><span class="absolute left-2 top-2 rounded-full bg-slate-950/80 px-2 py-1 text-[10px] font-black text-white">${badge}</span></button><div class="mt-2 flex items-center justify-between gap-2"><span class="text-[10px] font-black">#${item.index+1} · ${item.kb}KB</span><label class="flex items-center gap-1 text-[10px] font-black"><input class="export-check" type="checkbox" ${item.exportSelected?'checked':''}>匯出</label></div><div class="mt-1 truncate text-xs font-black" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div><div class="mt-1 truncate text-[10px] text-slate-400">${escapeHtml(item.sourceName)} · ${escapeHtml(item.fileName||'不匯出')}</div><div class="mt-2 flex gap-2"><button class="review-approve flex-1 rounded-xl ${item.approved?'bg-emerald-500 text-white':'bg-slate-100'} py-2 text-xs font-black">${item.approved?'撤銷核准':'核准'}</button><button class="single-download rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">PNG</button></div><select class="role-select mt-2 w-full rounded-xl bg-slate-100 px-2 py-1 text-xs font-black">${roles.map(role=>`<option value="${role}" ${packageRole(frame)===role?'selected':''}>${roleLabel(role)}</option>`).join('')}</select>`;
+    applyReviewBackground(card.querySelector('.preview'));attachReviewThumbnail(card.querySelector('.preview img'),frame,canvas);
     card.querySelector('.preview').addEventListener('click',()=>{state.activeEditor='review';selectFrame(frame.id);resetReviewViewport();refresh();});
     card.querySelector('.export-check').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,exportSelected:event.target.checked}},{preserveReview:true});runReview();refresh();});
     card.querySelector('.review-approve').addEventListener('click',()=>toggleFrameReviewApproval(frame.id));
@@ -885,11 +900,11 @@ function bindReviewViewport(viewport){if(!viewport)return;viewport.addEventListe
 function reorderFrame(fromId,toId){if(!fromId||fromId===toId)return;const list=[...frames()],from=list.findIndex(frame=>frame.id===fromId),to=list.findIndex(frame=>frame.id===toId);if(from<0||to<0)return;const[item]=list.splice(from,1);list.splice(to,0,item);setFrames(list);state.draggedReviewFrameId=null;resetFrameHistory();runReview();refresh();}
 
 function renderSelectedInfo(){const holder=document.getElementById('selectedInfo'),frame=selectedFrame();if(!holder)return;if(!frame){holder.textContent='尚未選取';return;}const g=frame.geometry,ox=frame.custom?.offsetX||0,oy=frame.custom?.offsetY||0;holder.innerHTML=`<div class="rounded-2xl bg-emerald-50 p-3 font-black text-emerald-800">${escapeHtml(frame.name)}<br><span class="text-xs">x ${Math.round(g.x)} · y ${Math.round(g.y)} · ${Math.round(g.width)}×${Math.round(g.height)}<br>output offset: ${ox}, ${oy}<br>role: ${roleLabel(packageRole(frame))}</span></div>`;const x=document.getElementById('offsetXInput'),y=document.getElementById('offsetYInput');if(x)x.value=ox;if(y)y.value=oy;}
-function renderReviewSummary(){const holder=document.getElementById('reviewSummary');if(!holder)return;runReview();const report=state.reviewReport,plan=packagePlan(exportFrames());if(!report){holder.innerHTML='<div class="text-slate-400">尚未檢查</div>';return;}holder.innerHTML=`<div class="rounded-2xl bg-white/10 p-3"><div class="text-2xl font-black">${exportFrames().length}</div><div class="text-xs text-slate-400">selected exports</div></div><div class="rounded-2xl bg-white/10 p-3 text-xs">${report.ready&&plan.ready?'✓ Review ready':`${report.summary.errors+plan.validation.errors.length} errors · ${report.summary.warnings} warnings`}</div>`;}
+function renderReviewSummary(){const holder=document.getElementById('reviewSummary');if(!holder)return;const report=runReview(),plan=report?.packagePlan||packagePlan(exportFrames());if(!report){holder.innerHTML='<div class="text-slate-400">尚未檢查</div>';return;}holder.innerHTML=`<div class="rounded-2xl bg-white/10 p-3"><div class="text-2xl font-black">${exportFrames().length}</div><div class="text-xs text-slate-400">selected exports</div></div><div class="rounded-2xl bg-white/10 p-3 text-xs">${report.ready&&plan.ready?'✓ Review ready':`${report.summary.errors+plan.validation.errors.length} errors · ${report.summary.warnings} warnings`}</div>`;}
 
-function setSelectedOffset(key,value){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,[key]:Math.max(-4096,Math.min(4096,Number(value)||0))}});commitFrameChange('Set Output Offset',before,frameSnapshot());clearRenderCache();renderAll();refresh();}
-function nudgeSelectedOffset(dx,dy){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,offsetX:(frame.custom?.offsetX||0)+dx,offsetY:(frame.custom?.offsetY||0)+dy}});commitFrameChange('Nudge Output Offset',before,frameSnapshot());clearRenderCache();renderAll();refresh();}
-function resetSelectedOffset(){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,offsetX:0,offsetY:0}});commitFrameChange('Reset Output Offset',before,frameSnapshot());clearRenderCache();renderAll();refresh();}
+function setSelectedOffset(key,value){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,[key]:Math.max(-4096,Math.min(4096,Number(value)||0))}});commitFrameChange('Set Output Offset',before,frameSnapshot());renderSingleFrameChange(frame.id);}
+function nudgeSelectedOffset(dx,dy){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,offsetX:(frame.custom?.offsetX||0)+dx,offsetY:(frame.custom?.offsetY||0)+dy}});commitFrameChange('Nudge Output Offset',before,frameSnapshot());renderSingleFrameChange(frame.id);}
+function resetSelectedOffset(){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot();replaceFrame({...frame,custom:{...frame.custom,offsetX:0,offsetY:0}});commitFrameChange('Reset Output Offset',before,frameSnapshot());renderSingleFrameChange(frame.id);}
 
 function duplicateSelectedFrame(){
   const frame=selectedFrame();if(!frame)return;
@@ -929,7 +944,7 @@ function resetFrameHistory(){state.frameHistory=createHistory(frameSnapshot());}
 function undoFrames(){if(!canUndo(state.frameHistory))return;state.frameHistory=undo(state.frameHistory);applyFrameSnapshot(state.frameHistory.present);}
 function redoFrames(){if(!canRedo(state.frameHistory))return;state.frameHistory=redo(state.frameHistory);applyFrameSnapshot(state.frameHistory.present);}
 function applyFrameListChange(label,nextFrames,nextSelected,sourceId=state.activeSourceId){
-  const before=frameSnapshot();
+  const before=frameSnapshot(),beforeIds=new Set(before.frames.map(frame=>frame.id));
   setFrames(nextFrames);
   state.activeSourceId=sourceId||state.activeSourceId;
   const selected=nextFrames.find(frame=>frame.id===nextSelected)||null;
@@ -939,7 +954,11 @@ function applyFrameListChange(label,nextFrames,nextSelected,sourceId=state.activ
     else state.selectedFrameBySource.delete(state.activeSourceId);
     state.settings=applySourceLayoutSettings(state.settings,sourceLayout(state.activeSourceId));
   }
-  const after=frameSnapshot();commitFrameChange(label,before,after);clearRenderCache();renderAll();refresh();
+  const after=frameSnapshot();commitFrameChange(label,before,after);
+  const nextIds=new Set(nextFrames.map(frame=>frame.id));
+  for(const frameId of [...state.rendered.keys()])if(!nextIds.has(frameId)){state.rendered.delete(frameId);state.renderKeys.delete(frameId);revokeReviewThumbnail(frameId);}
+  nextFrames.filter(frame=>!beforeIds.has(frame.id)).forEach(frame=>renderFrame(frame,true));
+  invalidateReviewCaches();runReview();refresh();
 }
 
 function downloadSelectedPng(){const frame=selectedFrame();if(frame)downloadFramePng(frame);}
