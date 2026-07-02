@@ -5,7 +5,7 @@ const marker = '// BETA_PROGRESSIVE_BOOTSTRAP';
 
 function schedulerHelper(name) {
   return `function ${name}() {
-  return new Promise(resolve => setTimeout(resolve, 0));
+  return Promise.resolve();
 }`;
 }
 
@@ -78,7 +78,7 @@ export async function initStixioWorkshopProgressive(
 ${schedulerHelper('nextBootstrapTurn')}`;
 
   await writeFile(path, source.replace(synchronousInit, progressiveInit));
-  console.log('Progressive Workshop bootstrap installed with timer scheduling.');
+  console.log('Progressive Workshop bootstrap installed with microtask scheduling.');
 }
 
 await main();
