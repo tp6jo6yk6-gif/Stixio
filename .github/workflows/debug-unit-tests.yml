@@ -44,6 +44,18 @@ jobs:
           cp src/ui/project-controller.js debug-src/project-controller.js
           exit 0
 
+      - name: Install diagnostic Chromium
+        run: npx playwright install chromium
+
+      - name: Capture blocked JavaScript stack
+        shell: bash
+        run: |
+          set +e
+          timeout 45s node scripts/debug-bootstrap-stack.mjs > bootstrap-debug-output.txt 2>&1
+          echo $? > bootstrap-debug-exit-code.txt
+          test -f debug-bootstrap-stack.json || echo '{"diagnostic":"no output"}' > debug-bootstrap-stack.json
+          exit 0
+
       - name: Upload test output
         uses: actions/upload-artifact@v4
         with:
@@ -53,6 +65,9 @@ jobs:
             unit-test-exit-code.txt
             build-output.txt
             build-exit-code.txt
+            bootstrap-debug-output.txt
+            bootstrap-debug-exit-code.txt
+            debug-bootstrap-stack.json
             debug-src/
             dist/
           if-no-files-found: error
