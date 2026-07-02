@@ -947,7 +947,16 @@ function renderReviewGrid(){
     card.querySelector('.role-select').addEventListener('change',event=>{replaceFrame({...frame,state:{...frame.state,packageRole:event.target.value,reviewApproved:false},custom:{...frame.custom,outputRole:event.target.value}});clearFrameRender(frame.id);renderFrame(frame,true);runReview();refresh();});
     card.querySelector('.single-download').addEventListener('click',()=>downloadFramePng(frame));
     // LARGE_PROJECT_FOLLOWUP_FIX_V1
-    card.addEventListener('dragstart',event=>{state.draggedReviewFrameId=frame.id;if(event.dataTransfer){event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',frame.id);}});card.addEventListener('dragenter',event=>{if(canReorder)event.preventDefault();});card.addEventListener('dragover',event=>{if(canReorder){event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect='move';}});card.addEventListener('drop',event=>{if(!canReorder)return;event.preventDefault();const fromId=event.dataTransfer?.getData('text/plain')||state.draggedReviewFrameId;reorderFrame(fromId,frame.id);});card.addEventListener('dragend',()=>{state.draggedReviewFrameId=null;});grid.appendChild(card);
+    card.addEventListener('dragstart',event=>{state.draggedReviewFrameId=frame.id;if(event.dataTransfer){event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',frame.id);}});card.addEventListener('dragenter',event=>{if(canReorder)event.preventDefault();});card.addEventListener('dragover',event=>{if(canReorder){event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect='move';}});card.addEventListener('drop',event=>{if(!canReorder)return;event.preventDefault();const fromId=event.dataTransfer?.getData('text/plain')||state.draggedReviewFrameId;reorderFrame(fromId,frame.id);});// REVIEW_DRAG_FALLBACK_V1
+    card.addEventListener('dragend',event=>{
+      const fromId=state.draggedReviewFrameId;
+      state.draggedReviewFrameId=null;
+      if(!canReorder||!fromId)return;
+      const element=document.elementFromPoint(event.clientX,event.clientY);
+      const target=element&&element.closest('[data-review-card="true"]');
+      const toId=target&&target.dataset.frameId;
+      if(toId&&toId!==fromId)reorderFrame(fromId,toId);
+    });grid.appendChild(card);
   });
   if(virtual.bottom)grid.appendChild(reviewVirtualSpacer(virtual.bottom));
   ensureReviewVirtualListeners();
