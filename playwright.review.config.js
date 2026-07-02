@@ -2,13 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: 'review.spec.js',
+  testMatch: ['review.spec.js', 'review-large.spec.js'],
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   workers: 1,
   timeout: 45_000,
-  globalTimeout: 300_000,
+  globalTimeout: 360_000,
   expect: { timeout: 10_000 },
   reporter: [
     ['list'],
