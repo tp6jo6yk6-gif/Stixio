@@ -2,18 +2,20 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const path = 'src/ui/package-controller.js';
 const marker = '// PACKAGE_EMPTY_BOOTSTRAP_FIX';
-const source = await readFile(path, 'utf8');
 
-if (source.includes(marker)) {
-  console.log('Empty Package bootstrap fix already present.');
-  process.exit(0);
-}
+async function main() {
+  const source = await readFile(path, 'utf8');
 
-const target = `  function createSnapshot() {
+  if (source.includes(marker)) {
+    console.log('Empty Package bootstrap fix already present.');
+    return;
+  }
+
+  const target = `  function createSnapshot() {
     const frames = adapter.getExportFrames();
     frames.forEach(frame => adapter.ensureRendered(frame));`;
 
-const replacement = `  function createSnapshot() {
+  const replacement = `  function createSnapshot() {
     const frames = adapter.getExportFrames();
 
     ${marker}
@@ -47,9 +49,12 @@ const replacement = `  function createSnapshot() {
 
     frames.forEach(frame => adapter.ensureRendered(frame));`;
 
-if (!source.includes(target)) {
-  throw new Error('Unable to locate Package createSnapshot bootstrap path.');
+  if (!source.includes(target)) {
+    throw new Error('Unable to locate Package createSnapshot bootstrap path.');
+  }
+
+  await writeFile(path, source.replace(target, replacement));
+  console.log('Empty Package bootstrap fix installed.');
 }
 
-await writeFile(path, source.replace(target, replacement));
-console.log('Empty Package bootstrap fix installed.');
+await main();
