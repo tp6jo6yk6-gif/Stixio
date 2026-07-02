@@ -662,40 +662,20 @@ function runReview(){
   state.reviewReport={...report,issues,summary,ready:report.allSelectedApproved&&summary.errors===0&&plan.ready,canPackage:report.allSelectedApproved&&summary.errors===0&&plan.ready,packagePlan:plan};
 }
 
-// EMPTY_WORKSPACE_REFRESH_FIX
+// EMPTY_WORKSPACE_REFRESH_FIX_V2
 function refresh(){
-  drawSourceCanvas();
-  drawRefineCanvas();
-  renderSourceList();
-
-  if(!frames().length){
-    renderReviewGrid();
-    renderLargeReview();
-    renderSelectedInfo();
+  if(state.sources.size===0){
+    state.reviewReport={issues:[],summary:{total:0,errors:0,warnings:0,info:0},ready:false,canPackage:false,packagePlan:null};
+    const sourceList=document.getElementById('sourceList');if(sourceList)sourceList.innerHTML='<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-400">尚無原圖</div>';
+    const selected=document.getElementById('selectedInfo');if(selected)selected.textContent='尚未選取';
+    const grid=document.getElementById('reviewGrid');if(grid)grid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';
     renderEmptyReviewState();
-    refreshReviewControls();
-    refreshMaskToolButtons();
-    refreshMaskHistoryButtons();
-    updateRefineTransform();
-    updateReviewTransform();
     refreshCommonControls();
+    const exportButton=document.getElementById('exportZipBtn');if(exportButton){exportButton.disabled=true;exportButton.classList.add('opacity-40');}
+    document.documentElement.dataset.stixioBootStage='refresh-empty';
     return;
   }
-
-  renderReviewGrid();
-  renderLargeReview();
-  renderSelectedInfo();
-  renderReviewSummary();
-  renderReviewInspector();
-  renderReviewProgress();
-  refreshReviewControls();
-  state.packageController?.refresh();
-  state.projectController?.refresh();
-  refreshMaskToolButtons();
-  refreshMaskHistoryButtons();
-  updateRefineTransform();
-  updateReviewTransform();
-  refreshCommonControls();
+  drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();state.projectController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();refreshCommonControls();
 }
 
 function renderEmptyReviewState(){
