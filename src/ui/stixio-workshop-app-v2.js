@@ -147,6 +147,10 @@ const state = {
   globalEventsBound: false,
   refineAppliedAt: new Map(),
   refineRenderTimer: null,
+  fullQualityJobToken: 0,
+  fullQualityIdleHandle: null,
+  previewMasks: new Map(),
+  previewInteractionActive: false,
   reviewView: createRefineViewState({ minZoom: 0.25, maxZoom: 4 }),
   reviewPan: null,
   reviewPointerActive: false,
@@ -243,7 +247,7 @@ function renderOutputPanel() {
   const frame=selectedFrame();
   const output=state.destinationController?.getFrameOutput?.(frame)||{role:state.settings.outputRole,width:state.settings.targetW,height:state.settings.targetH,safeMargin:state.settings.safeMargin,maxFileSizeBytes:state.settings.maxFileSizeKB*1024};
   const safeMax=Math.max(0,Math.floor(Math.min(output.width,output.height)/2)-1);
-  return `<section id="package-rules-panel" class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Rules Engine</p><h2 class="mt-1 text-xl font-black">角色輸出與對齊</h2><div class="mt-4 grid grid-cols-2 gap-3"><div class="rounded-2xl bg-slate-50 p-3"><div class="text-[10px] font-black uppercase text-slate-400">Role</div><div class="mt-1 text-sm font-black">${roleLabel(output.role)}</div></div><div class="rounded-2xl bg-slate-50 p-3"><div class="text-[10px] font-black uppercase text-slate-400">File limit</div><div class="mt-1 text-sm font-black">≤${Math.ceil(output.maxFileSizeBytes/1024)}KB</div></div></div><div class="mt-3 grid grid-cols-2 gap-3">${numberInput('targetWInput','自訂寬度',output.width,1,8192)}${numberInput('targetHInput','自訂高度',output.height,1,8192)}</div>${rangeInput('safeMarginInput','安全留白',output.safeMargin,0,safeMax)}<div class="mt-3"><div class="mb-2 text-xs font-black text-slate-500">圖案對齊</div><div class="grid grid-cols-2 gap-2">${alignButton('center','絕對置中')}${alignButton('bottom','靠下貼齊')}</div></div><div class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${output.width} × ${output.height}px · safe ${output.safeMargin}px</div><p class="mt-3 text-[10px] font-bold text-slate-400">修改內建規格時會自動複製成 Custom Profile，原始 Profile 不會被覆蓋。</p></section>`;
+  return `<section id="package-rules-panel" class="rounded-[1.75rem] border border-slate-900/10 bg-white p-5 shadow-sm"><p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Rules Engine</p><h2 class="mt-1 text-xl font-black">角色輸出與對齊</h2><div class="mt-4 grid grid-cols-2 gap-3"><div class="rounded-2xl bg-slate-50 p-3"><div class="text-[10px] font-black uppercase text-slate-400">Role</div><div id="outputRoleLabel" class="mt-1 text-sm font-black">${roleLabel(output.role)}</div></div><div class="rounded-2xl bg-slate-50 p-3"><div class="text-[10px] font-black uppercase text-slate-400">File limit</div><div id="outputFileLimitLabel" class="mt-1 text-sm font-black">≤${Math.ceil(output.maxFileSizeBytes/1024)}KB</div></div></div><div class="mt-3 grid grid-cols-2 gap-3">${numberInput('targetWInput','自訂寬度',output.width,1,8192)}${numberInput('targetHInput','自訂高度',output.height,1,8192)}</div>${rangeInput('safeMarginInput','安全留白',output.safeMargin,0,safeMax)}<div class="mt-3"><div class="mb-2 text-xs font-black text-slate-500">圖案對齊</div><div class="grid grid-cols-2 gap-2">${alignButton('center','絕對置中')}${alignButton('bottom','靠下貼齊')}</div></div><div id="outputRuleSummary" class="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-800">${output.width} × ${output.height}px · safe ${output.safeMargin}px</div><p class="mt-3 text-[10px] font-bold text-slate-400">修改內建規格時會自動複製成 Custom Profile，原始 Profile 不會被覆蓋。</p></section>`;
 }
 
 function renderRefinePanel() {
@@ -308,7 +312,7 @@ function bindStaticEvents(root) {
   root.querySelector('#targetWInput')?.addEventListener('change',event=>state.destinationController?.updateActiveRoleRule('width',event.target.value));
   root.querySelector('#targetHInput')?.addEventListener('change',event=>state.destinationController?.updateActiveRoleRule('height',event.target.value));
   root.querySelector('#safeMarginInput')?.addEventListener('change',event=>state.destinationController?.updateActiveRoleRule('safeMargin',event.target.value));
-  root.querySelectorAll('.align-btn').forEach(button => button.addEventListener('click', () => { state.settings.alignMode=button.dataset.align;clearRenderCache();renderAll();rerenderShell(); }));
+  root.querySelectorAll('.align-btn').forEach(button => button.addEventListener('click', () => { state.settings.alignMode=button.dataset.align;syncShellControls();scheduleRenderAll(0); }));
   root.querySelector('#chromaEnabledInput').addEventListener('change', event => updateRefineSetting('chromaEnabled',event.target.checked));
   root.querySelector('#chromaColorInput').addEventListener('input', event => updateRefineSetting('chromaColor',hexToRgb(event.target.value)));
   root.querySelector('#pickerBtn').addEventListener('click', () => { state.settings.maskTool = 'picker'; state.activeEditor='refine'; refreshMaskToolButtons(); });
@@ -330,7 +334,7 @@ function bindStaticEvents(root) {
   root.querySelectorAll('.magic-action').forEach(button=>button.addEventListener('click',()=>{state.settings.magicAction=button.dataset.magicAction;refreshMaskToolButtons();}));
   root.querySelector('#magicContiguousInput').addEventListener('change',event=>state.settings.magicContiguous=event.target.checked);
   root.querySelector('#maskOverlayInput').addEventListener('change',event=>{state.settings.maskOverlayVisible=event.target.checked;drawRefineCanvas();});
-  root.querySelectorAll('.refine-view').forEach(button=>button.addEventListener('click',()=>{state.settings.refineViewMode=button.dataset.refineView;rerenderShell();}));
+  root.querySelectorAll('.refine-view').forEach(button=>button.addEventListener('click',()=>{state.settings.refineViewMode=button.dataset.refineView;applyRefineViewMode();refreshMaskToolButtons();}));
   root.querySelector('#maskUndoBtn').addEventListener('click', () => stepMaskHistory(-1));
   root.querySelector('#maskRedoBtn').addEventListener('click', () => stepMaskHistory(1));
   root.querySelector('#maskClearBtn').addEventListener('click', clearSelectedMask);
@@ -536,13 +540,20 @@ async function getProjectFingerprint(){
 }
 
 function rerenderShell(){const root=document.getElementById('app');root.innerHTML=renderShell();bindStaticEvents(root);mountDestinationController(root);mountPackageController(root);mountProjectController(root);refresh();}
-function bindRange(root,id,key,render=true,afterChange=null){root.querySelector(`#${id}`).addEventListener('input',event=>{state.settings[key]=Number(event.target.value);const label=root.querySelector(`#${id}Value`);if(label)label.textContent=event.target.value;if(render){clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}if(afterChange)afterChange();});}
-function updateRefineSetting(key,value){state.settings[key]=value;clearRenderCache();renderSelectedRefineNow(false);scheduleRenderAll();}
-function scheduleRenderAll(delay=90){if(state.refineRenderTimer)clearTimeout(state.refineRenderTimer);state.refineRenderTimer=setTimeout(()=>{state.refineRenderTimer=null;clearRenderCache();renderAll();refresh();},delay);}
+function bindRange(root,id,key,render=true,afterChange=null){const input=root.querySelector(`#${id}`);input.addEventListener('input',event=>{state.settings[key]=Number(event.target.value);const label=root.querySelector(`#${id}Value`);if(label)label.textContent=event.target.value;if(render){renderSelectedLowQualityPreview();scheduleRenderAll();}if(afterChange)afterChange();});if(render)input.addEventListener('change',()=>scheduleRenderAll(20));}
+function updateRefineSetting(key,value){state.settings[key]=value;renderSelectedLowQualityPreview();scheduleRenderAll();}
+function setPreviewInteractionActive(active){state.previewInteractionActive=active;const button=document.getElementById('exportZipBtn');if(button){button.disabled=active;button.classList.toggle('opacity-40',active);button.title=active?'正在更新正式品質…':'';}}
+function previewMaskFor(frame,width,height){const mask=frame.custom?.protectMaskCanvas;if(!mask)return null;const key=`${frame.id}:${frame.custom?.maskVersion||0}:${width}x${height}`;if(state.previewMasks.has(key))return state.previewMasks.get(key);state.previewMasks.clear();const preview=resizeMaskCanvas(mask,width,height);state.previewMasks.set(key,preview);return preview;}
+function renderSelectedLowQualityPreview(){const frame=selectedFrame(),source=sourceForFrame(frame);if(!frame||!source)return;cancelScheduledFullQuality();setPreviewInteractionActive(true);const geometry=frame.geometry,maxSide=480,scale=Math.min(1,maxSide/Math.max(geometry.width,geometry.height)),width=Math.max(1,Math.round(geometry.width*scale)),height=Math.max(1,Math.round(geometry.height*scale)),crop=document.createElement('canvas');crop.width=width;crop.height=height;crop.getContext('2d').drawImage(source.img,geometry.x,geometry.y,geometry.width,geometry.height,0,0,width,height);const previewSource={...source,id:`${source.id}:preview`,img:crop,width,height},previewFrame={...frame,geometry:{x:0,y:0,width,height},custom:{...frame.custom,protectMaskCanvas:previewMaskFor(frame,width,height)}},base=getRenderOptions(frame),preview=renderWorkshopFrame(previewSource,previewFrame,{...base,highQuality:false,refine:{...base.refine,autoDespeckle:false,despeckle:{minComponentSize:Math.min(12,state.settings.despeckleMinSize)},featherRadius:Math.min(2,state.settings.featherRadius)}}).canvas,output=document.getElementById('refineOutputCanvas');drawRefineCanvas(false);if(output){output.width=preview.width;output.height=preview.height;const context=output.getContext('2d');context.clearRect(0,0,output.width,output.height);context.drawImage(preview,0,0);}const status=document.getElementById('refineStatus');if(status)status.dataset.previewQuality='low';}
+function cancelScheduledFullQuality(){if(state.refineRenderTimer)clearTimeout(state.refineRenderTimer);state.refineRenderTimer=null;state.fullQualityJobToken+=1;if(state.fullQualityIdleHandle!=null&&globalThis.cancelIdleCallback)cancelIdleCallback(state.fullQualityIdleHandle);state.fullQualityIdleHandle=null;}
+function scheduleRenderAll(delay=320){cancelScheduledFullQuality();const token=state.fullQualityJobToken;state.refineRenderTimer=setTimeout(()=>{state.refineRenderTimer=null;startFullQualityRender(token);},delay);}
+function startFullQualityRender(token){if(token!==state.fullQualityJobToken)return;clearRenderCache();const ordered=[...frames()],selected=selectedFrame(),queue=selected?[selected,...ordered.filter(frame=>frame.id!==selected.id)]:ordered;const runBatch=deadline=>{if(token!==state.fullQualityJobToken)return;let processed=0;while(queue.length&&(processed<2||deadline?.timeRemaining?.()>5)){renderFrame(queue.shift(),true);processed+=1;}if(queue.length){state.fullQualityIdleHandle=globalThis.requestIdleCallback?requestIdleCallback(runBatch,{timeout:120}):setTimeout(()=>runBatch({timeRemaining:()=>8}),0);return;}state.fullQualityIdleHandle=null;runReview(true);setPreviewInteractionActive(false);refreshRefineSection();refreshReviewSection({ensureReview:false});refreshPackageSection();refreshProjectSection();};runBatch({timeRemaining:()=>8});}
+function syncShellControls(){const setValue=(id,value)=>{const node=document.getElementById(id);if(node&&document.activeElement!==node)node.value=value;};const setChecked=(id,value)=>{const node=document.getElementById(id);if(node)node.checked=Boolean(value);};[['rowsInput','rows'],['colsInput','cols'],['marginXInput','marginX'],['marginYInput','marginY'],['gapXInput','gapX'],['gapYInput','gapY'],['toleranceInput','tolerance'],['despeckleSizeInput','despeckleMinSize'],['shrinkInput','shrinkRadius'],['featherInput','featherRadius'],['borderSizeInput','whiteBorderSize'],['maskSizeInput','maskSize'],['maskOverlayOpacityInput','maskOverlayOpacity']].forEach(([id,key])=>{setValue(id,state.settings[key]);const label=document.getElementById(`${id}Value`);if(label)label.textContent=state.settings[key];});setChecked('smartSnapInput',state.settings.smartSnap);setChecked('chromaEnabledInput',state.settings.chromaEnabled);setChecked('exteriorInput',state.settings.exteriorOnly);setChecked('despeckleInput',state.settings.autoDespeckle);setChecked('borderInput',state.settings.whiteBorderEnabled);setChecked('maskOverlayInput',state.settings.maskOverlayVisible);setValue('chromaColorInput',rgbToHex(state.settings.chromaColor));setValue('borderColorInput',state.settings.borderColor);document.querySelectorAll('.layout-btn').forEach(button=>{const active=button.dataset.layout===state.settings.layoutMode;button.classList.toggle('bg-slate-950',active);button.classList.toggle('text-white',active);button.classList.toggle('bg-slate-100',!active);});document.querySelectorAll('.align-btn').forEach(button=>{const active=button.dataset.align===state.settings.alignMode;button.classList.toggle('bg-slate-950',active);button.classList.toggle('text-white',active);button.classList.toggle('bg-slate-100',!active);});const frame=selectedFrame(),output=state.destinationController?.getFrameOutput?.(frame)||{role:state.settings.outputRole,width:state.settings.targetW,height:state.settings.targetH,safeMargin:state.settings.safeMargin,maxFileSizeBytes:state.settings.maxFileSizeKB*1024};setValue('targetWInput',output.width);setValue('targetHInput',output.height);setValue('safeMarginInput',output.safeMargin);const safeLabel=document.getElementById('safeMarginInputValue');if(safeLabel)safeLabel.textContent=output.safeMargin;const roleLabelNode=document.getElementById('outputRoleLabel');if(roleLabelNode)roleLabelNode.textContent=roleLabel(output.role);const limit=document.getElementById('outputFileLimitLabel');if(limit)limit.textContent=`≤${Math.ceil(output.maxFileSizeBytes/1024)}KB`;const summary=document.getElementById('outputRuleSummary');if(summary)summary.textContent=`${output.width} × ${output.height}px · safe ${output.safeMargin}px`;applyRefineViewMode();}
+function applyRefineViewMode(){const mode=state.settings.refineViewMode,workspace=document.getElementById('refineWorkspace'),viewport=document.getElementById('refineViewport'),result=document.getElementById('refineResultPane'),split=mode==='split';if(workspace){workspace.classList.toggle('lg:grid-cols-2',split);workspace.classList.toggle('grid-cols-1',!split);}if(viewport)viewport.style.display=mode==='result'?'none':'';if(result)result.style.display=mode==='mask'?'none':'';document.querySelectorAll('.refine-view').forEach(button=>button.classList.toggle('bg-emerald-300',button.dataset.refineView===mode));}
 function valueOf(id,fallback){const value=Number(document.getElementById(id)?.value);return Number.isFinite(value)?value:fallback;}
 
 function readGridSettings(){state.settings.rows=valueOf('rowsInput',1);state.settings.cols=valueOf('colsInput',1);state.settings.marginX=valueOf('marginXInput',0);state.settings.marginY=valueOf('marginYInput',0);state.settings.gapX=valueOf('gapXInput',0);state.settings.gapY=valueOf('gapYInput',0);saveActiveSourceLayout();}
-function setLayoutMode(mode){state.settings.layoutMode=mode;if(mode==='1x1'){state.settings.rows=1;state.settings.cols=1;}if(mode==='2x2'){state.settings.rows=2;state.settings.cols=2;}if(mode==='3x3'){state.settings.rows=3;state.settings.cols=3;}saveActiveSourceLayout();rerenderShell();}
+function setLayoutMode(mode){state.settings.layoutMode=mode;if(mode==='1x1'){state.settings.rows=1;state.settings.cols=1;}if(mode==='2x2'){state.settings.rows=2;state.settings.cols=2;}if(mode==='3x3'){state.settings.rows=3;state.settings.cols=3;}saveActiveSourceLayout();syncShellControls();refreshLayoutSection();}
 function saveActiveSourceLayout(){if(state.activeSourceId)state.sourceLayouts.set(state.activeSourceId,createSourceLayoutSettings(state.settings));}
 function sourceLayout(sourceId){return state.sourceLayouts.get(sourceId)||createSourceLayoutSettings(state.settings);}
 function activateSource(sourceId){
@@ -556,7 +567,7 @@ function activateSource(sourceId){
   const selected=sourceFrames.find(frame=>frame.id===rememberedId)||sourceFrames[0]||null;
   state.selectedFrameId=selected?.id||null;
   if(selected)state.selectedFrameBySource.set(sourceId,selected.id);
-  rerenderShell();
+  refreshSelectionSections();
 }
 function selectFrame(frameId){
   const frame=frames().find(item=>item.id===frameId);
@@ -569,9 +580,9 @@ function selectFrame(frameId){
   state.selectedFrameBySource.set(frame.sourceImageId,frame.id);
 }
 
-function changeCategory(category){state.settings.stickerCategory=category;const role=getStickerPresets(category)[0].role;state.settings=applyStickerPreset(state.settings,category,role);state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);normalizeFrameRolesForCategory();clearRenderCache();renderAll();rerenderShell();}
-function changePreset(role){state.settings=applyStickerPreset(state.settings,state.settings.stickerCategory,role);state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);clearRenderCache();renderAll();rerenderShell();}
-function updateOutputDimension(key,value){state.settings[key]=Math.max(1,Math.min(8192,Math.round(Number(value)||1)));state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);clearRenderCache();renderAll();rerenderShell();}
+function changeCategory(category){state.settings.stickerCategory=category;const role=getStickerPresets(category)[0].role;state.settings=applyStickerPreset(state.settings,category,role);state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);normalizeFrameRolesForCategory();syncShellControls();scheduleRenderAll(0);}
+function changePreset(role){state.settings=applyStickerPreset(state.settings,state.settings.stickerCategory,role);state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);syncShellControls();scheduleRenderAll(0);}
+function updateOutputDimension(key,value){state.settings[key]=Math.max(1,Math.min(8192,Math.round(Number(value)||1)));state.settings.safeMargin=clampSafeMargin(state.settings.safeMargin,state.settings.targetW,state.settings.targetH);syncShellControls();scheduleRenderAll(0);}
 function updateSafeMargin(value){state.settings.safeMargin=clampSafeMargin(value,state.settings.targetW,state.settings.targetH);const label=document.getElementById('safeMarginInputValue');if(label)label.textContent=state.settings.safeMargin;clearRenderCache();renderAll();refresh();}
 function normalizeFrameRolesForCategory(){const allowed=new Set(getAvailableAssetRoles(state.settings.stickerCategory));setFrames(frames().map(frame=>allowed.has(packageRole(frame))?frame:{...frame,state:{...frame.state,packageRole:AssetRoles.STICKER},custom:{...frame.custom,outputRole:AssetRoles.STICKER}}));}
 
@@ -587,7 +598,7 @@ async function importFiles(fileList) {
     state.activeSourceId = ref.id;
     detectSource(ref.id);
   }
-  rerenderShell();
+  syncShellControls();refresh();
 }
 
 function deleteSource(sourceId){
@@ -611,7 +622,7 @@ function deleteSource(sourceId){
   }else{
     state.selectedFrameId=null;
   }
-  resetFrameHistory();clearRenderCache();renderAll();rerenderShell();
+  resetFrameHistory();clearRenderCache();renderAll();syncShellControls();refresh();
 }
 
 function detectActiveSource(){if(!state.activeSourceId)return;readGridSettings();detectSource(state.activeSourceId);refresh();}
@@ -686,9 +697,20 @@ function refresh(){
     document.documentElement.dataset.stixioBootStage='refresh-empty';
     return;
   }
-  runReview();drawSourceCanvas();drawRefineCanvas();renderSourceList();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();state.packageController?.refresh();state.projectController?.refresh();refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();updateReviewTransform();refreshCommonControls();
+  refreshLayoutSection();
+  refreshRefineSection();
+  refreshReviewSection();
+  refreshPackageSection();
+  refreshProjectSection();
 }
 
+// WORKSHOP_INTERACTION_PERFORMANCE_V1
+function refreshLayoutSection(){drawSourceCanvas();renderSourceList();refreshCommonControls();}
+function refreshRefineSection({updateOutput=true}={}){drawRefineCanvas(updateOutput);refreshMaskToolButtons();refreshMaskHistoryButtons();updateRefineTransform();}
+function refreshReviewSection({ensureReview=true}={}){if(ensureReview)runReview();renderReviewGrid();renderLargeReview();renderSelectedInfo();renderReviewSummary();renderReviewInspector();renderReviewProgress();refreshReviewControls();updateReviewTransform();}
+function refreshPackageSection(){state.packageController?.refresh();}
+function refreshProjectSection(){state.projectController?.refresh();}
+function refreshSelectionSections(){syncShellControls();refreshLayoutSection();refreshRefineSection();refreshReviewSection({ensureReview:false});refreshProjectSection();}
 function renderEmptyReviewState(){
   state.reviewReport={
     issues:[],
@@ -814,7 +836,7 @@ function canStepMaskHistory(direction){const frame=selectedFrame(),history=frame
 function stepMaskHistory(direction){const frame=selectedFrame();if(!frame||!canStepMaskHistory(direction))return false;const mask=ensureFrameMask(frame),history=state.maskHistories.get(frame.id);history.index+=direction;restoreMaskSnapshot(mask,history.items[history.index]);touchMask(frame,mask,true);clearFrameRender(frame.id);renderSelectedRefineNow(false);refresh();return true;}
 function clearSelectedMask(){const frame=selectedFrame();if(!frame)return;const mask=ensureFrameMask(frame);ensureMaskHistory(frame.id,mask);clearMask(mask);touchMask(frame,mask,true);commitMaskHistory(frame.id,mask);clearFrameRender(frame.id);renderSelectedRefineNow(false);refresh();}
 function resetSelectedRefine(){const frame=selectedFrame();if(!frame)return;const before=frameSnapshot(),mask=ensureFrameMask(frame);ensureMaskHistory(frame.id,mask);clearMask(mask);const next={...frame,custom:{...frame.custom,protectMaskCanvas:mask,maskVersion:(frame.custom?.maskVersion||0)+1,offsetX:0,offsetY:0}};replaceFrame(next);commitMaskHistory(frame.id,mask);commitFrameChange('Reset Selected Refine',before,frameSnapshot());state.refineAppliedAt.delete(frame.id);resetRefineViewport();clearFrameRender(frame.id);renderSelectedRefineNow(false);refresh();}
-function resetRefineSettings(){['chromaEnabled','chromaColor','tolerance','exteriorOnly','autoDespeckle','despeckleMinSize','shrinkRadius','featherRadius','whiteBorderEnabled','whiteBorderSize','borderColor'].forEach(key=>state.settings[key]=Array.isArray(DEFAULT_SETTINGS[key])?[...DEFAULT_SETTINGS[key]]:DEFAULT_SETTINGS[key]);clearRenderCache();renderAll();rerenderShell();}
+function resetRefineSettings(){['chromaEnabled','chromaColor','tolerance','exteriorOnly','autoDespeckle','despeckleMinSize','shrinkRadius','featherRadius','whiteBorderEnabled','whiteBorderSize','borderColor'].forEach(key=>state.settings[key]=Array.isArray(DEFAULT_SETTINGS[key])?[...DEFAULT_SETTINGS[key]]:DEFAULT_SETTINGS[key]);syncShellControls();renderSelectedLowQualityPreview();scheduleRenderAll(0);}
 function renderSelectedRefineNow(refreshUi=true){const frame=selectedFrame();if(!frame)return;clearFrameRender(frame.id);renderFrame(frame,true);runReview();if(refreshUi)refresh();else{drawRefineCanvas();renderLargeReview();renderReviewSummary();}}
 function applySelectedRefine(){const frame=selectedFrame();if(!frame)return;renderSelectedRefineNow(false);state.refineAppliedAt.set(frame.id,Date.now());refresh();}
 function clearFrameRender(frameId){state.rendered.delete(frameId);state.renderKeys.delete(frameId);revokeReviewThumbnail(frameId);invalidateReviewCaches();invalidateFrameReviewApproval(frameId);}
