@@ -11,7 +11,8 @@ const state = {
   installed: false,
   errors: [],
   storage: null,
-  lastObservedError: null,
+  lastObservedProjectError: null,
+  lastObservedPackageError: null,
   mutationObserver: null,
   version: '1.0.0',
   build: 'development',
@@ -102,13 +103,14 @@ function guardProjectInput(event, input) {
 function observeApplicationErrors() {
   state.mutationObserver = new MutationObserver(() => {
     const projectStatus = document.querySelector('#projectAutosaveStatus')?.textContent?.trim();
-    if (projectStatus?.startsWith('錯誤') && projectStatus !== state.lastObservedError) {
-      state.lastObservedError = projectStatus;
+    if (projectStatus?.startsWith('錯誤') && projectStatus !== state.lastObservedProjectError) {
+      state.lastObservedProjectError = projectStatus;
       reportError(new Error(projectStatus.replace(/^錯誤\s*·?\s*/, '')), { source: 'project-storage', userVisible: true });
     }
+
     const packageError = document.querySelector('#packageProgress .text-rose-300')?.textContent?.trim();
-    if (packageError && packageError !== state.lastObservedError) {
-      state.lastObservedError = packageError;
+    if (packageError && packageError !== state.lastObservedPackageError) {
+      state.lastObservedPackageError = packageError;
       reportError(new Error(packageError), { source: 'package-export', userVisible: true });
     }
   });
