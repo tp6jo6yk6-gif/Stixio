@@ -3,7 +3,7 @@ name: Deploy Stixio Beta
 on:
   workflow_run:
     workflows:
-      - Legacy Parity Release Gate
+      - Stixio CI
     types:
       - completed
   workflow_dispatch:
@@ -45,10 +45,15 @@ jobs:
       - name: Validate Beta build
         run: |
           test -f dist/index.html
+          test -f dist/_headers
           test -f dist/public/robots.txt
+          test -f dist/src/ui/workshop-flow-app.js
+          test -f dist/src/ui/workshop-flow-experience.js
           grep -q 'noindex,nofollow' dist/index.html
-          grep -q 'initStixioWorkshop' dist/index.html
-          grep -q 'DESTINATION_RULES_FULL_COMPLETION' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'enhanceWorkshopFlow' dist/index.html
+          grep -q 'enhanceWorkflowExperience' dist/index.html
+          grep -q 'data-workflow-managed' dist/src/ui/workshop-flow-app.js
+          grep -q 'data-mobile-workflow-nav' dist/src/ui/workshop-flow-experience.js
 
       - name: Validate Cloudflare credentials
         env:
