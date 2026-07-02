@@ -66,6 +66,7 @@ export function enhanceWorkshopTabs(root = document.getElementById('app')) {
     }
     if (updateUrl) history.replaceState(null, '', `#workflow-${activeStage}`);
     applyWorkflowTabs(root, activeStage);
+    resetColumnScroll(root);
     if (focusTab) root.querySelector(`[data-workshop-stage="${activeStage}"]`)?.focus();
     root.dispatchEvent(new CustomEvent('stixio:stagechange', { detail: { stage: activeStage } }));
   };
@@ -116,6 +117,7 @@ export function applyWorkflowTabs(root, activeStage = 'layout') {
   updateBrandCopy(root);
   decorateTabList(nav, activeStage, root);
   arrangeStagePanels(root, main, activeStage);
+  applyWorkspaceViewport(root, main, activeStage);
 }
 
 function resolveInitialStage() {
@@ -229,18 +231,35 @@ function arrangeStagePanels(root, main, activeStage) {
   const allPanels = columns.flatMap(column => [...column.children]);
   allPanels.forEach(panel => {
     panel.hidden = true;
+    panel.style.display = 'none';
     panel.removeAttribute('role');
     panel.removeAttribute('aria-labelledby');
   });
 
   unique(panelGroups[activeStage]).forEach(panel => {
     panel.hidden = false;
+    panel.style.removeProperty('display');
     panel.setAttribute('role', 'tabpanel');
     panel.setAttribute('aria-labelledby', `workflow-tab-${activeStage}`);
   });
 
   columns.forEach(column => {
-    column.hidden = ![...column.children].some(panel => !panel.hidden);
+    const visible = [...column.children].some(panel => !panel.hidden);
+    column.hidden = !visible;
+    if (visible) column.style.removeProperty('display');
+    else column.style.display = 'none';
+  });
+}
+
+function applyWorkspaceViewport(root, main, activeStage) {
+  const shell = root.firstElementChild;
+  if (shell) shell.dataset.workshopShell = 'true';
+  main.dataset.activeStage = activeStage;
+}
+
+function resetColumnScroll(root) {
+  root.querySelectorAll('[data-workshop-column]').forEach(column => {
+    column.scrollTop = 0;
   });
 }
 
@@ -288,10 +307,58 @@ function installWorkflowStyle() {
   style.id = STYLE_ID;
   style.textContent = `
     #app [data-workshop-main] > [hidden],
-    #app [data-workshop-main] > * > [hidden] { display: none !important; }
+    #app [data-workshop-main] > * > [hidden] {
+      display: none !important;
+    }
+
+    @media (min-width: 1024px) {
+      html,
+      body,
+      #app,
+      #app > [data-workshop-shell] {
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      #app > [data-workshop-shell] {
+        display: flex;
+        flex-direction: column;
+      }
+
+      #app > [data-workshop-shell] > header {
+        position: relative;
+        flex: 0 0 auto;
+      }
+
+      #app [data-workshop-main] {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        align-items: stretch;
+      }
+
+      #app [data-workshop-main] > [data-workshop-column] {
+        min-height: 0;
+        max-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+    }
+
     @media (min-width: 1280px) {
       #app [data-workshop-main][data-active-stage="review"] {
         grid-template-columns: minmax(0, 1fr) 340px !important;
+      }
+    }
+
+    @media (max-width: 1023px) {
+      #app [data-workshop-main],
+      #app [data-workshop-main] > [data-workshop-column] {
+        max-height: none;
+        overflow: visible;
       }
     }
   `;
