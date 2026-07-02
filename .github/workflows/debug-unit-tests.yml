@@ -30,12 +30,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Capture tests
+      - name: Capture tests and patched sources
         shell: bash
         run: |
           set +e
           npm test > unit-test-output.txt 2>&1
           echo $? > unit-test-exit-code.txt
+          mkdir -p debug-src
+          cp src/ui/stixio-workshop-app-v2.js debug-src/stixio-workshop-app-v2.js
+          cp src/ui/package-controller.js debug-src/package-controller.js
           exit 0
 
       - name: Upload test output
@@ -45,5 +48,6 @@ jobs:
           path: |
             unit-test-output.txt
             unit-test-exit-code.txt
+            debug-src/
           if-no-files-found: error
           retention-days: 2
