@@ -109,7 +109,7 @@ export function enhanceWorkshopTabs(root = document.getElementById('app')) {
 
 export function applyWorkflowTabs(root, activeStage = 'layout') {
   if (!root || !STAGE_IDS.has(activeStage)) return;
-  const nav = root.querySelector('nav[aria-label="Workshop workflow"]');
+  const nav = root.querySelector('nav[aria-label="Workshop workflow"], nav[aria-label="貼圖製作流程"]');
   const main = root.querySelector('main');
   if (!nav || !main) return;
 
@@ -136,10 +136,8 @@ function stageFromHash(hash = '') {
 }
 
 function updateBrandCopy(root) {
-  const subtitle = root.querySelector('header h1 + p');
-  if (subtitle) subtitle.textContent = '從原圖到貼圖包，一個工作區完成';
-  const exportButton = root.querySelector('#exportZipBtn');
-  if (exportButton) exportButton.textContent = '下載貼圖包 ZIP';
+  setText(root.querySelector('header h1 + p'), '從原圖到貼圖包，一個工作區完成');
+  setText(root.querySelector('#exportZipBtn'), '下載貼圖包 ZIP');
 }
 
 function decorateTabList(nav, activeStage, root) {
@@ -156,11 +154,11 @@ function decorateTabList(nav, activeStage, root) {
       tab.id = `workflow-tab-${stage.id}`;
       tab.href = `#workflow-${stage.id}`;
       tab.setAttribute('role', 'tab');
-      tab.setAttribute('aria-controls', `workflow-panel-${stage.id}`);
+      tab.setAttribute('aria-controls', `stage-${stage.id}`);
       tab.innerHTML = `
         <span class="flex items-center justify-between gap-2">
           <span class="text-[10px] font-black uppercase tracking-[.18em]" data-stage-label></span>
-          <span class="rounded-full bg-current/10 px-2 py-0.5 text-[10px] font-black" data-stage-step></span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] font-black" data-stage-step></span>
         </span>
         <span class="mt-1 block text-sm font-black" data-stage-title></span>
         <span class="mt-1 block truncate text-[10px] font-bold opacity-65" data-stage-status></span>`;
@@ -177,15 +175,18 @@ function decorateTabList(nav, activeStage, root) {
 
     const label = tab.querySelector('[data-stage-label]');
     if (label) {
-      label.textContent = stage.label;
+      setText(label, stage.label);
       label.className = `text-[10px] font-black uppercase tracking-[.18em] ${active ? stage.accentClass : 'text-slate-400'}`;
     }
     const step = tab.querySelector('[data-stage-step]');
-    if (step) step.textContent = stage.step;
-    const title = tab.querySelector('[data-stage-title]');
-    if (title) title.textContent = stage.title;
-    const status = tab.querySelector('[data-stage-status]');
-    if (status) status.textContent = getStageStatus(stage.id, root);
+    if (step) {
+      setText(step, stage.step);
+      step.className = active
+        ? 'rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black text-white'
+        : 'rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500';
+    }
+    setText(tab.querySelector('[data-stage-title]'), stage.title);
+    setText(tab.querySelector('[data-stage-status]'), getStageStatus(stage.id, root));
   });
 }
 
@@ -234,7 +235,6 @@ function arrangeStagePanels(root, main, activeStage) {
 
   unique(panelGroups[activeStage]).forEach(panel => {
     panel.hidden = false;
-    panel.id ||= `workflow-panel-${activeStage}`;
     panel.setAttribute('role', 'tabpanel');
     panel.setAttribute('aria-labelledby', `workflow-tab-${activeStage}`);
   });
@@ -255,6 +255,10 @@ function findTopLevelPanel(element, main) {
 
 function unique(items) {
   return [...new Set(items.filter(Boolean))];
+}
+
+function setText(element, value) {
+  if (element && element.textContent !== value) element.textContent = value;
 }
 
 function getStageStatus(stageId, root) {
