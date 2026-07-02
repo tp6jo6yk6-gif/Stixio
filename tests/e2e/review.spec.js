@@ -63,6 +63,20 @@ async function selectedHeroText(page) {
   return page.locator('#reviewHeroMeta').innerText();
 }
 
+async function dispatchCardDrag(page, sourceIndex, targetIndex) {
+  await page.locator('[data-review-card="true"]').evaluateAll((cards, indexes) => {
+    const source = cards[indexes.sourceIndex];
+    const target = cards[indexes.targetIndex];
+    if (!source || !target) throw new Error('Review drag cards are unavailable.');
+    const dataTransfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
+    target.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }));
+    target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+    source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));
+  }, { sourceIndex, targetIndex });
+}
+
 function visiblePoint(box, viewport) {
   const left = Math.max(0, box.x);
   const right = Math.min(viewport.width, box.x + box.width);
@@ -176,7 +190,7 @@ test.describe('Review browser acceptance', () => {
   test('warning filter, drag reorder and Review keyboard shortcuts work in Chromium', async ({ page }) => {
     await importArtwork(page, fourPanelSvg(), '2x2', 'four-panel.svg');
     const originalIds = await page.locator('[data-review-card="true"]').evaluateAll(cards => cards.map(card => card.dataset.frameId));
-    await page.locator('[data-review-card="true"]').nth(0).dragTo(page.locator('[data-review-card="true"]').nth(2));
+    await dispatchCardDrag(page, 0, 2);
     const reorderedIds = await page.locator('[data-review-card="true"]').evaluateAll(cards => cards.map(card => card.dataset.frameId));
     expect(reorderedIds).not.toEqual(originalIds);
 
