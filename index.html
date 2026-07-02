@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="stixio-build" content="workflow-20260702-3">
+  <meta name="stixio-build" content="workflow-tabs-v4">
   <title>Stixio Workshop</title>
   <meta name="description" content="Stixio Workshop 是一套模組化貼圖製作工作區，支援多圖匯入、智能裁切、去背修補、規格預覽與打包輸出。">
   <meta name="application-name" content="Stixio Workshop">
@@ -16,20 +16,18 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body class="bg-[#f6f3ec]" data-stixio-build="workflow-20260702-3">
+<body class="bg-[#f6f3ec]" data-stixio-build="workflow-tabs-v4">
   <div id="app"></div>
   <script type="module">
     import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js';
     import { enhanceWorkshopUx } from './src/ui/workshop-ux.js';
     import { bridgeWorkshopLegacyControls } from './src/ui/workshop-ux-bridge.js';
-    import { enhanceWorkshopFlow } from './src/ui/workshop-flow-app.js?v=20260702-3';
-    import { enhanceWorkflowExperience } from './src/ui/workshop-flow-experience.js?v=20260702-3';
+    import { enhanceWorkshopTabsV4 } from './src/ui/workshop-tabs-v4.js?v=20260702-4';
     const root = document.getElementById('app');
     initStixioWorkshop(root);
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
-    enhanceWorkshopFlow(root);
-    enhanceWorkflowExperience(root);
+    enhanceWorkshopTabsV4(root);
   </script>
 </body>
 </html>
