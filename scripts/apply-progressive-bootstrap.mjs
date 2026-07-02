@@ -13,6 +13,7 @@ async function main() {
   await import('./apply-package-empty-bootstrap-fix.mjs');
   await import('./apply-empty-workspace-refresh-fix.mjs');
   await import('./apply-project-lazy-initialize-fix.mjs');
+  await import('./apply-workshop-ux-observer-fix.mjs');
 
   const source = await readFile(path, 'utf8');
   const existingHelperMatch = source.match(/function (nextBootstrap(?:Frame|Turn))\(\) \{[\s\S]*?\n\}/);
