@@ -22,6 +22,7 @@ async function main() {
   await import('./apply-project-blob-node-compat-fix.mjs');
   await import('./apply-large-project-performance-fix.mjs');
   await import('./apply-image-worker-url-fix.mjs');
+  await import('./apply-large-project-followup-fix.mjs');
 
   const source = await readFile(path, 'utf8');
   const existingHelperMatch = source.match(/function (nextBootstrap(?:Frame|Turn))\(\) \{[\s\S]*?\n\}/);
