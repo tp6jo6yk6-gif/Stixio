@@ -1,4 +1,5 @@
 import './apply-package-empty-bootstrap-fix.mjs';
+import './apply-empty-workspace-refresh-fix.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const path = 'src/ui/stixio-workshop-app-v2.js';
