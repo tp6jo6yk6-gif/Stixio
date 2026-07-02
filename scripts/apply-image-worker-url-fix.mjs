@@ -11,7 +11,7 @@ async function main() {
   }
 
   const before = `try{const workerUrl=new URL('./public/app/stixio-image-worker.js',document.baseURI);const worker=new Worker(workerUrl);`;
-  const after = `try{${marker}const bundleScript=[...document.scripts].find(script=>script.src.includes('stixio-workshop-1.0.0.js'));const workerUrl=bundleScript?new URL('stixio-image-worker.js',bundleScript.src):new URL('../../public/app/stixio-image-worker.js',document.baseURI);const worker=new Worker(workerUrl);`;
+  const after = `try{${marker}\nconst bundleScript=[...document.scripts].find(script=>script.src.includes('stixio-workshop-1.0.0.js'));const workerUrl=bundleScript?new URL('stixio-image-worker.js',bundleScript.src):new URL('../../public/app/stixio-image-worker.js',document.baseURI);const worker=new Worker(workerUrl);`;
 
   if (!source.includes(before)) throw new Error('Image worker URL target not found.');
   await writeFile(path, source.replace(before, after));
