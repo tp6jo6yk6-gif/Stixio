@@ -33,32 +33,52 @@ async function importSingleSticker(page) {
   await expect(page.locator('#sourceList [data-source-id]')).toHaveCount(1, { timeout: 20_000 });
 }
 
-test.describe('Workflow navigation and responsive experience', () => {
+test.describe('Workflow tabs v4', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => localStorage.clear());
   });
 
-  test('renders one active Workspace with empty guidance and previous/next navigation', async ({ page }) => {
+  test('changes active tab colour and shows only the selected stage', async ({ page }) => {
     await openWorkshop(page);
 
     const workspace = page.locator('[data-workflow-managed="true"]');
+    const layoutTab = page.locator('nav[aria-label="貼圖製作流程"] [data-workflow-stage="layout"]');
+    const refineTab = page.locator('nav[aria-label="貼圖製作流程"] [data-workflow-stage="refine"]');
+
     await expect(workspace).toHaveAttribute('data-active-stage', 'layout');
+    await expect(layoutTab).toHaveAttribute('aria-selected', 'true');
+    await expect(layoutTab).toHaveClass(/workflow-tab-active/);
+    await expect(refineTab).toHaveAttribute('aria-selected', 'false');
+    await expect(page.locator('#stage-layout')).toBeVisible();
+    await expect(page.locator('#stage-refine')).toBeHidden();
     await expect(page.locator('[data-workflow-empty="layout"]')).toContainText('尚未匯入圖片');
-    await expect(workspace.locator('#stage-layout')).toHaveCount(1);
-    await expect(workspace.locator('#stage-refine')).toHaveCount(0);
 
-    await page.locator('nav[aria-label="貼圖製作流程"] [data-workflow-stage="refine"]').click();
+    await refineTab.click();
     await expect(workspace).toHaveAttribute('data-active-stage', 'refine');
+    await expect(refineTab).toHaveAttribute('aria-selected', 'true');
+    await expect(refineTab).toHaveClass(/workflow-tab-active/);
+    await expect(layoutTab).toHaveAttribute('aria-selected', 'false');
+    await expect(page.locator('#stage-layout')).toBeHidden();
+    await expect(page.locator('#stage-refine')).toBeHidden();
     await expect(page.locator('[data-workflow-empty="refine"]')).toContainText('尚無貼圖可修整');
-    await expect(workspace.locator('#stage-layout')).toHaveCount(0);
-    await expect(workspace.locator('#stage-refine')).toHaveCount(1);
 
-    await page.locator('[data-workflow-action="next"]').click();
+    await page.locator('[data-workflow-direction="next"]').click();
     await expect(workspace).toHaveAttribute('data-active-stage', 'review');
     await expect(page.locator('[data-workflow-empty="review"]')).toContainText('尚無貼圖可檢查');
 
-    await page.locator('[data-workflow-action="previous"]').click();
+    await page.locator('[data-workflow-direction="previous"]').click();
     await expect(workspace).toHaveAttribute('data-active-stage', 'refine');
+  });
+
+  test('keeps the desktop document in a single-screen workspace', async ({ page }) => {
+    await openWorkshop(page);
+    const dimensions = await page.evaluate(() => ({
+      viewport: window.innerHeight,
+      documentHeight: document.scrollingElement?.scrollHeight || 0,
+      bodyOverflow: getComputedStyle(document.body).overflow
+    }));
+    expect(dimensions.bodyOverflow).toBe('hidden');
+    expect(dimensions.documentHeight).toBeLessThanOrEqual(dimensions.viewport + 2);
   });
 
   test('collapses both desktop sidebars and saves the preference', async ({ page }) => {
@@ -80,7 +100,7 @@ test.describe('Workflow navigation and responsive experience', () => {
     await expect(workspace).toHaveAttribute('data-collapse-right', 'true');
     await expect(page.locator('[data-workflow-column="right"]')).toHaveAttribute('data-collapsed', 'true');
 
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('stixio-workflow-collapsed-columns') || '{}'));
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('stixio-workflow-collapsed-columns-v4') || '{}'));
     expect(saved).toEqual({ left: true, right: true });
   });
 
