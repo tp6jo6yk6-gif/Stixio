@@ -24,4 +24,3 @@ async function main() {
 }
 
 await main();
-await import('./apply-review-drag-target-fix.mjs');
