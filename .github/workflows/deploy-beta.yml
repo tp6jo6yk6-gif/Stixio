@@ -47,13 +47,12 @@ jobs:
           test -f dist/index.html
           test -f dist/_headers
           test -f dist/public/robots.txt
-          test -f dist/src/ui/workshop-flow-app.js
-          test -f dist/src/ui/workshop-flow-experience.js
-          grep -q 'workflow-20260702-3' dist/index.html
-          grep -q 'enhanceWorkshopFlow' dist/index.html
-          grep -q 'enhanceWorkflowExperience' dist/index.html
-          grep -q 'data-workflow-managed' dist/src/ui/workshop-flow-app.js
-          grep -q 'data-mobile-workflow-nav' dist/src/ui/workshop-flow-experience.js
+          test -f dist/src/ui/workshop-tabs-v4.js
+          grep -q 'workflow-tabs-v4' dist/index.html
+          grep -q 'enhanceWorkshopTabsV4' dist/index.html
+          grep -q 'workflow-tab-active' dist/src/ui/workshop-tabs-v4.js
+          grep -q 'data-workflow-managed' dist/src/ui/workshop-tabs-v4.js
+          grep -q 'data-mobile-workflow-nav' dist/src/ui/workshop-tabs-v4.js
 
       - name: Validate Cloudflare credentials
         env:
