@@ -42,6 +42,7 @@ const requiredFiles = [
   `${dist}/public/vendor/jszip-3.10.1.min.js`,
   `${dist}/public/app/stixio-workshop-1.0.0.js`,
   `${dist}/public/app/stixio-workshop-1.0.0.js.map`,
+  `${dist}/public/app/stixio-image-worker.js`,
   `${dist}/public/icons/stixio-icon.svg`,
   `${dist}/public/icons/stixio-maskable.svg`
 ];
@@ -57,5 +58,10 @@ for (const token of ['.sticky', '.bg-\\[\\#f6f3ec\\]', '.font-black']) {
 const bundle = await readFile(`${dist}/public/app/stixio-workshop-1.0.0.js`, 'utf8');
 if (bundle.length < 20000) throw new Error('Stixio 1.0.0 browser bundle is unexpectedly small.');
 if (!bundle.includes('stixioReady')) throw new Error('Stixio 1.0.0 browser bundle is missing readiness signalling.');
+
+const imageWorker = await readFile(`${dist}/public/app/stixio-image-worker.js`, 'utf8');
+if (!imageWorker.includes('OffscreenCanvas') || !imageWorker.includes('convertToBlob')) {
+  throw new Error('Stixio image worker is missing OffscreenCanvas thumbnail processing.');
+}
 
 console.log(`Stixio 1.0.0 static build complete (${buildSha.slice(0, 12)}).`);
