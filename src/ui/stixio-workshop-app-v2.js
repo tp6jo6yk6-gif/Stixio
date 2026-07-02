@@ -190,7 +190,7 @@ export async function initStixioWorkshopProgressive(
 }
 
 function nextBootstrapFrame() {
-  return new Promise(resolve => setTimeout(resolve, 0));
+  return Promise.resolve();
 }
 
 function renderShell() {
