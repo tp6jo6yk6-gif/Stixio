@@ -1,4 +1,5 @@
 const WORKFLOW_STORAGE_KEY = 'stixio-workflow-stage';
+const REFINED_STORAGE_KEY = 'stixio-refined-frame-ids';
 const FLOW_STYLE_ID = 'stixio-workflow-app-style';
 const FLOW_CACHE_ID = 'stixio-workflow-panel-cache';
 
@@ -89,9 +90,18 @@ export function enhanceWorkshopFlow(root = document.getElementById('app')) {
   installFlowStyle();
 
   let activeStage = resolveInitialStage();
-  const refinedFrameIds = new Set();
+  const refinedFrameIds = loadRefinedFrameIds();
   let panelRegistry = new Map();
   let scheduled = false;
+  let chromeTimer = null;
+
+  const refreshChromeSoon = (delay = 0) => {
+    if (chromeTimer) clearTimeout(chromeTimer);
+    chromeTimer = setTimeout(() => {
+      chromeTimer = null;
+      refreshWorkflowChrome(root, activeStage, refinedFrameIds);
+    }, delay);
+  };
 
   const scheduleHydrate = () => {
     if (scheduled) return;
@@ -152,16 +162,22 @@ export function enhanceWorkshopFlow(root = document.getElementById('app')) {
     if (event.target.closest?.('#applyRefineBtn')) {
       const frameId = root.querySelector('#refineCanvas')?.dataset.frameId;
       if (frameId) refinedFrameIds.add(frameId);
-      queueMicrotask(() => refreshWorkflowChrome(root, activeStage, refinedFrameIds));
+      persistRefinedFrameIds(refinedFrameIds);
+      refreshChromeSoon();
       return;
     }
 
     if (event.target.closest?.('#resetSelectedRefineBtn')) {
       const frameId = root.querySelector('#refineCanvas')?.dataset.frameId;
       if (frameId) refinedFrameIds.delete(frameId);
-      queueMicrotask(() => refreshWorkflowChrome(root, activeStage, refinedFrameIds));
+      persistRefinedFrameIds(refinedFrameIds);
     }
+
+    refreshChromeSoon();
   });
+
+  root.addEventListener('change', () => refreshChromeSoon());
+  root.addEventListener('input', () => refreshChromeSoon(140));
 
   root.addEventListener('keydown', event => {
     const tab = event.target.closest?.('[data-workflow-stage]');
@@ -182,11 +198,8 @@ export function enhanceWorkshopFlow(root = document.getElementById('app')) {
     if (stage) setStage(stage, { updateUrl: false });
   });
 
-  const observer = new MutationObserver(mutations => {
-    if (mutations.some(mutation => mutation.target === root)) scheduleHydrate();
-    else queueMicrotask(() => refreshWorkflowChrome(root, activeStage, refinedFrameIds));
-  });
-  observer.observe(root, { childList: true, subtree: true });
+  const observer = new MutationObserver(() => scheduleHydrate());
+  observer.observe(root, { childList: true });
 
   scheduleHydrate();
 }
@@ -296,9 +309,9 @@ function renderWorkspace(workspace, cache, registry, activeStage, root, refinedF
         <h2 class="mt-1 text-xl font-black">${stage.title}</h2>
         <p class="mt-1 text-sm font-bold text-slate-500">${stage.description}</p>
       </div>
-      <div class="min-w-[220px] rounded-2xl ${toneSurfaceClass(summary.tone)} px-4 py-3">
+      <div class="min-w-[220px] rounded-2xl ${toneSurfaceClass(summary.tone)} px-4 py-3" data-workflow-status-card>
         <div class="text-xs font-black" data-workflow-current-status>${summary.value}</div>
-        <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/70"><div class="h-full rounded-full ${toneBarClass(summary.tone)}" style="width:${summary.percent}%"></div></div>
+        <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/70"><div class="h-full rounded-full ${toneBarClass(summary.tone)}" data-workflow-current-bar style="width:${summary.percent}%"></div></div>
       </div>
     </section>
     <div class="grid min-h-0 flex-1 grid-cols-1 gap-5 ${layout.grid}" data-workflow-grid>
@@ -386,8 +399,10 @@ function refreshWorkflowChrome(root, activeStage, refinedFrameIds) {
 
   const current = summaries[activeStage];
   const status = workspace.querySelector('[data-workflow-current-status]');
+  const card = workspace.querySelector('[data-workflow-status-card]');
+  const bar = workspace.querySelector('[data-workflow-current-bar]');
   if (status) status.textContent = current.value;
-  const bar = status?.parentElement?.querySelector('.h-full');
+  if (card) card.className = `min-w-[220px] rounded-2xl ${toneSurfaceClass(current.tone)} px-4 py-3`;
   if (bar) {
     bar.className = `h-full rounded-full ${toneBarClass(current.tone)}`;
     bar.style.width = `${current.percent}%`;
@@ -402,10 +417,14 @@ function collectWorkflowMetrics(root, refinedFrameIds) {
     return total + Number(match?.[1] || 0);
   }, 0);
   const totalFrames = Math.max(totalFromSources, reviewCards.length);
+
+  const reviewProgressText = root.querySelector('#reviewProgressBar')?.textContent || '';
+  const approvedMatch = reviewProgressText.match(/已核准\s*(\d+)\s*\/\s*(\d+)/);
+  const errorsMatch = reviewProgressText.match(/錯誤\s*(\d+)/);
+  const warningsMatch = reviewProgressText.match(/警告\s*(\d+)/);
   const selectedCards = reviewCards.filter(card => card.dataset.exportSelected !== 'false');
   const approvedCards = selectedCards.filter(card => card.dataset.reviewApproved === 'true');
-  const errors = selectedCards.filter(card => card.dataset.reviewSeverity === 'error').length;
-  const warnings = selectedCards.filter(card => card.dataset.reviewSeverity === 'warning').length;
+
   const packagePreflight = root.querySelector('#packagePreflight')?.textContent || '';
   const packageFileText = root.querySelector('#packageFileCount')?.textContent || '';
   const packageFileCount = Number(packageFileText.match(/(\d+)\s+files/i)?.[1] || selectedCards.length);
@@ -413,25 +432,40 @@ function collectWorkflowMetrics(root, refinedFrameIds) {
   return {
     sourceCount: sourceRows.length,
     totalFrames,
-    refinedCount: [...refinedFrameIds].filter(id => reviewCards.some(card => card.dataset.frameId === id)).length,
-    selectedCount: selectedCards.length || totalFrames,
-    approvedCount: approvedCards.length,
-    errors,
-    warnings,
+    refinedCount: Math.min(refinedFrameIds.size, totalFrames),
+    selectedCount: Number(approvedMatch?.[2] || selectedCards.length || totalFrames),
+    approvedCount: Number(approvedMatch?.[1] || approvedCards.length),
+    errors: Number(errorsMatch?.[1] || selectedCards.filter(card => card.dataset.reviewSeverity === 'error').length),
+    warnings: Number(warningsMatch?.[1] || selectedCards.filter(card => card.dataset.reviewSeverity === 'warning').length),
     packageReady: packagePreflight.includes('可產生 ZIP'),
     packageFileCount
   };
 }
 
 function pruneRefinedFrames(root, refinedFrameIds) {
-  const known = new Set([...root.querySelectorAll('[data-review-card="true"]')].map(card => card.dataset.frameId));
-  if (!known.size) {
-    if (!root.querySelector('#sourceList [data-source-id]')) refinedFrameIds.clear();
+  const sourceExists = Boolean(root.querySelector('#sourceList [data-source-id]'));
+  if (!sourceExists) {
+    refinedFrameIds.clear();
+    persistRefinedFrameIds(refinedFrameIds);
     return;
   }
+
+  const totalFrames = [...root.querySelectorAll('#sourceList [data-source-id]')].reduce((total, row) => {
+    const match = row.textContent.match(/(\d+)\s+Frames/i);
+    return total + Number(match?.[1] || 0);
+  }, 0);
+  const cards = [...root.querySelectorAll('[data-review-card="true"]')];
+  if (!totalFrames || cards.length !== totalFrames) return;
+
+  const known = new Set(cards.map(card => card.dataset.frameId));
+  let changed = false;
   [...refinedFrameIds].forEach(id => {
-    if (!known.has(id)) refinedFrameIds.delete(id);
+    if (!known.has(id)) {
+      refinedFrameIds.delete(id);
+      changed = true;
+    }
   });
+  if (changed) persistRefinedFrameIds(refinedFrameIds);
 }
 
 function renderPreviousButton(stageId) {
@@ -471,6 +505,23 @@ function persistStage(stageId) {
     localStorage.setItem(WORKFLOW_STORAGE_KEY, stageId);
   } catch {
     // Storage can be unavailable in private or embedded browsing contexts.
+  }
+}
+
+function loadRefinedFrameIds() {
+  try {
+    const value = JSON.parse(localStorage.getItem(REFINED_STORAGE_KEY) || '[]');
+    return new Set(Array.isArray(value) ? value.filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistRefinedFrameIds(frameIds) {
+  try {
+    localStorage.setItem(REFINED_STORAGE_KEY, JSON.stringify([...frameIds]));
+  } catch {
+    // Ignore unavailable storage.
   }
 }
 
