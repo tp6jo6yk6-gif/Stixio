@@ -19,6 +19,7 @@ async function main() {
   await import('./apply-workshop-interaction-performance-fix.mjs');
   await import('./apply-workshop-interaction-approval-race-fix.mjs');
   await import('./apply-project-blob-assets-fix.mjs');
+  await import('./apply-project-blob-node-compat-fix.mjs');
   await import('./apply-large-project-performance-fix.mjs');
 
   const source = await readFile(path, 'utf8');
