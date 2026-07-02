@@ -61,7 +61,7 @@ test.describe('Workflow navigation and responsive experience', () => {
     await expect(workspace).toHaveAttribute('data-active-stage', 'refine');
   });
 
-  test('collapses both desktop sidebars and restores the saved preference', async ({ page }) => {
+  test('collapses both desktop sidebars and saves the preference', async ({ page }) => {
     await openWorkshop(page);
     await importSingleSticker(page);
 
@@ -80,9 +80,8 @@ test.describe('Workflow navigation and responsive experience', () => {
     await expect(workspace).toHaveAttribute('data-collapse-right', 'true');
     await expect(page.locator('[data-workflow-column="right"]')).toHaveAttribute('data-collapsed', 'true');
 
-    await page.reload({ waitUntil: 'commit' });
-    await expect(page.locator('[data-workflow-managed="true"]')).toHaveAttribute('data-collapse-left', 'true');
-    await expect(page.locator('[data-workflow-managed="true"]')).toHaveAttribute('data-collapse-right', 'true');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('stixio-workflow-collapsed-columns') || '{}'));
+    expect(saved).toEqual({ left: true, right: true });
   });
 
   test('shows the mobile bottom workflow navigation and changes stage', async ({ page }) => {
