@@ -30,24 +30,16 @@ if (!refreshPattern.test(source)) {
 
 const safeRefresh = `${marker}
 function refresh(){
-  drawSourceCanvas();
-  drawRefineCanvas();
-  renderSourceList();
-
   if(!frames().length){
-    renderReviewGrid();
-    renderLargeReview();
-    renderSelectedInfo();
-    renderEmptyReviewState();
-    refreshReviewControls();
-    refreshMaskToolButtons();
-    refreshMaskHistoryButtons();
-    updateRefineTransform();
-    updateReviewTransform();
-    refreshCommonControls();
+    document.documentElement.dataset.stixioBootStage='refresh-empty';
+    renderEmptyWorkspace();
     return;
   }
 
+  document.documentElement.dataset.stixioBootStage='refresh-full';
+  drawSourceCanvas();
+  drawRefineCanvas();
+  renderSourceList();
   renderReviewGrid();
   renderLargeReview();
   renderSelectedInfo();
@@ -64,7 +56,7 @@ function refresh(){
   refreshCommonControls();
 }
 
-function renderEmptyReviewState(){
+function renderEmptyWorkspace(){
   state.reviewReport={
     issues:[],
     summary:{total:0,errors:0,warnings:0,info:0},
@@ -72,6 +64,27 @@ function renderEmptyReviewState(){
     canPackage:false,
     packagePlan:null
   };
+
+  const sourceList=document.getElementById('sourceList');
+  if(sourceList)sourceList.innerHTML='<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-400">尚無原圖</div>';
+
+  const selectedInfo=document.getElementById('selectedInfo');
+  if(selectedInfo)selectedInfo.textContent='尚未選取';
+
+  const reviewGrid=document.getElementById('reviewGrid');
+  if(reviewGrid)reviewGrid.innerHTML='<div class="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-400">尚無貼圖</div>';
+
+  const reviewImage=document.getElementById('reviewHeroImage');
+  if(reviewImage)reviewImage.removeAttribute('src');
+
+  const reviewGuide=document.getElementById('reviewSafeGuide');
+  if(reviewGuide)reviewGuide.classList.add('hidden');
+
+  const reviewBounds=document.getElementById('reviewContentBounds');
+  if(reviewBounds)reviewBounds.classList.add('hidden');
+
+  const reviewMeta=document.getElementById('reviewHeroMeta');
+  if(reviewMeta)reviewMeta.innerHTML='<div class="text-slate-400">尚無預覽</div>';
 
   const summary=document.getElementById('reviewSummary');
   if(summary)summary.innerHTML='<div class="rounded-2xl bg-white/10 p-3 text-xs text-slate-400">尚無可檢查貼圖</div>';
@@ -85,9 +98,18 @@ function renderEmptyReviewState(){
   const progress=document.getElementById('reviewProgressBar');
   if(progress)progress.innerHTML='<div class="flex items-center justify-between text-xs font-black"><span>已核准 0/0</span><span>0%</span></div><div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-100"></div>';
 
-  if(document.documentElement.dataset.stixioReady==='true'){
-    state.packageController?.refresh();
-    state.projectController?.refresh();
+  const sourceStatus=document.getElementById('sourceStatus');
+  if(sourceStatus)sourceStatus.textContent='尚未匯入';
+
+  const undoBtn=document.getElementById('undoBtn');
+  const redoBtn=document.getElementById('redoBtn');
+  const exportBtn=document.getElementById('exportZipBtn');
+  if(undoBtn)undoBtn.disabled=true;
+  if(redoBtn)redoBtn.disabled=true;
+  if(exportBtn){
+    exportBtn.disabled=true;
+    exportBtn.classList.add('opacity-40');
+    exportBtn.title='尚未匯入貼圖';
   }
 }
 
