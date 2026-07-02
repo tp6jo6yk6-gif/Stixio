@@ -1,0 +1,49 @@
+name: Debug unit test output
+
+on:
+  push:
+    branches:
+      - release/1.0.0
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/1.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Capture tests
+        shell: bash
+        run: |
+          set +e
+          npm test > unit-test-output.txt 2>&1
+          echo $? > unit-test-exit-code.txt
+          exit 0
+
+      - name: Upload test output
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-unit-test-output
+          path: |
+            unit-test-output.txt
+            unit-test-exit-code.txt
+          if-no-files-found: error
+          retention-days: 2
