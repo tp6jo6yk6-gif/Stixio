@@ -1,0 +1,181 @@
+name: Stixio 1.0.0 Release Readiness
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stixio-1.0.0-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-readiness:
+    name: release-readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install and build release assets
+        run: npm ci
+
+      - name: Verify release version contract
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const versions = [pkg.version, lock.version, lock.packages?.['']?.version];
+          if (versions.some(version => version !== '1.0.0')) {
+            throw new Error(`Release versions are not synchronized: ${versions.join(', ')}`);
+          }
+          NODE
+          grep -q 'meta name="stixio-version" content="1.0.0"' index.html
+          grep -q 'stixio-workshop-1.0.0.js' index.html
+
+      - name: Unit tests and production build
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee release-unit.log
+          npm run build 2>&1 | tee release-build.log
+
+      - name: Verify production bundle and local runtime
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const required = [
+            'dist/public/app/stixio-workshop-1.0.0.js',
+            'dist/public/app/stixio-workshop-1.0.0.js.map',
+            'dist/public/vendor/tailwind-3.4.17.css',
+            'dist/public/vendor/jszip-3.10.1.min.js'
+          ];
+          for (const path of required) {
+            if (!fs.existsSync(path) || fs.statSync(path).size === 0) throw new Error(`Missing release asset: ${path}`);
+          }
+          const index = fs.readFileSync('dist/index.html', 'utf8');
+          if (!index.includes('stixio-workshop-1.0.0.js')) throw new Error('Release bundle is not referenced.');
+          if (index.includes('tailwindcss-browser')) throw new Error('Tailwind browser runtime remains.');
+          if (index.includes("import('./src/") || index.includes('import("./src/')) throw new Error('Unbundled runtime imports remain.');
+          const blockedHosts = ['cdn.tailwindcss.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com'];
+          if (blockedHosts.some(host => index.includes(host))) throw new Error('A runtime CDN dependency remains.');
+          NODE
+
+      - name: Install Chromium Firefox and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Cross-browser release smoke
+        run: npm run test:e2e:smoke
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stixio-1.0.0-release-readiness
+          path: |
+            release-unit.log
+            release-build.log
+            dist
+            playwright-report-smoke
+            test-results
+            docs/RELEASE-NOTES-1.0.0.md
+            docs/USER-TEST-SIGNOFF.md
+          if-no-files-found: ignore
+          retention-days: 90
+
+  rollback-rehearsal:
+    name: rollback-rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Build and fingerprint candidate
+        run: |
+          npm ci
+          npm run build
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > candidate-first.sha256
+
+      - name: Build rollback reference
+        env:
+          ROLLBACK_SHA: ${{ github.event.pull_request.base.sha || '63b7ac73de0de68e3e994551b0558e8c1a5e3b7c' }}
+        run: |
+          set -o pipefail
+          git fetch --no-tags --depth=1 origin "$ROLLBACK_SHA"
+          git checkout --detach FETCH_HEAD
+          npm ci 2>&1 | tee rollback-install.log
+          npm test 2>&1 | tee rollback-unit.log
+          npm run build 2>&1 | tee rollback-build.log
+          test -s dist/index.html
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > rollback-reference.sha256
+
+      - name: Restore and verify candidate
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$CANDIDATE_SHA"
+          git checkout --detach FETCH_HEAD
+          npm ci
+          npm run build
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > candidate-restored.sha256
+          diff -u candidate-first.sha256 candidate-restored.sha256
+          test -s dist/public/app/stixio-workshop-1.0.0.js
+
+      - name: Upload rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stixio-1.0.0-rollback-rehearsal
+          path: |
+            candidate-first.sha256
+            candidate-restored.sha256
+            rollback-reference.sha256
+            rollback-install.log
+            rollback-unit.log
+            rollback-build.log
+            docs/ROLLBACK-1.0.0.md
+          if-no-files-found: ignore
+          retention-days: 90
+
+  real-user-signoff:
+    name: real-user-signoff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Require real-user approval
+        run: |
+          if ! grep -Fq 'Decision: **APPROVED**' docs/USER-TEST-SIGNOFF.md; then
+            echo 'Stixio 1.0.0 remains blocked until real-user Beta testing is recorded and approved.'
+            exit 1
+          fi
+          if grep -Eq '^\| Pending ' docs/USER-TEST-SIGNOFF.md; then
+            echo 'Real-user test rows are still pending.'
+            exit 1
+          fi

@@ -10,9 +10,13 @@ async function text(path) {
 
 test('index.html is the only executable Workshop entry', async () => {
   const index = await text('index.html');
-  assert.match(index, /initStixioWorkshop/);
-  assert.match(index, /src\/ui\/stixio-workshop-app-v2\.js/);
-  assert.doesNotMatch(index, /initStixioApp/);
+  const entry = await text('src/ui/stixio-browser-entry.js');
+  assert.match(index, /public\/app\/stixio-workshop-1\.0\.0\.js/);
+  assert.doesNotMatch(index, /type="module"/);
+  assert.doesNotMatch(index, /src\/ui\/stixio-workshop-app-v2\.js/);
+  assert.match(entry, /initStixioWorkshop/);
+  assert.match(entry, /stixioReady/);
+  assert.doesNotMatch(entry, /initStixioApp/);
 });
 
 test('legacy entry URLs only redirect to index.html', async () => {
@@ -27,4 +31,5 @@ test('legacy entry URLs only redirect to index.html', async () => {
 test('retired duplicate UI implementation is removed', async () => {
   await assert.rejects(access(new URL('src/ui/stixio-app.js', root)));
   await access(new URL('src/ui/stixio-workshop-app-v2.js', root));
+  await access(new URL('src/ui/stixio-browser-entry.js', root));
 });

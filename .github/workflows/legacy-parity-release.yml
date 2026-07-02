@@ -21,7 +21,7 @@ permissions:
 jobs:
   release-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Install dependencies
+      - name: Install dependencies and compile local assets
         run: npm ci
       - name: Unit tests, static build, and Legacy fingerprint
         run: |
@@ -40,8 +40,18 @@ jobs:
             npm run build
             npm run parity:extract
           } 2>&1 | tee rc-unit-build.log
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Verify compiled local runtime and PWA assets
+        run: |
+          test -s public/vendor/tailwind-3.4.17.css
+          test -s public/vendor/jszip-3.10.1.min.js
+          test -s public/icons/stixio-icon.svg
+          test -s public/icons/stixio-maskable.svg
+          grep -q '.sticky' public/vendor/tailwind-3.4.17.css
+          ! grep -Eiq 'tailwindcss-browser|https://(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)' dist/index.html
+      - name: Install Chromium Firefox and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Cross-browser Beta smoke
+        run: npm run test:e2e:smoke
       - name: Prepare Layout acceptance harness
         run: |
           node scripts/apply-layout-e2e-harness.mjs
@@ -69,6 +79,10 @@ jobs:
             parity-results
             rc-unit-build.log
             playwright-report
+            playwright-report-smoke
             test-results
+            dist/manifest.json
+            dist/public/icons
+            dist/public/vendor/tailwind-3.4.17.css
           if-no-files-found: ignore
           retention-days: 30

@@ -1,15 +1,16 @@
-name: Build Stixio Preview Artifact
+name: Deploy Stixio to GitHub Pages
 
 on:
   push:
     branches:
+      - release/1.0.0
       - main
     paths:
       - 'index.html'
       - 'manifest.json'
       - 'src/**'
       - 'public/**'
-      - 'scripts/build-static.js'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/deploy-pages.yml'
@@ -17,13 +18,15 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: preview-artifact
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
-  build-preview:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,26 +35,39 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build static preview
+      - name: Build production site
         run: npm run build
 
-      - name: Validate preview entry
+      - name: Verify Pages output
         run: |
           test -f dist/index.html
-          test -f dist/src/ui/stixio-workshop-app-v2.js
-          grep -q "initStixioWorkshop" dist/index.html
-          grep -q "DESTINATION_RULES_FULL_COMPLETION" dist/src/ui/stixio-workshop-app-v2.js
+          test -f dist/public/app/stixio-workshop-1.0.0.js
+          test -f dist/public/vendor/jszip-3.10.1.min.js
+          test -f dist/public/vendor/tailwind-3.4.17.css
 
-      - name: Upload preview artifact
-        uses: actions/upload-artifact@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          name: stixio-workshop-preview
-          path: dist
-          if-no-files-found: error
-          retention-days: 14
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+# Re-trigger deployment after switching Pages source to GitHub Actions.

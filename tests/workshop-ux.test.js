@@ -58,9 +58,14 @@ test('UX controller includes viewport, workspace and theme behavior', async () =
   }
 });
 
-test('production entry enables both Workshop and UX controllers', async () => {
+test('production entry bundles Workshop, UX, bridge, and diagnostics', async () => {
   const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(index, /initStixioWorkshop/);
-  assert.match(index, /enhanceWorkshopUx/);
-  assert.match(index, /bridgeWorkshopLegacyControls/);
+  const entry = await readFile(new URL('../src/ui/stixio-browser-entry.js', import.meta.url), 'utf8');
+  assert.match(index, /public\/app\/stixio-workshop-1\.0\.0\.js/);
+  assert.doesNotMatch(index, /import\(['"]\.\/src\//);
+  assert.match(entry, /initStixioWorkshop/);
+  assert.match(entry, /enhanceWorkshopUx/);
+  assert.match(entry, /bridgeWorkshopLegacyControls/);
+  assert.match(entry, /installBetaHardening/);
+  assert.match(entry, /stixioReady/);
 });
