@@ -23,7 +23,7 @@ async function main() {
 
   const refreshAfter = `${marker}
 function refresh(){
-  if(!frames().length){
+  if(state.sources.size===0){
     state.reviewReport={issues:[],summary:{total:0,errors:0,warnings:0,info:0},ready:false,canPackage:false,packagePlan:null};
     const values=[
       ['sourceList','<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-400">尚無原圖</div>'],
