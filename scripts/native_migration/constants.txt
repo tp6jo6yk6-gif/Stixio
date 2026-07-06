@@ -1,0 +1,27 @@
+const DEFAULT_MAX_FILE_SIZE_KB = 1000;
+
+// NATIVE_WORKSPACE_RENDERING
+const WORKFLOW_STORAGE_KEY = 'stixio-active-workflow-stage';
+const WORKFLOW_STAGES = Object.freeze([
+  { id: 'layout', step: '01', label: 'IMPORT', title: '匯入與切割', description: '匯入圖片並建立貼圖裁切範圍', accent: 'emerald' },
+  { id: 'refine', step: '02', label: 'REFINE', title: '去背與修圖', description: '清除背景並修補貼圖邊緣', accent: 'rose' },
+  { id: 'review', step: '03', label: 'REVIEW', title: '檢查與核准', description: '預覽成品並確認輸出品質', accent: 'sky' },
+  { id: 'package', step: '04', label: 'EXPORT', title: '打包與下載', description: '建立並下載完整貼圖包', accent: 'amber' }
+]);
+const WORKFLOW_STAGE_IDS = new Set(WORKFLOW_STAGES.map(stage => stage.id));
+
+function resolveInitialEditor() {
+  if (typeof location !== 'undefined') {
+    const hashStage = String(location.hash || '').replace(/^#/, '').replace(/^workflow-/, '').replace(/^stage-/, '');
+    if (WORKFLOW_STAGE_IDS.has(hashStage)) return hashStage;
+  }
+  try {
+    const stored = globalThis.localStorage?.getItem(WORKFLOW_STORAGE_KEY);
+    if (WORKFLOW_STAGE_IDS.has(stored)) return stored;
+  } catch {}
+  return 'layout';
+}
+
+function createWorkspaceViewState() {
+  return Object.fromEntries(WORKFLOW_STAGES.map(stage => [stage.id, { leftCollapsed: false, rightCollapsed: false }]));
+}
