@@ -42,17 +42,21 @@ jobs:
       - name: Workflow browser tests
         run: npm run test:e2e:workflow
 
-      - name: Validate Beta build
+      - name: Validate Native Beta build
         run: |
           test -f dist/index.html
           test -f dist/_headers
           test -f dist/public/robots.txt
-          test -f dist/src/ui/workshop-tabs-v4.js
-          grep -q 'workflow-tabs-v4' dist/index.html
-          grep -q 'enhanceWorkshopTabsV4' dist/index.html
-          grep -q 'workflow-tab-active' dist/src/ui/workshop-tabs-v4.js
-          grep -q 'workflowManaged' dist/src/ui/workshop-tabs-v4.js
-          grep -q 'data-mobile-workflow-nav' dist/src/ui/workshop-tabs-v4.js
+          test -f dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'native-workspaces-v1' dist/index.html
+          grep -q 'NATIVE_WORKSPACE_RENDERING' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'renderActiveWorkspace' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'renderLayoutWorkspace' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'renderRefineWorkspace' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'renderReviewWorkspace' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'renderPackageWorkspace' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'getWorkflowProgress' dist/src/ui/stixio-workshop-app-v2.js
+          grep -q 'data-native-workflow' dist/src/ui/stixio-workshop-app-v2.js
 
       - name: Validate Cloudflare credentials
         env:
