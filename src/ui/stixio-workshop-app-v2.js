@@ -1,15 +1,51 @@
-import { bootNativeWorkshop } from './native-workspace-runtime.js';
+// NATIVE_WORKSPACE_RENDERING
+import { migrateWorkshopSource, rewriteWorkshopImports } from './native-workspace-migrator.js';
+
+const BUILD_ID = 'native-workspaces-v1';
+const SOURCE_URL = new URL('./stixio-workshop-app-v2.backup.js', import.meta.url);
+const CONSTANTS_URL = new URL('../../scripts/native_migration/constants.txt', import.meta.url);
+const RENDERER_URL = new URL('../../scripts/native_migration/render_block.txt', import.meta.url);
+
+let nativeModulePromise;
 
 export async function initStixioWorkshop(root = document.getElementById('app')) {
   if (!root) throw new Error('Stixio root element not found.');
-  root.dataset.stixioBuild = 'native-workspaces-v1';
+  root.dataset.stixioBuild = BUILD_ID;
   try {
-    return await bootNativeWorkshop(root);
+    const nativeModule = await loadNativeModule();
+    return nativeModule.initStixioWorkshop(root);
   } catch (error) {
     console.error('Stixio native Workspace bootstrap failed.', error);
     root.innerHTML = renderBootstrapError(error);
     throw error;
   }
+}
+
+async function loadNativeModule() {
+  if (!nativeModulePromise) nativeModulePromise = createNativeModule();
+  return nativeModulePromise;
+}
+
+async function createNativeModule() {
+  const [source, constants, renderer] = await Promise.all([
+    fetchText(SOURCE_URL),
+    fetchText(CONSTANTS_URL),
+    fetchText(RENDERER_URL)
+  ]);
+  const migrated = migrateWorkshopSource(source, { constants, renderer });
+  const executable = rewriteWorkshopImports(migrated, import.meta.url);
+  const moduleUrl = URL.createObjectURL(new Blob([`${executable}\n//# sourceURL=stixio-native-workspaces.js`], { type: 'text/javascript' }));
+  try {
+    return await import(moduleUrl);
+  } finally {
+    URL.revokeObjectURL(moduleUrl);
+  }
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Unable to load ${url.pathname}: HTTP ${response.status}`);
+  return response.text();
 }
 
 function renderBootstrapError(error) {
