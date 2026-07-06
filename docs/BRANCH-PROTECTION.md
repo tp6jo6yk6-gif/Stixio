@@ -47,4 +47,6 @@ Confirm that required status checks are strict, administrator enforcement is ena
 
 ## Release evidence
 
-Record the date, operator, and returned protection summary in PR #20 before changing the pull request from Draft to Ready for review.
+- 2026-07-06 17:30 Asia/Taipei — Weizhe / JOE reported that `main` branch protection was confirmed against `.github/branch-protection-main.json`.
+- Required checks confirmed in the release record: `test-build`, `smoke`, `release-readiness`, `rollback-rehearsal`, `real-user-signoff`.
+- This document records user-reported verification evidence only. The release PR must still show the required checks as green before publication.
