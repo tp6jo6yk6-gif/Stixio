@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { installRuntimeZip } from './helpers/runtime-zip.js';
 
 const outputDir = new URL('../../parity-results/', import.meta.url);
 const stressResults = [];
+const NON_VIRTUAL_REVIEW_CARD_LIMIT = 48;
 
 function gridSvg(rows, cols, cell = 120) {
   const width = cols * cell;
@@ -27,74 +29,40 @@ function singleSvg(index) {
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="white"/><rect x="35" y="35" width="230" height="230" rx="35" fill="hsl(${hue} 75% 55%)"/><text x="150" y="170" text-anchor="middle" font-size="72" font-family="sans-serif" fill="white">${index + 1}</text></svg>`);
 }
 
-async function installRuntime(page) {
-  await page.addInitScript(() => {
-    const toBase64 = bytes => {
-      let binary = '';
-      const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-      for (const byte of view) binary += String.fromCharCode(byte);
-      return btoa(binary);
-    };
-    const fromBase64 = value => Uint8Array.from(atob(value), character => character.charCodeAt(0));
-    class RuntimeZipFile {
-      constructor(entry) { this.entry = entry; this.dir = false; }
-      async async(type) {
-        const bytes = this.entry.kind === 'text' ? new TextEncoder().encode(this.entry.value) : fromBase64(this.entry.value);
-        if (type === 'string') return this.entry.kind === 'text' ? this.entry.value : new TextDecoder().decode(bytes);
-        if (type === 'base64') return toBase64(bytes);
-        if (type === 'uint8array') return bytes;
-        return bytes.buffer;
-      }
-    }
-    class RuntimeZip {
-      constructor() { this.entries = {}; this.files = {}; }
-      file(path, value, options = {}) {
-        if (arguments.length === 1) return this.files[path] || null;
-        const entry = typeof value === 'string' && !options.base64
-          ? { kind: 'text', value }
-          : { kind: 'base64', value: typeof value === 'string' ? value : toBase64(value) };
-        this.entries[path] = entry;
-        this.files[path] = new RuntimeZipFile(entry);
-        return this;
-      }
-      async generateAsync(_options, onUpdate) {
-        const paths = Object.keys(this.entries);
-        onUpdate?.({ percent: 25, currentFile: paths[0] || null });
-        onUpdate?.({ percent: 100, currentFile: paths.at(-1) || null });
-        return new Blob([JSON.stringify(this.entries)], { type: 'application/zip' });
-      }
-      async loadAsync(blob) {
-        const entries = JSON.parse(await blob.text());
-        const archive = new RuntimeZip();
-        archive.entries = entries;
-        archive.files = Object.fromEntries(Object.entries(entries).map(([path, entry]) => [path, new RuntimeZipFile(entry)]));
-        return archive;
-      }
-    }
-    window.JSZip = RuntimeZip;
-    window.lucide = { createIcons() {} };
-  });
-  await page.route(/cdn\.tailwindcss\.com/, route => route.fulfill({ contentType: 'application/javascript', body: 'window.tailwind={};' }));
-  await page.route(/unpkg\.com\/lucide/, route => route.fulfill({ contentType: 'application/javascript', body: 'window.lucide={createIcons(){}};' }));
-  await page.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/jszip/, route => route.fulfill({ contentType: 'application/javascript', body: '' }));
-}
-
 async function openWorkshop(browser) {
   const context = await browser.newContext({ viewport: { width: 1600, height: 1100 }, acceptDownloads: true });
   const page = await context.newPage();
-  await installRuntime(page);
+  await installRuntimeZip(page);
   await page.goto('/tests/fixtures/layout-harness.html', { waitUntil: 'commit' });
   await page.waitForSelector('#fileInput', { state: 'attached' });
   return { context, page };
 }
 
+async function waitForVisibleReviewImages(page, expectedVisible = null) {
+  const renderedImageCount = () => page.locator('[data-review-card="true"] img').evaluateAll(images =>
+    images.filter(image => image.complete && image.naturalWidth > 0).length
+  );
+
+  await expect.poll(renderedImageCount, { timeout: 120000 }).toBeGreaterThan(0);
+  if (expectedVisible !== null) await expect.poll(renderedImageCount, { timeout: 120000 }).toBe(expectedVisible);
+}
+
 async function importCustomGrid(page, rows, cols, name) {
+  const expected = rows * cols;
   await page.locator('[data-layout="custom"]').click();
   await page.locator('#rowsInput').fill(String(rows));
   await page.locator('#colsInput').fill(String(cols));
   await page.locator('#fileInput').setInputFiles({ name, mimeType: 'image/svg+xml', buffer: gridSvg(rows, cols) });
-  await expect(page.locator('[data-review-card="true"]')).toHaveCount(rows * cols, { timeout: 120000 });
-  await page.waitForFunction(expected => [...document.querySelectorAll('[data-review-card="true"] img')].filter(image => image.complete && image.naturalWidth > 0).length === expected, rows * cols, { timeout: 120000 });
+  await expect(page.locator('#sourceStatus')).toContainText(`${expected} Frames`, { timeout: 120000 });
+
+  const cards = page.locator('[data-review-card="true"]');
+  if (expected <= NON_VIRTUAL_REVIEW_CARD_LIMIT) {
+    await expect(cards).toHaveCount(expected, { timeout: 120000 });
+    await waitForVisibleReviewImages(page, expected);
+  } else {
+    await expect(cards.first()).toBeVisible({ timeout: 120000 });
+    await waitForVisibleReviewImages(page);
+  }
 }
 
 async function parseArchive(download) {
@@ -159,7 +127,7 @@ for (const scenario of [
       const renderedAt = Date.now();
       await app.page.locator('#packageAutoRolesBtn').click();
       await app.page.locator('#reviewApproveCleanBtn').click();
-      await expect(app.page.locator('[data-review-card="true"][data-review-approved="true"]')).toHaveCount(scenario.count, { timeout: 120000 });
+      await expect(app.page.locator('#reviewGateStatus')).toContainText(`${scenario.count}/${scenario.count}`, { timeout: 120000 });
       await expect(app.page.locator('#packageExportBtn')).toBeEnabled({ timeout: 120000 });
       const downloadPromise = app.page.waitForEvent('download');
       await app.page.locator('#packageExportBtn').click();
@@ -257,7 +225,7 @@ test('fifty Destination Profile switches never leave stale output dimensions', a
       const key = index % 2 === 0 ? 'messaging-big' : 'workshop-flexible';
       const expected = key === 'messaging-big' ? [396, 660] : [370, 320];
       await app.page.locator('#destinationProfileInput').selectOption(key);
-      await expect.poll(() => app.page.locator('[data-review-card="true"] img').evaluate(image => [image.naturalWidth, image.naturalHeight]), { timeout: 20000 }).toEqual(expected);
+      await expect.poll(() => app.page.locator('#refineOutputCanvas').evaluate(canvas => [canvas.width, canvas.height]), { timeout: 20000 }).toEqual(expected);
       observed.push(`${expected[0]}x${expected[1]}`);
     }
     expect(new Set(observed)).toEqual(new Set(['396x660', '370x320']));
