@@ -10,9 +10,9 @@ Record at least three real users who are not the primary implementer:
 
 | Tester | Environment | Typical workload | Date | Result | Evidence / issue |
 |---|---|---|---|---|---|
-| Pending | Chromium on Windows | Small project, 1–10 images | | | |
-| Pending | Firefox on Windows or macOS | Medium project, 10–40 outputs | | | |
-| Pending | Safari/WebKit on macOS | Project restore and package export | | | |
+| Weizhe | Chromium on Windows | Small project, 1-10 images | 2026-07-06 17:29 Asia/Taipei | Reported pass | User-reported Beta evidence supplied in ChatGPT. |
+| JOE | Firefox on Windows or macOS | Medium project, 10-40 outputs | 2026-07-06 17:29 Asia/Taipei | Reported pass | User-reported Beta evidence supplied in ChatGPT. |
+| Weizhe / JOE | Safari/WebKit on macOS | Project restore and package export | 2026-07-06 17:29 Asia/Taipei | Reported pass | User-reported Beta evidence supplied in ChatGPT. |
 
 ## Required scenarios
 
@@ -41,12 +41,12 @@ All blocker and high-severity issues must be fixed and retested before approval.
 
 ## Final approval
 
-- Open blocker issues: Pending
-- Open high-severity issues: Pending
+- Open blocker issues: Pending release-owner review of user-reported evidence
+- Open high-severity issues: Pending release-owner review of user-reported evidence
 - Medium-risk acceptance: Pending
 - Rollback rehearsal: Pending
-- Branch protection verified: Pending
-- Release owner: Pending
+- Branch protection verified: User-reported confirmation by Weizhe / JOE on 2026-07-06 17:30 Asia/Taipei
+- Release owner: JOE
 - Approval date: Pending
 - Decision: **BLOCKED**
 
