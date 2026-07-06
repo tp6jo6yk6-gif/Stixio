@@ -1,0 +1,137 @@
+name: Apply Native Workspaces
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-native-workspaces.yml
+      - scripts/native_migration/constants.txt
+      - scripts/native_migration/render_block.txt
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-native-workspaces
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply native Workspace migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path('src/ui/stixio-workshop-app-v2.js')
+          source = app.read_text()
+          marker = '// NATIVE_WORKSPACE_RENDERING'
+          if marker in source:
+              print('Migration already applied')
+              raise SystemExit(0)
+
+          def once(old, new, label):
+              global source
+              count = source.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected 1 match, found {count}')
+              source = source.replace(old, new, 1)
+
+          constants = Path('scripts/native_migration/constants.txt').read_text().rstrip()
+          renderer = Path('scripts/native_migration/render_block.txt').read_text().rstrip() + '\n\n'
+          once('const DEFAULT_MAX_FILE_SIZE_KB = 1000;', constants, 'constants')
+          once("  activeEditor: 'layout',", "  activeEditor: resolveInitialEditor(),\n  workspaceView: createWorkspaceViewState(),", 'state')
+
+          start = source.index('function renderShell() {')
+          end = source.index('function renderImportPanel() {', start)
+          source = source[:start] + renderer + source[end:]
+          once('function bindStaticEvents(root) {', 'function bindAllWorkspaceEvents(root) {', 'event rename')
+
+          wrapper = '''function bindStaticEvents(root) {
+            bindWorkflowNavigationEvents(root);
+            if (state.activeEditor === 'layout') bindLayoutEvents(root);
+            if (state.activeEditor === 'refine') bindRefineEvents(root);
+            if (state.activeEditor === 'review') bindReviewEvents(root);
+            if (state.activeEditor === 'package') bindPackageEvents(root);
+          }
+
+          function bindWorkflowNavigationEvents(root) {
+            if (root.dataset.nativeWorkflowEvents === 'ready') return;
+            root.dataset.nativeWorkflowEvents = 'ready';
+            root.addEventListener('click', event => {
+              const stage = event.target.closest?.('[data-workflow-stage]');
+              if (stage && root.contains(stage)) { event.preventDefault(); setActiveEditor(stage.dataset.workflowStage); return; }
+              const move = event.target.closest?.('[data-workflow-direction]');
+              if (move && root.contains(move)) {
+                event.preventDefault();
+                const index = WORKFLOW_STAGES.findIndex(item => item.id === state.activeEditor);
+                const next = WORKFLOW_STAGES[index + (move.dataset.workflowDirection === 'previous' ? -1 : 1)];
+                if (next) setActiveEditor(next.id);
+                return;
+              }
+              const collapse = event.target.closest?.('[data-workflow-collapse]');
+              if (collapse && root.contains(collapse)) { event.preventDefault(); toggleWorkspaceColumn(collapse.dataset.workflowCollapse); return; }
+              const empty = event.target.closest?.('[data-workflow-empty-action]');
+              if (!empty || !root.contains(empty)) return;
+              event.preventDefault();
+              if (empty.dataset.workflowEmptyAction === 'file') root.querySelector('#fileInput')?.click();
+              else setActiveEditor(empty.dataset.workflowEmptyAction);
+            });
+          }
+
+          function bindLayoutEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
+          function bindRefineEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
+          function bindReviewEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
+          function bindPackageEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
+
+          function createSafeEventRoot(root) {
+            return {
+              querySelector(selector) { return root.querySelector(selector) || NULL_WORKSPACE_CONTROL; },
+              querySelectorAll(selector) { return root.querySelectorAll(selector); }
+            };
+          }
+
+          const NULL_WORKSPACE_CONTROL = Object.freeze({
+            addEventListener() {}, setPointerCapture() {},
+            classList: Object.freeze({ add() {}, remove() {}, toggle() {} }),
+            dataset: Object.freeze({}), style: Object.freeze({}),
+            value: '', checked: false, disabled: false, textContent: ''
+          });
+
+          '''
+          once('// DESTINATION_RULES_FULL_COMPLETION', wrapper + '// DESTINATION_RULES_FULL_COMPLETION', 'event wrapper')
+          once("openFrame:frameId=>{selectFrame(frameId);state.activeEditor='review';refresh();document.getElementById('stage-review')?.scrollIntoView({behavior:'smooth',block:'start'});},", "openFrame:frameId=>{selectFrame(frameId);setActiveEditor('review');},", 'review navigation')
+          once("if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);}", "if(redoBtn)redoBtn.disabled=!canRedo(state.frameHistory);refreshWorkflowProgress();}", 'progress refresh')
+          app.write_text(source)
+
+          index = Path('index.html')
+          html = index.read_text().replace('workflow-tabs-v4', 'native-workspaces-v1')
+          html = html.replace("import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js';", "import { initStixioWorkshop } from './src/ui/stixio-workshop-app-v2.js?v=native-workspaces-v1';")
+          html = html.replace("    import { enhanceWorkshopTabsV4 } from './src/ui/workshop-tabs-v4.js?v=20260702-4';\n", '')
+          html = html.replace('    enhanceWorkshopTabsV4(root);\n', '')
+          index.write_text(html)
+          PY
+      - name: Validate migration
+        run: |
+          node --check src/ui/stixio-workshop-app-v2.js
+          npm ci
+          npm test
+          npm run build
+          grep -q 'NATIVE_WORKSPACE_RENDERING' src/ui/stixio-workshop-app-v2.js
+          grep -q 'renderLayoutWorkspace' src/ui/stixio-workshop-app-v2.js
+          grep -q 'bindLayoutEvents' src/ui/stixio-workshop-app-v2.js
+          grep -q 'native-workspaces-v1' index.html
+      - name: Commit migrated core
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/ui/stixio-workshop-app-v2.js index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'refactor: make activeEditor own native workspaces'
+          git push
