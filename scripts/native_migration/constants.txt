@@ -1,7 +1,7 @@
 const DEFAULT_MAX_FILE_SIZE_KB = 1000;
 
 // NATIVE_WORKSPACE_RENDERING
-// Triggered migration revision: 1
+// Triggered migration revision: 2
 const WORKFLOW_STORAGE_KEY = 'stixio-active-workflow-stage';
 const WORKFLOW_STAGES = Object.freeze([
   { id: 'layout', step: '01', label: 'IMPORT', title: '匯入與切割', description: '匯入圖片並建立貼圖裁切範圍', accent: 'emerald' },
