@@ -2,7 +2,7 @@ name: Run Native Workspaces On Issue
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited, reopened]
 
 permissions:
   contents: write
