@@ -1,4 +1,17 @@
+import { COMMON_WORKSPACE_EVENTS } from './native-workspace-events-common.js';
+import { LAYOUT_WORKSPACE_EVENTS } from './native-workspace-events-layout.js';
+import { REFINE_WORKSPACE_EVENTS } from './native-workspace-events-refine.js';
+import { REVIEW_WORKSPACE_EVENTS } from './native-workspace-events-review.js';
+import { PACKAGE_WORKSPACE_EVENTS } from './native-workspace-events-package.js';
+
 const NATIVE_MARKER = '// NATIVE_WORKSPACE_RENDERING';
+const STAGE_EVENT_BINDINGS = [
+  COMMON_WORKSPACE_EVENTS,
+  LAYOUT_WORKSPACE_EVENTS,
+  REFINE_WORKSPACE_EVENTS,
+  REVIEW_WORKSPACE_EVENTS,
+  PACKAGE_WORKSPACE_EVENTS
+].join('');
 
 export function migrateWorkshopSource(source, { constants, renderer }) {
   if (typeof source !== 'string' || !source.trim()) throw new TypeError('Workshop source is required.');
@@ -21,11 +34,11 @@ export function migrateWorkshopSource(source, { constants, renderer }) {
     `${renderer.trimEnd()}\n\n`,
     'native Workspace renderer'
   );
-  next = replaceExactlyOnce(next, 'function bindStaticEvents(root) {', 'function bindAllWorkspaceEvents(root) {', 'legacy event binder');
-  next = replaceExactlyOnce(
+  next = replaceBetween(
     next,
+    'function bindStaticEvents(root) {',
     '// DESTINATION_RULES_FULL_COMPLETION',
-    `${renderStageEventBindings()}// DESTINATION_RULES_FULL_COMPLETION`,
+    STAGE_EVENT_BINDINGS,
     'stage event bindings'
   );
   next = replaceExactlyOnce(
@@ -67,74 +80,4 @@ function replaceBetween(source, startMarker, endMarker, replacement, label) {
   if (start < 0 || end < 0) throw new Error(`${label}: anchors not found.`);
   if (source.indexOf(startMarker, start + startMarker.length) >= 0) throw new Error(`${label}: start anchor is not unique.`);
   return source.slice(0, start) + replacement + source.slice(end);
-}
-
-function renderStageEventBindings() {
-  return `function bindStaticEvents(root) {
-  bindWorkflowNavigationEvents(root);
-  if (state.activeEditor === 'layout') bindLayoutEvents(root);
-  if (state.activeEditor === 'refine') bindRefineEvents(root);
-  if (state.activeEditor === 'review') bindReviewEvents(root);
-  if (state.activeEditor === 'package') bindPackageEvents(root);
-}
-
-function bindWorkflowNavigationEvents(root) {
-  if (root.dataset.nativeWorkflowEvents === 'ready') return;
-  root.dataset.nativeWorkflowEvents = 'ready';
-  root.addEventListener('click', event => {
-    const stage = event.target.closest?.('[data-workflow-stage]');
-    if (stage && root.contains(stage)) {
-      event.preventDefault();
-      setActiveEditor(stage.dataset.workflowStage);
-      return;
-    }
-    const move = event.target.closest?.('[data-workflow-direction]');
-    if (move && root.contains(move)) {
-      event.preventDefault();
-      const index = WORKFLOW_STAGES.findIndex(item => item.id === state.activeEditor);
-      const direction = move.dataset.workflowDirection === 'previous' ? -1 : 1;
-      const target = WORKFLOW_STAGES[index + direction];
-      if (target) setActiveEditor(target.id);
-      return;
-    }
-    const collapse = event.target.closest?.('[data-workflow-collapse]');
-    if (collapse && root.contains(collapse)) {
-      event.preventDefault();
-      toggleWorkspaceColumn(collapse.dataset.workflowCollapse);
-      return;
-    }
-    const empty = event.target.closest?.('[data-workflow-empty-action]');
-    if (!empty || !root.contains(empty)) return;
-    event.preventDefault();
-    const action = empty.dataset.workflowEmptyAction;
-    if (action === 'file') root.querySelector('#fileInput')?.click();
-    else setActiveEditor(action);
-  });
-}
-
-function bindLayoutEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
-function bindRefineEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
-function bindReviewEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
-function bindPackageEvents(root) { bindAllWorkspaceEvents(createSafeEventRoot(root)); }
-
-function createSafeEventRoot(root) {
-  return {
-    querySelector(selector) { return root.querySelector(selector) || NULL_WORKSPACE_CONTROL; },
-    querySelectorAll(selector) { return root.querySelectorAll(selector); }
-  };
-}
-
-const NULL_WORKSPACE_CONTROL = Object.freeze({
-  addEventListener() {},
-  setPointerCapture() {},
-  classList: Object.freeze({ add() {}, remove() {}, toggle() {} }),
-  dataset: Object.freeze({}),
-  style: Object.freeze({}),
-  value: '',
-  checked: false,
-  disabled: false,
-  textContent: ''
-});
-
-`;
 }
