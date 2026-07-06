@@ -1,0 +1,23 @@
+name: Trigger Native Workspaces
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  actions: write
+
+jobs:
+  trigger:
+    if: github.event.issue.title == '[automation] Apply native workspaces'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'apply-native-workspaces.yml',
+              ref: 'main'
+            })
