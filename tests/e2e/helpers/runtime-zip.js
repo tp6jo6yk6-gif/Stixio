@@ -5,6 +5,13 @@ export async function installRuntimeZip(page) {
       return new Uint8Array(await response.arrayBuffer());
     };
 
+    const toBytes = value => {
+      if (value instanceof Uint8Array) return value;
+      if (value instanceof ArrayBuffer) return new Uint8Array(value);
+      if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      return new TextEncoder().encode(String(value));
+    };
+
     class RuntimeZipFile {
       constructor(entry) {
         this.entry = entry;
@@ -18,10 +25,12 @@ export async function installRuntimeZip(page) {
           return this.entry.value;
         }
 
-        if (type === 'base64') return this.entry.value;
-        const bytes = await decodeBase64(this.entry.value);
+        const bytes = this.entry.kind === 'bytes'
+          ? new Uint8Array(this.entry.value)
+          : await decodeBase64(this.entry.value);
         if (type === 'uint8array') return bytes;
         if (type === 'string') return new TextDecoder().decode(bytes);
+        if (type === 'base64') return this.entry.value;
         return bytes.buffer;
       }
     }
@@ -36,7 +45,9 @@ export async function installRuntimeZip(page) {
         if (arguments.length === 1) return this.files[path] || null;
         const entry = options.base64
           ? { kind: 'base64', value: String(value) }
-          : { kind: 'text', value: String(value) };
+          : typeof value === 'string'
+            ? { kind: 'text', value }
+            : { kind: 'bytes', value: Array.from(toBytes(value)) };
         this.entries[path] = entry;
         this.files[path] = new RuntimeZipFile(entry);
         return this;
