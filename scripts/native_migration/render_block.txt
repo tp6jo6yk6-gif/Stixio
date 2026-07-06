@@ -12,7 +12,7 @@ function renderShell() {
           <div class="flex items-center gap-2"><button id="undoBtn" class="rounded-xl bg-white px-3 py-2 text-xs font-black">Undo</button><button id="redoBtn" class="rounded-xl bg-white px-3 py-2 text-xs font-black">Redo</button><button id="exportZipBtn" class="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white">下載貼圖包 ZIP</button></div>
         </div>
         <div id="projectToolbarRoot"></div>
-        <nav aria-label="貼圖製作流程" role="tablist" class="mx-auto grid max-w-[1600px] grid-cols-2 gap-2 px-5 pb-4 md:grid-cols-4">
+        <nav aria-label="貼圖製作流程" role="tablist" class="mx-auto grid max-w-[1600px] grid-cols-2 gap-3 px-5 pb-4 md:grid-cols-4">
           ${renderWorkflowTabs(progress)}
         </nav>
       </header>
@@ -52,22 +52,27 @@ function renderWorkflowTabs(progress) {
   return WORKFLOW_STAGES.map(stage => {
     const active = stage.id === state.activeEditor;
     const status = progress[stage.id];
-    return `<button type="button" data-workflow-stage="${stage.id}" id="workflow-tab-${stage.id}" role="tab" aria-selected="${active}" aria-current="${active ? 'step' : 'false'}" tabindex="${active ? '0' : '-1'}" class="workflow-tab ${active ? 'workflow-tab-active border-slate-950 bg-slate-950 text-white' : 'border-slate-900/10 bg-white text-slate-950'} rounded-2xl border px-4 py-3 text-left shadow-sm"><span class="flex items-center justify-between gap-2"><span class="text-[10px] font-black uppercase tracking-[.18em] ${active ? activeAccentClass(stage.accent) : 'text-slate-400'}">${stage.label}</span><span class="rounded-full px-2 py-0.5 text-[10px] font-black ${active ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500'}">${stage.step}</span></span><span class="mt-1 block text-sm font-black">${stage.title}</span><span data-workflow-progress-label="${stage.id}" class="mt-1 block truncate text-[10px] font-bold opacity-70">${status.label}</span><span class="mt-2 block h-1.5 overflow-hidden rounded-full ${active ? 'bg-white/15' : 'bg-slate-100'}"><span data-workflow-progress-bar="${stage.id}" class="block h-full rounded-full ${progressBarClass(status.tone)}" style="width:${status.percent}%"></span></span></button>`;
+    const topAccent = active ? accentBorderClass(stage.accent) : 'border-transparent';
+    const cardClass = active
+      ? 'workflow-tab-active border-slate-950 bg-slate-950 text-white shadow-xl shadow-slate-950/20'
+      : 'border-slate-900/10 bg-white text-slate-950 shadow-sm hover:shadow-md';
+    return `<button type="button" data-workflow-stage="${stage.id}" data-tone="${status.tone}" id="workflow-tab-${stage.id}" role="tab" aria-selected="${active}" aria-current="${active ? 'step' : 'false'}" tabindex="${active ? '0' : '-1'}" class="workflow-tab workflow-tab-card ${cardClass} relative overflow-hidden rounded-2xl border px-4 py-3 text-left"><span class="absolute inset-x-0 top-0 border-t-4 ${topAccent}"></span><span class="flex items-start justify-between gap-3"><span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-[.18em] ${active ? activeAccentClass(stage.accent) : 'text-slate-400'}">${stage.step} · ${stage.label}</span><span class="mt-1 block text-sm font-black leading-tight">${stage.title}</span></span><span data-workflow-status-pill="${stage.id}" class="workflow-status-pill rounded-full px-2 py-0.5 text-[10px] font-black ${active ? 'bg-white/10 text-white' : statusPillClass(status.tone)}">${toneLabel(status.tone)}</span></span><span data-workflow-progress-label="${stage.id}" class="mt-3 block truncate text-[11px] font-bold ${active ? 'text-white/70' : 'text-slate-500'}">${status.label}</span><span data-workflow-progress-reason="${stage.id}" class="mt-1 block truncate text-[10px] font-bold ${active ? 'text-white/50' : 'text-slate-400'}">${status.reason}</span><span class="mt-3 block h-1.5 overflow-hidden rounded-full ${active ? 'bg-white/15' : 'bg-slate-100'}"><span data-workflow-progress-bar="${stage.id}" class="block h-full rounded-full ${progressBarClass(status.tone)}" style="width:${status.percent}%"></span></span></button>`;
   }).join('');
 }
 
 function renderWorkspaceHeader(progress) {
   const stage = WORKFLOW_STAGES.find(item => item.id === state.activeEditor) || WORKFLOW_STAGES[0];
   const status = progress[stage.id];
-  return `<section class="workflow-stage-header rounded-[1.5rem] border border-slate-900/10 bg-white px-5 py-4 shadow-sm"><div class="min-w-0"><div class="text-[10px] font-black uppercase tracking-[.2em] ${accentClass(stage.accent)}">${stage.step} · ${stage.label}</div><h2 class="mt-1 text-xl font-black">${stage.title}</h2><p class="mt-1 text-sm font-bold text-slate-500">${stage.description}</p></div><div class="workflow-header-actions"><div data-workflow-current-status class="min-w-[220px] rounded-2xl ${statusSurfaceClass(status.tone)} px-4 py-3"><div data-workflow-current-label class="text-xs font-black">${status.label}</div><div class="mt-2 h-2 overflow-hidden rounded-full bg-white/70"><div data-workflow-current-bar class="h-full rounded-full ${progressBarClass(status.tone)}" style="width:${status.percent}%"></div></div></div><div class="hidden items-center gap-2 xl:flex"><button type="button" data-workflow-collapse="left" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700">${workspaceView().leftCollapsed ? '顯示左欄' : '收合左欄'}</button><button type="button" data-workflow-collapse="right" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700">${workspaceView().rightCollapsed ? '顯示右欄' : '收合右欄'}</button></div></div></section>`;
+  return `<section class="workflow-stage-header rounded-[1.5rem] border border-slate-900/10 bg-white px-5 py-4 shadow-sm"><div class="min-w-0"><div class="text-[10px] font-black uppercase tracking-[.2em] ${accentClass(stage.accent)}">${stage.step} · ${stage.label}</div><h2 class="mt-1 text-xl font-black">${stage.title}</h2><p class="mt-1 text-sm font-bold text-slate-500">${stage.description}</p></div><div class="workflow-header-actions"><div data-workflow-current-status class="min-w-[240px] rounded-2xl ${statusSurfaceClass(status.tone)} px-4 py-3"><div data-workflow-current-label class="text-xs font-black">${status.label}</div><div data-workflow-current-reason class="mt-1 text-[10px] font-bold opacity-70">${status.reason}</div><div class="mt-2 h-2 overflow-hidden rounded-full bg-white/70"><div data-workflow-current-bar class="h-full rounded-full ${progressBarClass(status.tone)}" style="width:${status.percent}%"></div></div></div><div class="hidden items-center gap-2 xl:flex"><button type="button" data-workflow-collapse="left" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700">${workspaceView().leftCollapsed ? '顯示左欄' : '收合左欄'}</button><button type="button" data-workflow-collapse="right" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700">${workspaceView().rightCollapsed ? '顯示右欄' : '收合右欄'}</button></div></div></section>`;
 }
 
 function renderWorkspaceFooter(progress) {
   const index = WORKFLOW_STAGES.findIndex(stage => stage.id === state.activeEditor);
   const previous = WORKFLOW_STAGES[index - 1];
   const next = WORKFLOW_STAGES[index + 1];
+  const current = progress[state.activeEditor];
   const previousButton = previous ? `<button type="button" data-workflow-direction="previous" class="rounded-xl bg-slate-100 px-4 py-2 text-xs font-black text-slate-700">← 返回：${previous.title}</button>` : '<span></span>';
-  const nextButton = next ? `<button type="button" data-workflow-direction="next" class="rounded-xl bg-slate-950 px-4 py-2 text-left text-xs font-black text-white"><span class="block">下一步：${next.title} →</span><span class="mt-0.5 block text-[10px] font-bold text-white/60">${progress[next.id].label}</span></button>` : '<span></span>';
+  const nextButton = next ? `<button type="button" data-workflow-direction="next" data-tone="${progress[next.id].tone}" class="rounded-xl bg-slate-950 px-4 py-2 text-left text-xs font-black text-white shadow-sm"><span class="block">下一步：${next.title} →</span><span data-workflow-next-reason class="mt-0.5 block text-[10px] font-bold text-white/60">${progress[next.id].reason}</span></button>` : `<div class="rounded-xl ${statusSurfaceClass(current.tone)} px-4 py-2 text-right text-xs font-black"><span class="block">流程狀態</span><span class="mt-0.5 block text-[10px] font-bold opacity-70">${current.reason}</span></div>`;
   return `<footer data-workflow-footer class="workflow-footer rounded-[1.5rem] border border-slate-900/10 bg-white px-4 py-3 shadow-sm">${previousButton}<span class="text-center text-xs font-bold text-slate-400">自動儲存目前專案進度</span>${nextButton}</footer>`;
 }
 
@@ -80,28 +85,63 @@ function renderWorkspaceEmpty(stageId) {
 }
 
 function renderMobileWorkflowNavigation() {
+  const progress = getWorkflowProgress();
   return `<nav data-mobile-workflow-nav aria-label="行動版貼圖製作流程">${WORKFLOW_STAGES.map(stage => {
     const active = stage.id === state.activeEditor;
-    return `<button type="button" data-workflow-stage="${stage.id}" data-active="${active}" ${active ? 'aria-current="step"' : ''}><span>${stage.step}</span><strong>${stage.title.replace('與', '')}</strong></button>`;
+    const status = progress[stage.id];
+    return `<button type="button" data-workflow-stage="${stage.id}" data-tone="${status.tone}" data-active="${active}" ${active ? 'aria-current="step"' : ''}><span>${stage.step}</span><strong>${stageShortName(stage.id)}</strong><small>${status.shortLabel}</small></button>`;
   }).join('')}</nav>`;
 }
 
 function getWorkflowProgress() {
   const sourceCount = state.sources.size;
-  const frameCount = frames().length;
-  const frameIds = new Set(frames().map(frame => frame.id));
+  const frameList = frames();
+  const frameCount = frameList.length;
+  const frameIds = new Set(frameList.map(frame => frame.id));
   const refinedCount = [...state.refineAppliedAt.keys()].filter(id => frameIds.has(id)).length;
   const selected = exportFrames();
+  const selectedCount = selected.length;
   const approvedCount = selected.filter(frame => frame.state?.reviewApproved === true).length;
   const errors = state.reviewReport?.summary?.errors || 0;
   const warnings = state.reviewReport?.summary?.warnings || 0;
   const packageReady = Boolean(state.reviewReport?.canPackage);
-  const reviewDetail = errors ? ` · ${errors} 錯誤` : warnings ? ` · ${warnings} 警告` : '';
+  const layoutDone = sourceCount > 0 && frameCount > 0;
+  const refineDone = frameCount > 0 && refinedCount >= frameCount;
+  const reviewDone = selectedCount > 0 && approvedCount >= selectedCount && errors === 0;
+  const reviewDetail = errors ? `${errors} 錯誤` : warnings ? `${warnings} 警告` : approvedCount ? '部分核准' : '等待核准';
   return {
-    layout: { label: sourceCount ? `${sourceCount} 張原圖 · ${frameCount} 張貼圖` : '尚未加入素材', percent: sourceCount && frameCount ? 100 : 0, tone: sourceCount && frameCount ? 'complete' : 'idle' },
-    refine: { label: frameCount ? `已完成 ${refinedCount}/${frameCount}` : '等待建立貼圖範圍', percent: frameCount ? Math.round(refinedCount / frameCount * 100) : 0, tone: refinedCount && refinedCount === frameCount ? 'complete' : refinedCount ? 'active' : 'idle' },
-    review: { label: selected.length ? `已核准 ${approvedCount}/${selected.length}${reviewDetail}` : '尚無貼圖可檢查', percent: selected.length ? Math.round(approvedCount / selected.length * 100) : 0, tone: errors ? 'error' : warnings ? 'warning' : approvedCount && approvedCount === selected.length ? 'complete' : approvedCount ? 'active' : 'idle' },
-    package: { label: packageReady ? `可下載 · ${selected.length} 張貼圖` : errors ? `${errors} 項錯誤待修正` : selected.length ? `尚缺 ${Math.max(0, selected.length - approvedCount)} 張核准` : '完成檢查後即可下載', percent: packageReady ? 100 : selected.length ? Math.round(approvedCount / selected.length * 100) : 0, tone: packageReady ? 'complete' : errors ? 'error' : warnings ? 'warning' : approvedCount ? 'active' : 'idle' }
+    layout: {
+      label: sourceCount ? `${sourceCount} 張原圖 · ${frameCount} 張貼圖` : '尚未加入素材',
+      shortLabel: sourceCount ? `${frameCount} 張` : '未開始',
+      reason: layoutDone ? '已建立貼圖範圍' : sourceCount ? '尚未建立貼圖範圍' : '請先匯入圖片',
+      percent: layoutDone ? 100 : sourceCount ? 45 : 0,
+      tone: layoutDone ? 'complete' : sourceCount ? 'active' : 'idle',
+      completed: layoutDone
+    },
+    refine: {
+      label: frameCount ? `已完成 ${refinedCount}/${frameCount}` : '等待建立貼圖範圍',
+      shortLabel: frameCount ? `${refinedCount}/${frameCount}` : '未開始',
+      reason: frameCount ? (refineDone ? '所有貼圖已套用修圖' : `尚有 ${Math.max(0, frameCount - refinedCount)} 張未修整`) : '請先完成匯入與切割',
+      percent: frameCount ? Math.round(refinedCount / frameCount * 100) : 0,
+      tone: refineDone ? 'complete' : refinedCount ? 'active' : 'idle',
+      completed: refineDone
+    },
+    review: {
+      label: selectedCount ? `已核准 ${approvedCount}/${selectedCount}${errors || warnings ? ` · ${reviewDetail}` : ''}` : '尚無貼圖可檢查',
+      shortLabel: selectedCount ? `${approvedCount}/${selectedCount}` : '未開始',
+      reason: selectedCount ? (errors ? `仍有 ${errors} 個錯誤待修正` : warnings ? `仍有 ${warnings} 個警告待確認` : reviewDone ? '已完成檢查與核准' : `尚有 ${Math.max(0, selectedCount - approvedCount)} 張未核准`) : '請先建立可輸出的貼圖',
+      percent: selectedCount ? Math.round(approvedCount / selectedCount * 100) : 0,
+      tone: errors ? 'error' : warnings ? 'warning' : reviewDone ? 'complete' : approvedCount ? 'active' : 'idle',
+      completed: reviewDone
+    },
+    package: {
+      label: packageReady ? `可下載 · ${selectedCount} 張貼圖` : errors ? `${errors} 項錯誤待修正` : selectedCount ? `尚缺 ${Math.max(0, selectedCount - approvedCount)} 張核准` : '完成檢查後即可下載',
+      shortLabel: packageReady ? '可下載' : '未就緒',
+      reason: packageReady ? '貼圖包已符合下載條件' : errors ? `仍有 ${errors} 個錯誤待修正` : selectedCount ? `尚有 ${Math.max(0, selectedCount - approvedCount)} 張未核准` : '請先完成檢查與核准',
+      percent: packageReady ? 100 : selectedCount ? Math.round(approvedCount / selectedCount * 100) : 0,
+      tone: packageReady ? 'complete' : errors ? 'error' : warnings ? 'warning' : approvedCount ? 'active' : 'idle',
+      completed: packageReady
+    }
   };
 }
 
@@ -110,17 +150,29 @@ function refreshWorkflowProgress() {
   WORKFLOW_STAGES.forEach(stage => {
     const status = progress[stage.id];
     const label = document.querySelector(`[data-workflow-progress-label="${stage.id}"]`);
+    const reason = document.querySelector(`[data-workflow-progress-reason="${stage.id}"]`);
     const bar = document.querySelector(`[data-workflow-progress-bar="${stage.id}"]`);
+    const pill = document.querySelector(`[data-workflow-status-pill="${stage.id}"]`);
+    const tab = document.querySelector(`[data-workflow-stage="${stage.id}"]`);
     if (label) label.textContent = status.label;
+    if (reason) reason.textContent = status.reason;
     if (bar) { bar.className = `block h-full rounded-full ${progressBarClass(status.tone)}`; bar.style.width = `${status.percent}%`; }
+    if (pill) { pill.textContent = toneLabel(status.tone); pill.className = `workflow-status-pill rounded-full px-2 py-0.5 text-[10px] font-black ${stage.id === state.activeEditor ? 'bg-white/10 text-white' : statusPillClass(status.tone)}`; }
+    if (tab) tab.dataset.tone = status.tone;
   });
   const current = progress[state.activeEditor];
   const label = document.querySelector('[data-workflow-current-label]');
+  const reason = document.querySelector('[data-workflow-current-reason]');
   const bar = document.querySelector('[data-workflow-current-bar]');
   const card = document.querySelector('[data-workflow-current-status]');
+  const nextReason = document.querySelector('[data-workflow-next-reason]');
+  const index = WORKFLOW_STAGES.findIndex(stage => stage.id === state.activeEditor);
+  const next = WORKFLOW_STAGES[index + 1];
   if (label) label.textContent = current.label;
+  if (reason) reason.textContent = current.reason;
   if (bar) { bar.className = `h-full rounded-full ${progressBarClass(current.tone)}`; bar.style.width = `${current.percent}%`; }
-  if (card) card.className = `min-w-[220px] rounded-2xl ${statusSurfaceClass(current.tone)} px-4 py-3`;
+  if (card) card.className = `min-w-[240px] rounded-2xl ${statusSurfaceClass(current.tone)} px-4 py-3`;
+  if (nextReason && next) nextReason.textContent = progress[next.id].reason;
 }
 
 function setActiveEditor(editor) {
@@ -147,18 +199,21 @@ function workspaceGridClass() {
   return 'xl:grid-cols-[360px_minmax(0,1fr)_340px]';
 }
 
+function stageShortName(id) { return ({ layout: '匯入', refine: '修圖', review: '檢查', package: '下載' })[id] || id; }
+function toneLabel(tone) { return ({ complete: '完成', active: '進行中', warning: '警告', error: '錯誤', idle: '未開始' })[tone] || '未開始'; }
 function activeAccentClass(accent) { return ({ emerald: 'text-emerald-300', rose: 'text-rose-300', sky: 'text-sky-300', amber: 'text-amber-300' })[accent] || 'text-white'; }
 function accentClass(accent) { return ({ emerald: 'text-emerald-600', rose: 'text-rose-500', sky: 'text-sky-600', amber: 'text-amber-600' })[accent] || 'text-slate-500'; }
+function accentBorderClass(accent) { return ({ emerald: 'border-emerald-300', rose: 'border-rose-300', sky: 'border-sky-300', amber: 'border-amber-300' })[accent] || 'border-white'; }
 function statusSurfaceClass(tone) { return ({ complete: 'bg-emerald-50 text-emerald-800', active: 'bg-sky-50 text-sky-800', warning: 'bg-amber-50 text-amber-800', error: 'bg-rose-50 text-rose-800', idle: 'bg-slate-100 text-slate-600' })[tone] || 'bg-slate-100 text-slate-600'; }
+function statusPillClass(tone) { return ({ complete: 'bg-emerald-50 text-emerald-700', active: 'bg-sky-50 text-sky-700', warning: 'bg-amber-50 text-amber-700', error: 'bg-rose-50 text-rose-700', idle: 'bg-slate-100 text-slate-500' })[tone] || 'bg-slate-100 text-slate-500'; }
 function progressBarClass(tone) { return ({ complete: 'bg-emerald-500', active: 'bg-sky-500', warning: 'bg-amber-500', error: 'bg-rose-500', idle: 'bg-slate-300' })[tone] || 'bg-slate-300'; }
 
 function renderWorkflowStyles() {
   return `<style>
-    .workflow-tab{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}.workflow-tab:not(.workflow-tab-active):hover{transform:translateY(-2px);border-color:rgba(15,23,42,.35)}
+    .workflow-tab{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease,color .18s ease}.workflow-tab:not(.workflow-tab-active):hover{transform:translateY(-2px);border-color:rgba(15,23,42,.35)}.workflow-tab-card{min-height:132px}.workflow-tab-active{transform:translateY(-1px)}
     .workflow-stage-header,.workflow-footer{grid-column:1/-1}.workflow-stage-header{display:flex;align-items:center;justify-content:space-between;gap:1rem}.workflow-header-actions{display:flex;align-items:center;gap:.75rem}.workflow-footer{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
     [data-mobile-workflow-nav]{display:none}
     @media(min-width:1024px){html,body,#app,#app>[data-native-workflow="true"]{height:100%;min-height:0;overflow:hidden}#app>[data-native-workflow="true"]{display:flex;flex-direction:column}#app>[data-native-workflow="true"]>header{flex:0 0 auto}.native-workflow-main{min-height:0;overflow:hidden;align-items:stretch;grid-template-rows:auto minmax(0,1fr) auto}.native-workflow-main>[data-workspace-column]{min-height:0;max-height:100%;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.native-workflow-main[data-collapse-left="true"]>[data-workspace-column="left"],.native-workflow-main[data-collapse-right="true"]>[data-workspace-column="right"]{display:none}.native-workflow-main[data-collapse-left="true"][data-collapse-right="false"]{grid-template-columns:minmax(0,1fr) 340px!important}.native-workflow-main[data-collapse-left="false"][data-collapse-right="true"]{grid-template-columns:360px minmax(0,1fr)!important}.native-workflow-main[data-collapse-left="true"][data-collapse-right="true"],.native-workflow-main[data-active-stage="review"][data-collapse-right="true"]{grid-template-columns:minmax(0,1fr)!important}}
-    @media(max-width:767px){body{padding-bottom:76px}header nav[aria-label="貼圖製作流程"]{display:none!important}.workflow-stage-header{align-items:flex-start;flex-direction:column}.workflow-header-actions{width:100%}.workflow-header-actions>div:first-child{width:100%;min-width:0}.workflow-footer{display:none}[data-mobile-workflow-nav]{position:fixed;z-index:80;right:0;bottom:0;left:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.25rem;padding:.5rem max(.5rem,env(safe-area-inset-right)) calc(.5rem + env(safe-area-inset-bottom)) max(.5rem,env(safe-area-inset-left));border-top:1px solid rgba(15,23,42,.12);background:rgba(255,255,255,.96);box-shadow:0 -10px 30px rgba(15,23,42,.12);backdrop-filter:blur(16px)}[data-mobile-workflow-nav] button{display:grid;min-width:0;place-items:center;gap:.1rem;border:0;border-radius:.9rem;padding:.45rem .25rem;background:transparent;color:#64748b}[data-mobile-workflow-nav] button[data-active="true"]{background:#0f172a;color:#fff}[data-mobile-workflow-nav] span{font-size:.62rem;font-weight:900;letter-spacing:.12em}[data-mobile-workflow-nav] strong{overflow:hidden;max-width:100%;font-size:.72rem;text-overflow:ellipsis;white-space:nowrap}}
+    @media(max-width:767px){body{padding-bottom:86px}header nav[aria-label="貼圖製作流程"]{display:none!important}.workflow-stage-header{align-items:flex-start;flex-direction:column}.workflow-header-actions{width:100%}.workflow-header-actions>div:first-child{width:100%;min-width:0}.workflow-footer{display:none}[data-mobile-workflow-nav]{position:fixed;z-index:80;right:0;bottom:0;left:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.25rem;padding:.5rem max(.5rem,env(safe-area-inset-right)) calc(.5rem + env(safe-area-inset-bottom)) max(.5rem,env(safe-area-inset-left));border-top:1px solid rgba(15,23,42,.12);background:rgba(255,255,255,.96);box-shadow:0 -10px 30px rgba(15,23,42,.12);backdrop-filter:blur(16px)}[data-mobile-workflow-nav] button{display:grid;min-width:0;place-items:center;gap:.08rem;border:0;border-radius:.9rem;padding:.45rem .2rem;background:transparent;color:#64748b;position:relative}[data-mobile-workflow-nav] button::before{content:"";width:.42rem;height:.42rem;border-radius:999px;background:#cbd5e1;position:absolute;top:.32rem;right:.42rem}[data-mobile-workflow-nav] button[data-tone="active"]::before{background:#0ea5e9}[data-mobile-workflow-nav] button[data-tone="complete"]::before{background:#10b981}[data-mobile-workflow-nav] button[data-tone="warning"]::before{background:#f59e0b}[data-mobile-workflow-nav] button[data-tone="error"]::before{background:#f43f5e}[data-mobile-workflow-nav] button[data-active="true"]{background:#0f172a;color:#fff}[data-mobile-workflow-nav] button[data-active="true"]::before{background:#fff}[data-mobile-workflow-nav] span{font-size:.6rem;font-weight:900;letter-spacing:.12em}[data-mobile-workflow-nav] strong{overflow:hidden;max-width:100%;font-size:.72rem;text-overflow:ellipsis;white-space:nowrap}[data-mobile-workflow-nav] small{font-size:.56rem;font-weight:800;line-height:1;color:currentColor;opacity:.62}}
   </style>`;
 }
-
