@@ -19,7 +19,13 @@ async function generateNativeCore() {
   return migrateWorkshopSource(source, { constants, renderer });
 }
 
-test('migrates the complete legacy core into native activeEditor Workspaces', async () => {
+test('source entry is marked native and no longer imports native-workspace-runtime', async () => {
+  const entry = await readFile(new URL('../src/ui/stixio-workshop-app-v2.js', import.meta.url), 'utf8');
+  assert.match(entry, /\/\/ NATIVE_WORKSPACE_RENDERING/);
+  assert.doesNotMatch(entry, /native-workspace-runtime/);
+});
+
+test('migrates the complete legacy core into polished native activeEditor Workspaces', async () => {
   const nativeCore = await generateNativeCore();
 
   assert.match(nativeCore, /\/\/ NATIVE_WORKSPACE_RENDERING/);
@@ -30,6 +36,11 @@ test('migrates the complete legacy core into native activeEditor Workspaces', as
   assert.match(nativeCore, /function renderReviewWorkspace\(\)/);
   assert.match(nativeCore, /function renderPackageWorkspace\(\)/);
   assert.match(nativeCore, /function getWorkflowProgress\(\)/);
+  assert.match(nativeCore, /shortLabel/);
+  assert.match(nativeCore, /reason/);
+  assert.match(nativeCore, /workflow-tab-card/);
+  assert.match(nativeCore, /data-workflow-next-reason/);
+  assert.match(nativeCore, /data-tone/);
 
   assert.match(nativeCore, /function bindLayoutEvents\(root\)/);
   assert.match(nativeCore, /function bindRefineEvents\(root\)/);
