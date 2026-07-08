@@ -21,6 +21,35 @@ const coreWorkflowStages = [
   { id: 'package', number: '04', label: 'Package', detail: 'Export files', target: 'stage-package' }
 ];
 
+const mainGridClass = 'mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-5 py-6';
+const threeColumnGrid = `${mainGridClass} xl:grid-cols-[360px_1fr_340px]`;
+const twoColumnGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
+
+const workflowPanels = {
+  layout: [
+    '#stage-layout',
+    '#stage-layout + section',
+    '#sourceCanvas',
+    '#sourceList',
+    '#selectedInfo'
+  ],
+  refine: [
+    '#refine-settings-panel',
+    '#stage-refine',
+    '#selectedInfo'
+  ],
+  review: [
+    '#stage-review',
+    '#reviewGateStatus'
+  ],
+  package: [
+    '#destinationRulesRoot',
+    '#package-rules-panel',
+    '#stage-package',
+    '#packageSettingsRoot'
+  ]
+};
+
 void bootstrap();
 
 async function bootstrap() {
@@ -85,7 +114,6 @@ function alignCoreWorkflow(root) {
   });
 
   syncCoreWorkflowOffsets(root);
-  installCoreWorkflowSpy(root);
   activateCoreWorkflowTab(root, 'layout');
   window.addEventListener('resize', () => syncCoreWorkflowOffsets(root), { passive: true });
 }
@@ -115,9 +143,43 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
       : 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400';
   });
 
+  applyFocusedWorkflowLayout(root, activeStage.id);
+
   if (options.scroll) {
-    document.getElementById(activeStage.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    root.querySelector('main')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+function applyFocusedWorkflowLayout(root, stageId) {
+  const main = root?.querySelector('main');
+  if (!main) return;
+
+  const allowedPanels = new Set(resolveWorkflowPanels(root, stageId));
+  resolveWorkflowPanels(root).forEach(panel => {
+    panel.hidden = !allowedPanels.has(panel);
+  });
+
+  const columns = [...main.children];
+  columns.forEach(column => {
+    const hasVisiblePanel = [...column.children].some(child => !child.hidden);
+    column.hidden = !hasVisiblePanel;
+  });
+
+  main.className = stageId === 'review' ? twoColumnGrid : threeColumnGrid;
+  syncCoreWorkflowOffsets(root);
+}
+
+function resolveWorkflowPanels(root, stageId = null) {
+  const selectors = stageId
+    ? workflowPanels[stageId] || []
+    : [...new Set(Object.values(workflowPanels).flat())];
+  const panels = [];
+  selectors.forEach(selector => {
+    const node = root.querySelector(selector);
+    const panel = node?.matches?.('section, div[id$="Root"]') ? node : node?.closest?.('section, div[id$="Root"]');
+    if (panel && !panels.includes(panel)) panels.push(panel);
+  });
+  return panels;
 }
 
 function syncCoreWorkflowOffsets(root) {
@@ -127,30 +189,4 @@ function syncCoreWorkflowOffsets(root) {
     const target = document.getElementById(stage.target);
     if (target) target.style.scrollMarginTop = `${offset}px`;
   });
-}
-
-function installCoreWorkflowSpy(root) {
-  const targets = coreWorkflowStages
-    .map(stage => ({ ...stage, element: document.getElementById(stage.target) }))
-    .filter(stage => stage.element);
-  if (!targets.length) return;
-
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver(entries => {
-      const visible = entries
-        .filter(entry => entry.isIntersecting)
-        .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top))[0];
-      const stage = visible && targets.find(item => item.element === visible.target);
-      if (stage) activateCoreWorkflowTab(root, stage.id);
-    }, { rootMargin: '-28% 0px -58% 0px', threshold: [0, 0.2, 0.6] });
-    targets.forEach(stage => observer.observe(stage.element));
-    return;
-  }
-
-  window.addEventListener('scroll', () => {
-    const stage = targets
-      .map(item => ({ ...item, distance: Math.abs(item.element.getBoundingClientRect().top - 120) }))
-      .sort((a, b) => a.distance - b.distance)[0];
-    if (stage) activateCoreWorkflowTab(root, stage.id);
-  }, { passive: true });
 }
