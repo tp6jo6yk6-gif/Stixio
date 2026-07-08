@@ -52,6 +52,8 @@ const workflowPanels = {
 
 let activeCoreWorkflowStage = 'layout';
 let workflowMutationFrame = null;
+let restoringWorkflowScroll = false;
+const workflowScrollPositions = new Map();
 
 void bootstrap();
 
@@ -137,6 +139,7 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
   const nav = root?.querySelector('header nav[aria-label="Workshop workflow"]');
   if (!nav) return;
 
+  if (options.scroll) rememberWorkflowScroll(activeCoreWorkflowStage);
   activeCoreWorkflowStage = activeStage.id;
 
   nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
@@ -153,9 +156,7 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
 
   applyFocusedWorkflowLayout(root, activeStage.id);
 
-  if (options.scroll) {
-    root.querySelector('main')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  if (options.scroll) restoreWorkflowScroll(activeStage.id);
 }
 
 function applyFocusedWorkflowLayout(root, stageId) {
@@ -175,6 +176,27 @@ function applyFocusedWorkflowLayout(root, stageId) {
 
   main.className = stageId === 'review' ? twoColumnGrid : threeColumnGrid;
   syncCoreWorkflowOffsets(root);
+}
+
+function rememberWorkflowScroll(stageId) {
+  if (!stageId || restoringWorkflowScroll) return;
+  workflowScrollPositions.set(stageId, currentScrollY());
+}
+
+function restoreWorkflowScroll(stageId) {
+  const targetTop = workflowScrollPositions.has(stageId) ? workflowScrollPositions.get(stageId) : 0;
+  restoringWorkflowScroll = true;
+  requestAnimationFrame(() => {
+    const maxTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo({ top: Math.min(targetTop, maxTop), left: 0, behavior: 'auto' });
+    requestAnimationFrame(() => {
+      restoringWorkflowScroll = false;
+    });
+  });
+}
+
+function currentScrollY() {
+  return Math.max(0, window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
 }
 
 function resolveWorkflowPanels(root, stageId = null) {
