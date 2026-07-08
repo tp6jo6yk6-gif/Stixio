@@ -182,8 +182,71 @@ function applyFocusedWorkflowLayout(root, stageId) {
   });
 
   main.className = workflowGridClasses[stageId] || threeColumnGrid;
+  if (stageId === 'review') resetReviewGalleryLayout(root);
   syncStageActions(root, stageId);
   syncCoreWorkflowOffsets(root);
+}
+
+function resetReviewGalleryLayout(root) {
+  const board = root?.querySelector('#stage-review');
+  const reviewGridNode = root?.querySelector('#reviewGrid');
+  const heroStage = root?.querySelector('#reviewHeroStage');
+  if (!board || !reviewGridNode || !heroStage) return;
+
+  const titleBlock = board.firstElementChild;
+  let gallery = board.querySelector('#coreReviewGallery');
+  if (!gallery) {
+    gallery = document.createElement('div');
+    gallery.id = 'coreReviewGallery';
+    gallery.className = 'mt-4 grid gap-4 2xl:grid-cols-[280px_minmax(0,1fr)]';
+    gallery.innerHTML = `
+      <section id="coreReviewThumbPane" class="min-w-0 rounded-3xl bg-slate-50 p-3">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-[.16em] text-slate-400">Review Gallery</p>
+            <h3 class="text-sm font-black">縮圖總覽</h3>
+          </div>
+          <span class="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-400">All Frames</span>
+        </div>
+      </section>
+      <section id="coreReviewPreviewPane" class="min-w-0"></section>`;
+    if (titleBlock?.nextSibling) board.insertBefore(gallery, titleBlock.nextSibling);
+    else board.appendChild(gallery);
+  }
+
+  const thumbPane = gallery.querySelector('#coreReviewThumbPane');
+  const previewPane = gallery.querySelector('#coreReviewPreviewPane');
+  const filters = root.querySelector('#reviewSearchInput')?.closest('.mt-4.grid');
+  const progress = root.querySelector('#reviewProgressBar');
+  const backgroundTools = root.querySelector('[data-review-bg]')?.closest('.mt-3.flex');
+  const heroLayout = heroStage.closest('.mt-4.grid');
+  const bulkActions = root.querySelector('#reviewSelectAllBtn')?.closest('.mt-4.flex');
+
+  if (filters && thumbPane && !thumbPane.contains(filters)) {
+    filters.className = 'mt-3 grid gap-2 rounded-2xl bg-white p-3';
+    thumbPane.appendChild(filters);
+  }
+  if (progress && thumbPane && !thumbPane.contains(progress)) {
+    progress.className = 'mt-3';
+    thumbPane.appendChild(progress);
+  }
+  if (reviewGridNode && thumbPane && !thumbPane.contains(reviewGridNode)) {
+    reviewGridNode.className = 'mt-3 grid max-h-[64vh] grid-cols-2 gap-2 overflow-auto pr-1 xl:grid-cols-1';
+    thumbPane.appendChild(reviewGridNode);
+  }
+
+  if (backgroundTools && previewPane && !previewPane.contains(backgroundTools)) {
+    backgroundTools.className = 'flex flex-wrap items-center gap-2 rounded-3xl bg-slate-50 p-3';
+    previewPane.appendChild(backgroundTools);
+  }
+  if (heroLayout && previewPane && !previewPane.contains(heroLayout)) {
+    heroLayout.className = 'mt-3 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_250px]';
+    previewPane.appendChild(heroLayout);
+  }
+  if (bulkActions && previewPane && !previewPane.contains(bulkActions)) {
+    bulkActions.className = 'mt-3 flex flex-wrap gap-2';
+    previewPane.appendChild(bulkActions);
+  }
 }
 
 function syncStageActions(root, stageId) {
