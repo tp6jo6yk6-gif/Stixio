@@ -50,6 +50,9 @@ const workflowPanels = {
   ]
 };
 
+let activeCoreWorkflowStage = 'layout';
+let workflowMutationFrame = null;
+
 void bootstrap();
 
 async function bootstrap() {
@@ -99,22 +102,25 @@ async function bootstrap() {
 
 function alignCoreWorkflow(root) {
   const nav = root?.querySelector('header nav[aria-label="Workshop workflow"]');
-  if (!nav || nav.dataset.coreWorkflowTabs === 'true') return;
+  if (!nav) return;
 
-  nav.dataset.coreWorkflowTabs = 'true';
-  nav.className = 'mx-auto max-w-[1600px] px-5 pb-3';
-  nav.innerHTML = `<div class="rounded-2xl border border-slate-900/10 bg-white/90 p-2 shadow-sm backdrop-blur" role="tablist" aria-label="Stixio core workflow">
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
-    </div>
-  </div>`;
+  if (nav.dataset.coreWorkflowTabs !== 'true') {
+    nav.dataset.coreWorkflowTabs = 'true';
+    nav.className = 'mx-auto max-w-[1600px] px-5 pb-3';
+    nav.innerHTML = `<div class="rounded-2xl border border-slate-900/10 bg-white/90 p-2 shadow-sm backdrop-blur" role="tablist" aria-label="Stixio core workflow">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
+      </div>
+    </div>`;
 
-  nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
-    button.addEventListener('click', () => activateCoreWorkflowTab(root, button.dataset.coreWorkflowTab, { scroll: true }));
-  });
+    nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
+      button.addEventListener('click', () => activateCoreWorkflowTab(root, button.dataset.coreWorkflowTab, { scroll: true }));
+    });
+  }
 
   syncCoreWorkflowOffsets(root);
-  activateCoreWorkflowTab(root, 'layout');
+  activateCoreWorkflowTab(root, activeCoreWorkflowStage);
+  installWorkflowMutationGuard(root);
   window.addEventListener('resize', () => syncCoreWorkflowOffsets(root), { passive: true });
 }
 
@@ -130,6 +136,8 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
   const activeStage = coreWorkflowStages.find(stage => stage.id === stageId) || coreWorkflowStages[0];
   const nav = root?.querySelector('header nav[aria-label="Workshop workflow"]');
   if (!nav) return;
+
+  activeCoreWorkflowStage = activeStage.id;
 
   nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
     const active = button.dataset.coreWorkflowTab === activeStage.id;
@@ -180,6 +188,25 @@ function resolveWorkflowPanels(root, stageId = null) {
     if (panel && !panels.includes(panel)) panels.push(panel);
   });
   return panels;
+}
+
+function installWorkflowMutationGuard(root) {
+  if (!root || root.dataset.coreWorkflowMutationGuard === 'true' || !('MutationObserver' in window)) return;
+  root.dataset.coreWorkflowMutationGuard = 'true';
+  const observer = new MutationObserver(() => {
+    if (workflowMutationFrame) return;
+    workflowMutationFrame = requestAnimationFrame(() => {
+      workflowMutationFrame = null;
+      const nav = root.querySelector('header nav[aria-label="Workshop workflow"]');
+      if (!nav) return;
+      if (nav.dataset.coreWorkflowTabs !== 'true') {
+        alignCoreWorkflow(root);
+        return;
+      }
+      activateCoreWorkflowTab(root, activeCoreWorkflowStage);
+    });
+  });
+  observer.observe(root, { childList: true, subtree: true });
 }
 
 function syncCoreWorkflowOffsets(root) {
