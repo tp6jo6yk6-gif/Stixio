@@ -15,10 +15,10 @@ const stageLabels = {
 };
 
 const coreWorkflowStages = [
-  { id: 'layout', number: '01', label: 'Layout', detail: 'Import and frame artwork', target: 'stage-layout' },
-  { id: 'refine', number: '02', label: 'Refine', detail: 'Clean edges and masks', target: 'stage-refine' },
-  { id: 'review', number: '03', label: 'Review', detail: 'Inspect and approve', target: 'stage-review' },
-  { id: 'package', number: '04', label: 'Package', detail: 'Export ZIP or project', target: 'stage-package' }
+  { id: 'layout', number: '01', label: 'Layout', detail: 'Frame artwork', target: 'stage-layout' },
+  { id: 'refine', number: '02', label: 'Refine', detail: 'Clean masks', target: 'stage-refine' },
+  { id: 'review', number: '03', label: 'Review', detail: 'Approve output', target: 'stage-review' },
+  { id: 'package', number: '04', label: 'Package', detail: 'Export files', target: 'stage-package' }
 ];
 
 void bootstrap();
@@ -73,31 +73,28 @@ function alignCoreWorkflow(root) {
   if (!nav || nav.dataset.coreWorkflowTabs === 'true') return;
 
   nav.dataset.coreWorkflowTabs = 'true';
-  nav.className = 'mx-auto max-w-[1600px] px-5 pb-4';
-  nav.innerHTML = `<section aria-label="Core workflow tabs" class="rounded-2xl border border-slate-900/10 bg-white px-4 py-3 shadow-sm">
-    <div class="flex items-center justify-between gap-3">
-      <div class="text-[10px] font-black uppercase tracking-[.18em] text-slate-400">Core workflow</div>
-      <div class="text-[10px] font-black uppercase tracking-[.14em] text-emerald-600">1.0.0 aligned path</div>
-    </div>
-    <div class="mt-3 grid gap-2 md:grid-cols-4" role="tablist" aria-label="Stixio core workflow">
+  nav.className = 'mx-auto max-w-[1600px] px-5 pb-3';
+  nav.innerHTML = `<div class="rounded-2xl border border-slate-900/10 bg-white/90 p-2 shadow-sm backdrop-blur" role="tablist" aria-label="Stixio core workflow">
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
       ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
     </div>
-    <p class="mt-3 text-xs font-bold leading-5 text-slate-500">Use these tabs to move through the active production flow. Native Workspace tabs, hidden columns, and alternate page modes stay deferred until this path is stable.</p>
-  </section>`;
+  </div>`;
 
   nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
     button.addEventListener('click', () => activateCoreWorkflowTab(root, button.dataset.coreWorkflowTab, { scroll: true }));
   });
 
+  syncCoreWorkflowOffsets(root);
   installCoreWorkflowSpy(root);
   activateCoreWorkflowTab(root, 'layout');
+  window.addEventListener('resize', () => syncCoreWorkflowOffsets(root), { passive: true });
 }
 
 function coreWorkflowTab(stage) {
-  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition">
-    <span class="block text-[10px] font-black uppercase tracking-[.16em] text-slate-400">${stage.number}</span>
-    <span class="mt-1 block text-sm font-black">${stage.label}</span>
-    <span class="mt-0.5 block text-[11px] font-bold opacity-70">${stage.detail}</span>
+  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition">
+    <span class="block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400">${stage.number}</span>
+    <span class="mt-0.5 block truncate text-sm font-black">${stage.label}</span>
+    <span class="block truncate text-[11px] font-bold opacity-70">${stage.detail}</span>
   </button>`;
 }
 
@@ -110,17 +107,26 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
     const active = button.dataset.coreWorkflowTab === activeStage.id;
     button.setAttribute('aria-selected', String(active));
     button.className = active
-      ? 'rounded-xl bg-slate-950 px-3 py-2 text-left text-white shadow-sm transition'
-      : 'rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100';
+      ? 'min-w-0 rounded-xl bg-slate-950 px-3 py-2 text-left text-white shadow-sm transition'
+      : 'min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100';
     const number = button.querySelector('span');
     if (number) number.className = active
-      ? 'block text-[10px] font-black uppercase tracking-[.16em] text-emerald-300'
-      : 'block text-[10px] font-black uppercase tracking-[.16em] text-slate-400';
+      ? 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-emerald-300'
+      : 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400';
   });
 
   if (options.scroll) {
     document.getElementById(activeStage.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+function syncCoreWorkflowOffsets(root) {
+  const header = root?.querySelector('header');
+  const offset = Math.ceil((header?.getBoundingClientRect().height || 140) + 16);
+  coreWorkflowStages.forEach(stage => {
+    const target = document.getElementById(stage.target);
+    if (target) target.style.scrollMarginTop = `${offset}px`;
+  });
 }
 
 function installCoreWorkflowSpy(root) {
@@ -136,7 +142,7 @@ function installCoreWorkflowSpy(root) {
         .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top))[0];
       const stage = visible && targets.find(item => item.element === visible.target);
       if (stage) activateCoreWorkflowTab(root, stage.id);
-    }, { rootMargin: '-25% 0px -55% 0px', threshold: [0, 0.2, 0.6] });
+    }, { rootMargin: '-28% 0px -58% 0px', threshold: [0, 0.2, 0.6] });
     targets.forEach(stage => observer.observe(stage.element));
     return;
   }
