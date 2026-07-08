@@ -15,15 +15,16 @@ const stageLabels = {
 };
 
 const coreWorkflowStages = [
-  { id: 'layout', number: '01', label: 'Layout', detail: 'Frame artwork', target: 'stage-layout' },
+  { id: 'layout', number: '01', label: 'Layout', detail: 'Import and frame', target: 'stage-layout' },
   { id: 'refine', number: '02', label: 'Refine', detail: 'Clean masks', target: 'stage-refine' },
   { id: 'review', number: '03', label: 'Review', detail: 'Approve output', target: 'stage-review' },
   { id: 'package', number: '04', label: 'Package', detail: 'Export files', target: 'stage-package' }
 ];
 
 const mainGridClass = 'mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-5 py-6';
-const threeColumnGrid = `${mainGridClass} xl:grid-cols-[360px_1fr_340px]`;
-const twoColumnGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
+const threeColumnGrid = `${mainGridClass} xl:grid-cols-[360px_minmax(0,1fr)_340px]`;
+const focusedGrid = `${mainGridClass} xl:grid-cols-[340px_minmax(0,1fr)]`;
+const reviewGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
 
 const workflowPanels = {
   layout: [
@@ -35,8 +36,7 @@ const workflowPanels = {
   ],
   refine: [
     '#refine-settings-panel',
-    '#stage-refine',
-    '#selectedInfo'
+    '#stage-refine'
   ],
   review: [
     '#stage-review',
@@ -48,6 +48,13 @@ const workflowPanels = {
     '#stage-package',
     '#packageSettingsRoot'
   ]
+};
+
+const workflowGridClasses = {
+  layout: threeColumnGrid,
+  refine: focusedGrid,
+  review: reviewGrid,
+  package: threeColumnGrid
 };
 
 let activeCoreWorkflowStage = 'layout';
@@ -163,19 +170,25 @@ function applyFocusedWorkflowLayout(root, stageId) {
   const main = root?.querySelector('main');
   if (!main) return;
 
+  document.documentElement.dataset.stixioCoreStage = stageId;
   const allowedPanels = new Set(resolveWorkflowPanels(root, stageId));
   resolveWorkflowPanels(root).forEach(panel => {
     panel.hidden = !allowedPanels.has(panel);
   });
 
-  const columns = [...main.children];
-  columns.forEach(column => {
+  [...main.children].forEach(column => {
     const hasVisiblePanel = [...column.children].some(child => !child.hidden);
     column.hidden = !hasVisiblePanel;
   });
 
-  main.className = stageId === 'review' ? twoColumnGrid : threeColumnGrid;
+  main.className = workflowGridClasses[stageId] || threeColumnGrid;
+  syncStageActions(root, stageId);
   syncCoreWorkflowOffsets(root);
+}
+
+function syncStageActions(root, stageId) {
+  const exportZip = root?.querySelector('#exportZipBtn');
+  if (exportZip) exportZip.hidden = stageId !== 'package';
 }
 
 function rememberWorkflowScroll(stageId) {
