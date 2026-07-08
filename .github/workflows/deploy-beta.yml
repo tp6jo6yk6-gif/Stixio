@@ -1,11 +1,6 @@
 name: Deploy Stixio Beta
 
 on:
-  workflow_run:
-    workflows:
-      - Legacy Parity Release Gate
-    types:
-      - completed
   workflow_dispatch:
 
 permissions:
@@ -17,10 +12,6 @@ concurrency:
 
 jobs:
   deploy-beta:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment:
       name: beta
@@ -28,7 +19,7 @@ jobs:
       - name: Checkout verified source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: release/1.0.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -69,4 +60,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=stixio-beta --branch=main --commit-hash=${{ github.event.workflow_run.head_sha || github.sha }}
+          command: pages deploy dist --project-name=stixio-beta --branch=main --commit-hash=${{ github.sha }}
