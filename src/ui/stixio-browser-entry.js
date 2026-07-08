@@ -2,6 +2,7 @@ import { initStixioWorkshopProgressive } from './stixio-workshop-app-v2.js';
 import { enhanceWorkshopUx } from './workshop-ux.js';
 import { bridgeWorkshopLegacyControls } from './workshop-ux-bridge.js';
 import { installBetaHardening } from './beta-hardening.js';
+import { installUsableBetaGuide } from './usable-beta-guide.js';
 
 const stageLabels = {
   shell: '正在建立工作區…',
@@ -43,6 +44,7 @@ async function bootstrap() {
     setStage('ux');
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
+    installUsableBetaGuide(root);
     if (html.dataset.stixioBootError === 'true') throw new Error('Stixio bootstrap did not finish.');
     html.dataset.stixioReady = 'true';
     html.dataset.stixioBootStage = 'ready';
