@@ -14,6 +14,45 @@ const stageLabels = {
   ready: '工作區已就緒'
 };
 
+const coreWorkflowStages = [
+  { id: 'layout', number: '01', label: 'Layout', detail: 'Frame artwork', target: 'stage-layout' },
+  { id: 'refine', number: '02', label: 'Refine', detail: 'Clean masks', target: 'stage-refine' },
+  { id: 'review', number: '03', label: 'Review', detail: 'Approve output', target: 'stage-review' },
+  { id: 'package', number: '04', label: 'Package', detail: 'Export files', target: 'stage-package' }
+];
+
+const mainGridClass = 'mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-5 py-6';
+const threeColumnGrid = `${mainGridClass} xl:grid-cols-[360px_1fr_340px]`;
+const twoColumnGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
+
+const workflowPanels = {
+  layout: [
+    '#stage-layout',
+    '#stage-layout + section',
+    '#sourceCanvas',
+    '#sourceList',
+    '#selectedInfo'
+  ],
+  refine: [
+    '#refine-settings-panel',
+    '#stage-refine',
+    '#selectedInfo'
+  ],
+  review: [
+    '#stage-review',
+    '#reviewGateStatus'
+  ],
+  package: [
+    '#destinationRulesRoot',
+    '#package-rules-panel',
+    '#stage-package',
+    '#packageSettingsRoot'
+  ]
+};
+
+let activeCoreWorkflowStage = 'layout';
+let workflowMutationFrame = null;
+
 void bootstrap();
 
 async function bootstrap() {
@@ -41,6 +80,7 @@ async function bootstrap() {
   try {
     await initStixioWorkshopProgressive(root, { onStage: setStage });
     setStage('ux');
+    alignCoreWorkflow(root);
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
     if (html.dataset.stixioBootError === 'true') throw new Error('Stixio bootstrap did not finish.');
@@ -58,4 +98,122 @@ async function bootstrap() {
   } finally {
     clearTimeout(watchdog);
   }
+}
+
+function alignCoreWorkflow(root) {
+  const nav = root?.querySelector('header nav[aria-label="Workshop workflow"]');
+  if (!nav) return;
+
+  if (nav.dataset.coreWorkflowTabs !== 'true') {
+    nav.dataset.coreWorkflowTabs = 'true';
+    nav.className = 'mx-auto max-w-[1600px] px-5 pb-3';
+    nav.innerHTML = `<div class="rounded-2xl border border-slate-900/10 bg-white/90 p-2 shadow-sm backdrop-blur" role="tablist" aria-label="Stixio core workflow">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
+      </div>
+    </div>`;
+
+    nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
+      button.addEventListener('click', () => activateCoreWorkflowTab(root, button.dataset.coreWorkflowTab, { scroll: true }));
+    });
+  }
+
+  syncCoreWorkflowOffsets(root);
+  activateCoreWorkflowTab(root, activeCoreWorkflowStage);
+  installWorkflowMutationGuard(root);
+  window.addEventListener('resize', () => syncCoreWorkflowOffsets(root), { passive: true });
+}
+
+function coreWorkflowTab(stage) {
+  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition">
+    <span class="block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400">${stage.number}</span>
+    <span class="mt-0.5 block truncate text-sm font-black">${stage.label}</span>
+    <span class="block truncate text-[11px] font-bold opacity-70">${stage.detail}</span>
+  </button>`;
+}
+
+function activateCoreWorkflowTab(root, stageId, options = {}) {
+  const activeStage = coreWorkflowStages.find(stage => stage.id === stageId) || coreWorkflowStages[0];
+  const nav = root?.querySelector('header nav[aria-label="Workshop workflow"]');
+  if (!nav) return;
+
+  activeCoreWorkflowStage = activeStage.id;
+
+  nav.querySelectorAll('[data-core-workflow-tab]').forEach(button => {
+    const active = button.dataset.coreWorkflowTab === activeStage.id;
+    button.setAttribute('aria-selected', String(active));
+    button.className = active
+      ? 'min-w-0 rounded-xl bg-slate-950 px-3 py-2 text-left text-white shadow-sm transition'
+      : 'min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100';
+    const number = button.querySelector('span');
+    if (number) number.className = active
+      ? 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-emerald-300'
+      : 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400';
+  });
+
+  applyFocusedWorkflowLayout(root, activeStage.id);
+
+  if (options.scroll) {
+    root.querySelector('main')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function applyFocusedWorkflowLayout(root, stageId) {
+  const main = root?.querySelector('main');
+  if (!main) return;
+
+  const allowedPanels = new Set(resolveWorkflowPanels(root, stageId));
+  resolveWorkflowPanels(root).forEach(panel => {
+    panel.hidden = !allowedPanels.has(panel);
+  });
+
+  const columns = [...main.children];
+  columns.forEach(column => {
+    const hasVisiblePanel = [...column.children].some(child => !child.hidden);
+    column.hidden = !hasVisiblePanel;
+  });
+
+  main.className = stageId === 'review' ? twoColumnGrid : threeColumnGrid;
+  syncCoreWorkflowOffsets(root);
+}
+
+function resolveWorkflowPanels(root, stageId = null) {
+  const selectors = stageId
+    ? workflowPanels[stageId] || []
+    : [...new Set(Object.values(workflowPanels).flat())];
+  const panels = [];
+  selectors.forEach(selector => {
+    const node = root.querySelector(selector);
+    const panel = node?.matches?.('section, div[id$="Root"]') ? node : node?.closest?.('section, div[id$="Root"]');
+    if (panel && !panels.includes(panel)) panels.push(panel);
+  });
+  return panels;
+}
+
+function installWorkflowMutationGuard(root) {
+  if (!root || root.dataset.coreWorkflowMutationGuard === 'true' || !('MutationObserver' in window)) return;
+  root.dataset.coreWorkflowMutationGuard = 'true';
+  const observer = new MutationObserver(() => {
+    if (workflowMutationFrame) return;
+    workflowMutationFrame = requestAnimationFrame(() => {
+      workflowMutationFrame = null;
+      const nav = root.querySelector('header nav[aria-label="Workshop workflow"]');
+      if (!nav) return;
+      if (nav.dataset.coreWorkflowTabs !== 'true') {
+        alignCoreWorkflow(root);
+        return;
+      }
+      activateCoreWorkflowTab(root, activeCoreWorkflowStage);
+    });
+  });
+  observer.observe(root, { childList: true, subtree: true });
+}
+
+function syncCoreWorkflowOffsets(root) {
+  const header = root?.querySelector('header');
+  const offset = Math.ceil((header?.getBoundingClientRect().height || 140) + 16);
+  coreWorkflowStages.forEach(stage => {
+    const target = document.getElementById(stage.target);
+    if (target) target.style.scrollMarginTop = `${offset}px`;
+  });
 }
