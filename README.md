@@ -20,6 +20,18 @@ Package
 Export
 ```
 
+## Usable Beta path
+
+For the current 1.0.0 release candidate, keep testing on the usable Beta path:
+
+1. Import artwork in Layout.
+2. Run Detect or choose a grid preset to create frames.
+3. Use Refine only after frames exist.
+4. Review selected outputs and approve clean frames.
+5. Package and download the ZIP or export the `.stixio` project.
+
+The native Workspace/tab automation track is deferred until after the 1.0.0 release path is stable. Do not use native Workspace work as a release blocker unless it is required for data safety, parity, or export correctness.
+
 ## Current capabilities
 
 - Multi-image artwork import
