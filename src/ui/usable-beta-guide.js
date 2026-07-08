@@ -7,11 +7,21 @@ export function installUsableBetaGuide(root = document.getElementById('app')) {
   ensureGuideContainer(root);
   updateUsableBetaGuide(root);
 
-  const observer = new MutationObserver(() => updateUsableBetaGuide(root));
+  let scheduled = false;
+  const scheduleUpdate = () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      updateUsableBetaGuide(root);
+    });
+  };
+
+  const observer = new MutationObserver(scheduleUpdate);
   observer.observe(root, { childList: true, subtree: true });
 
-  window.addEventListener('stixio:ready', () => updateUsableBetaGuide(root));
-  window.addEventListener('hashchange', () => updateUsableBetaGuide(root));
+  window.addEventListener('stixio:ready', scheduleUpdate);
+  window.addEventListener('hashchange', scheduleUpdate);
 }
 
 function ensureGuideContainer(root) {
@@ -30,7 +40,8 @@ function updateUsableBetaGuide(root) {
   if (!guide) return;
 
   const info = getGuideState(root);
-  guide.innerHTML = renderGuide(info);
+  const markup = renderGuide(info);
+  if (guide.innerHTML !== markup) guide.innerHTML = markup;
   patchEmptyReview(root, info);
 }
 
