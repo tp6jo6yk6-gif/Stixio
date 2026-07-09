@@ -36,9 +36,7 @@ const workflowPanels = {
   ],
   refine: [
     '#refine-settings-panel',
-    '#stage-refine',
-    '#sourceList',
-    '#selectedInfo'
+    '#stage-refine'
   ],
   review: [
     '#stage-review',
@@ -246,6 +244,22 @@ function installOriginalShellStyles() {
     html[data-stixio-core-stage="review"] #reviewGrid {
       max-height: 55vh;
       overflow: auto;
+    }
+
+    html[data-stixio-core-stage="review"] #reviewGrid .single-download,
+    html[data-stixio-core-stage="review"] #reviewGrid .role-select {
+      display: none;
+    }
+
+    html[data-stixio-core-stage="review"] #reviewGrid [data-review-card="true"] {
+      padding-bottom: 0.75rem;
+    }
+
+    html[data-stixio-core-stage="package"] #destinationRulesRoot,
+    html[data-stixio-core-stage="package"] #package-rules-panel,
+    html[data-stixio-core-stage="package"] #stage-package,
+    html[data-stixio-core-stage="package"] #packageSettingsRoot {
+      display: block;
     }
 
     @media (max-width: 1279px) {
