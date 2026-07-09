@@ -37,8 +37,7 @@ const workflowPanels = {
   refine: [
     '#refine-settings-panel',
     '#stage-refine',
-    '#sourceList',
-    '#selectedInfo'
+    '#stage-review'
   ],
   review: [
     '#stage-review',
@@ -239,9 +238,57 @@ function installOriginalShellStyles() {
       width: min(720px, calc(100vw - 2.5rem));
     }
 
-    html[data-stixio-core-stage="refine"] #sourceList {
-      max-height: 54vh;
+    html[data-stixio-core-stage="refine"] #stage-review {
+      display: block;
+      padding: 1rem !important;
+    }
+
+    html[data-stixio-core-stage="refine"] #stage-review::before {
+      content: '已切割單張';
+      display: block;
+      margin-bottom: 0.75rem;
+      color: #0891b2;
+      font-size: 0.68rem;
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    html[data-stixio-core-stage="refine"] #stage-review > div:first-child,
+    html[data-stixio-core-stage="refine"] #stage-review > div:nth-of-type(2),
+    html[data-stixio-core-stage="refine"] #stage-review > div:nth-of-type(3),
+    html[data-stixio-core-stage="refine"] #stage-review > div:nth-of-type(4),
+    html[data-stixio-core-stage="refine"] #stage-review > div:nth-of-type(5),
+    html[data-stixio-core-stage="refine"] #stage-review > #reviewProgressBar {
+      display: none !important;
+    }
+
+    html[data-stixio-core-stage="refine"] #reviewGrid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+      max-height: calc(100vh - var(--stixio-workflow-offset, 150px) - 3rem);
       overflow: auto;
+      padding-right: 0.25rem;
+    }
+
+    html[data-stixio-core-stage="refine"] #reviewGrid [data-review-card="true"] {
+      border-radius: 1rem;
+      cursor: pointer;
+      padding: 0.65rem;
+    }
+
+    html[data-stixio-core-stage="refine"] #reviewGrid [data-review-card="true"] > div:first-child {
+      aspect-ratio: 1 / 1;
+      min-height: 0;
+    }
+
+    html[data-stixio-core-stage="refine"] #reviewGrid .single-download,
+    html[data-stixio-core-stage="refine"] #reviewGrid .role-select,
+    html[data-stixio-core-stage="refine"] #reviewGrid .review-approve,
+    html[data-stixio-core-stage="refine"] #reviewGrid .export-check,
+    html[data-stixio-core-stage="refine"] #reviewGrid [data-review-card="true"] > div:nth-of-type(2) {
+      display: none !important;
     }
 
     html[data-stixio-core-stage="review"] #stage-review {
