@@ -29,6 +29,12 @@
     return Number.isFinite(value) ? Math.max(5, Math.min(160, value)) : 30;
   }
 
+  function tintDeletePixel(image, offset, strength = 0.38) {
+    image.data[offset] = Math.min(255, Math.round(image.data[offset] * (1 - strength) + 255 * strength));
+    image.data[offset + 1] = Math.round(image.data[offset + 1] * (1 - strength));
+    image.data[offset + 2] = Math.round(image.data[offset + 2] * (1 - strength));
+  }
+
   function applyAutoDeleteMarks(ctx) {
     const canvas = ctx.canvas;
     if (!canvas?.width || !canvas?.height) return;
@@ -48,20 +54,50 @@
       const distance = Math.abs(image.data[offset] - target[0])
         + Math.abs(image.data[offset + 1] - target[1])
         + Math.abs(image.data[offset + 2] - target[2]);
-      if (distance > tolerance) continue;
-
-      image.data[offset] = Math.min(255, Math.round(image.data[offset] * 0.62 + 255 * 0.38));
-      image.data[offset + 1] = Math.round(image.data[offset + 1] * 0.58);
-      image.data[offset + 2] = Math.round(image.data[offset + 2] * 0.58);
+      if (distance <= tolerance) tintDeletePixel(image, offset, 0.34);
     }
 
     ctx.putImageData(image, 0, 0);
   }
 
+  function drawDeleteMaskOnly(ctx, maskCanvas) {
+    const canvas = ctx.canvas;
+    if (!canvas?.width || !canvas?.height || !maskCanvas?.width || !maskCanvas?.height) return false;
+
+    const maskBuffer = document.createElement('canvas');
+    maskBuffer.width = canvas.width;
+    maskBuffer.height = canvas.height;
+    const maskCtx = maskBuffer.getContext('2d', { willReadFrequently: true });
+    maskCtx.imageSmoothingEnabled = false;
+    originalDrawImage.call(maskCtx, maskCanvas, 0, 0, canvas.width, canvas.height);
+
+    let image;
+    let mask;
+    try {
+      image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      mask = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
+    } catch {
+      return false;
+    }
+
+    for (let offset = 0; offset < mask.data.length; offset += 4) {
+      if (mask.data[offset + 3] <= 0) continue;
+      const red = mask.data[offset];
+      const green = mask.data[offset + 1];
+      if (red > 128 && red > green) tintDeletePixel(image, offset, 0.55);
+    }
+
+    ctx.putImageData(image, 0, 0);
+    return true;
+  }
+
   CanvasRenderingContext2D.prototype.drawImage = function patchedDrawImage(source, ...args) {
+    if (isRefineMaskOverlay(this, source)) {
+      if (drawDeleteMaskOnly(this, source)) return;
+    }
+
     const result = originalDrawImage.call(this, source, ...args);
     if (isRefineSourceDraw(this, source)) applyAutoDeleteMarks(this);
-    if (isRefineMaskOverlay(this, source)) return result;
     return result;
   };
 })();
