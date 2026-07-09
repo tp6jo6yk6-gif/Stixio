@@ -35,9 +35,9 @@ const workflowPanels = {
     '#selectedInfo'
   ],
   refine: [
-    '#refine-settings-panel',
+    '#stage-review',
     '#stage-refine',
-    '#stage-review'
+    '#refine-settings-panel'
   ],
   review: [
     '#stage-review',
@@ -426,6 +426,7 @@ function applyFocusedWorkflowLayout(root, stageId) {
   if (!main) return;
 
   document.documentElement.dataset.stixioCoreStage = stageId;
+  organizeCoreWorkflowColumns(root, stageId);
   const allowedPanels = new Set(resolveWorkflowPanels(root, stageId));
   resolveWorkflowPanels(root).forEach(panel => {
     panel.hidden = !allowedPanels.has(panel);
@@ -439,6 +440,21 @@ function applyFocusedWorkflowLayout(root, stageId) {
   main.className = workflowGridClasses[stageId] || threeColumnGrid;
   syncStageActions(root, stageId);
   syncCoreWorkflowOffsets(root);
+}
+
+function organizeCoreWorkflowColumns(root, stageId) {
+  if (stageId !== 'refine') return;
+  const main = root?.querySelector('main');
+  const leftColumn = main?.children?.[0];
+  const middleColumn = main?.children?.[1];
+  const rightColumn = main?.children?.[2];
+  const framePicker = root?.querySelector('#stage-review');
+  const refineStage = root?.querySelector('#stage-refine');
+  const refineSettings = root?.querySelector('#refine-settings-panel');
+
+  if (leftColumn && framePicker && framePicker.parentElement !== leftColumn) leftColumn.appendChild(framePicker);
+  if (middleColumn && refineStage && refineStage.parentElement !== middleColumn) middleColumn.appendChild(refineStage);
+  if (rightColumn && refineSettings && refineSettings.parentElement !== rightColumn) rightColumn.insertBefore(refineSettings, rightColumn.firstElementChild);
 }
 
 function syncStageActions(root, stageId) {
