@@ -15,15 +15,16 @@ const stageLabels = {
 };
 
 const coreWorkflowStages = [
-  { id: 'layout', number: 'Step 1', label: '匯入與裁切', detail: 'Import artwork', target: 'stage-layout' },
-  { id: 'refine', number: 'Step 2', label: '修補與預覽', detail: 'Clean and inspect', target: 'stage-refine' },
-  { id: 'export', number: 'Step 3', label: '總覽與輸出', detail: 'Review and package', target: 'stage-review' }
+  { id: 'layout', number: '01', label: 'Layout', detail: '匯入與裁切', target: 'stage-layout' },
+  { id: 'refine', number: '02', label: 'Refine', detail: '修補與預覽', target: 'stage-refine' },
+  { id: 'review', number: '03', label: 'Review', detail: '檢查與核准', target: 'stage-review' },
+  { id: 'package', number: '04', label: 'Package', detail: '輸出與封裝', target: 'stage-package' }
 ];
 
 const mainGridClass = 'mx-auto grid w-full max-w-[2400px] grid-cols-1 gap-0 px-0 py-0';
 const threeColumnGrid = `${mainGridClass} xl:grid-cols-[360px_minmax(0,1fr)_340px]`;
 const focusedGrid = `${mainGridClass} xl:grid-cols-[340px_minmax(0,1fr)]`;
-const exportGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
+const reviewGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
 
 const workflowPanels = {
   layout: [
@@ -39,9 +40,11 @@ const workflowPanels = {
     '#sourceList',
     '#selectedInfo'
   ],
-  export: [
+  review: [
     '#stage-review',
-    '#reviewGateStatus',
+    '#reviewGateStatus'
+  ],
+  package: [
     '#destinationRulesRoot',
     '#package-rules-panel',
     '#stage-package',
@@ -52,7 +55,8 @@ const workflowPanels = {
 const workflowGridClasses = {
   layout: threeColumnGrid,
   refine: focusedGrid,
-  export: exportGrid
+  review: reviewGrid,
+  package: threeColumnGrid
 };
 
 let activeCoreWorkflowStage = 'layout';
@@ -162,11 +166,11 @@ function installOriginalShellStyles() {
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
     }
 
-    html[data-stixio-core-stage="export"] #stage-review {
+    html[data-stixio-core-stage="review"] #stage-review {
       display: block;
     }
 
-    html[data-stixio-core-stage="export"] #reviewGrid {
+    html[data-stixio-core-stage="review"] #reviewGrid {
       max-height: 55vh;
       overflow: auto;
     }
@@ -191,9 +195,9 @@ function alignCoreWorkflow(root) {
 
   if (nav.dataset.coreWorkflowTabs !== 'true') {
     nav.dataset.coreWorkflowTabs = 'true';
-    nav.className = 'mx-auto max-w-3xl px-5 pb-3';
-    nav.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-100 p-1.5 shadow-sm" role="tablist" aria-label="Stixio original three-step workflow">
-      <div class="grid grid-cols-1 gap-1 sm:grid-cols-3">
+    nav.className = 'mx-auto max-w-4xl px-5 pb-3';
+    nav.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-100 p-1.5 shadow-sm" role="tablist" aria-label="Stixio four-page workflow">
+      <div class="grid grid-cols-2 gap-1 md:grid-cols-4">
         ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
       </div>
     </div>`;
@@ -211,7 +215,7 @@ function alignCoreWorkflow(root) {
 
 function coreWorkflowTab(stage) {
   return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-lg px-4 py-2 text-center text-sm font-black text-slate-500 transition">
-    <span class="block truncate">${stage.number}: ${stage.label}</span>
+    <span class="block truncate">${stage.number} ${stage.label}</span>
     <span class="mt-0.5 block truncate text-[10px] font-bold opacity-60">${stage.detail}</span>
   </button>`;
 }
@@ -259,7 +263,7 @@ function applyFocusedWorkflowLayout(root, stageId) {
 
 function syncStageActions(root, stageId) {
   const exportZip = root?.querySelector('#exportZipBtn');
-  if (exportZip) exportZip.hidden = stageId !== 'export';
+  if (exportZip) exportZip.hidden = stageId !== 'package';
 }
 
 function rememberWorkflowScroll(stageId) {
