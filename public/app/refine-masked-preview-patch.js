@@ -3,6 +3,7 @@
   window.__stixioRefineMaskedPreviewPatch = true;
 
   const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
+  const DELETE_MARK_STRENGTH = 0.34;
 
   function isRefineSourceDraw(ctx, source) {
     return ctx?.canvas?.id === 'refineCanvas'
@@ -29,7 +30,8 @@
     return Number.isFinite(value) ? Math.max(5, Math.min(160, value)) : 30;
   }
 
-  function tintDeletePixel(image, offset, strength = 0.38) {
+  function tintDeletePixel(image, offset) {
+    const strength = DELETE_MARK_STRENGTH;
     image.data[offset] = Math.min(255, Math.round(image.data[offset] * (1 - strength) + 255 * strength));
     image.data[offset + 1] = Math.round(image.data[offset + 1] * (1 - strength));
     image.data[offset + 2] = Math.round(image.data[offset + 2] * (1 - strength));
@@ -54,7 +56,7 @@
       const distance = Math.abs(image.data[offset] - target[0])
         + Math.abs(image.data[offset + 1] - target[1])
         + Math.abs(image.data[offset + 2] - target[2]);
-      if (distance <= tolerance) tintDeletePixel(image, offset, 0.34);
+      if (distance <= tolerance) tintDeletePixel(image, offset);
     }
 
     ctx.putImageData(image, 0, 0);
@@ -84,7 +86,7 @@
       if (mask.data[offset + 3] <= 0) continue;
       const red = mask.data[offset];
       const green = mask.data[offset + 1];
-      if (red > 128 && red > green) tintDeletePixel(image, offset, 0.55);
+      if (red > 128 && red > green) tintDeletePixel(image, offset);
     }
 
     ctx.putImageData(image, 0, 0);
