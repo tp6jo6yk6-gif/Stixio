@@ -291,6 +291,45 @@ function installOriginalShellStyles() {
       display: none !important;
     }
 
+    html[data-stixio-core-stage="refine"] #app:has(.mask-tool[data-mask-tool="magic"].bg-emerald-300) #refineBrushCursor {
+      width: 8px !important;
+      height: 8px !important;
+      border: 2px solid #ffffff !important;
+      background: #ef4444;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.72), 0 4px 12px rgba(15, 23, 42, 0.22) !important;
+      overflow: visible;
+    }
+
+    html[data-stixio-core-stage="refine"] #app:has(.mask-tool[data-mask-tool="magic"].bg-emerald-300):has(.magic-action[data-magic-action="keep"].bg-emerald-300) #refineBrushCursor {
+      background: #10b981;
+    }
+
+    html[data-stixio-core-stage="refine"] #app:has(.mask-tool[data-mask-tool="magic"].bg-emerald-300) #refineBrushCursor::before {
+      content: '';
+      position: absolute;
+      left: 23px;
+      top: 10px;
+      width: 8px;
+      height: 2px;
+      border-radius: 999px;
+      background: #0f172a;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+
+    html[data-stixio-core-stage="refine"] #app:has(.mask-tool[data-mask-tool="magic"].bg-emerald-300) #refineBrushCursor::after {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: -9px;
+      width: 17px;
+      height: 17px;
+      border: 2px solid #0f172a;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.74);
+      box-shadow: inset 0 0 0 3px rgba(14, 165, 233, 0.16), 0 2px 8px rgba(15, 23, 42, 0.18);
+    }
+
     html[data-stixio-core-stage="review"] #stage-review {
       display: block;
     }
