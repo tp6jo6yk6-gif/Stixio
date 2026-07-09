@@ -95,6 +95,7 @@ async function bootstrap() {
     alignCoreWorkflow(root);
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
+    installMagicLoupe(root);
     if (html.dataset.stixioBootError === 'true') throw new Error('Stixio bootstrap did not finish.');
     html.dataset.stixioReady = 'true';
     html.dataset.stixioBootStage = 'ready';
@@ -304,30 +305,20 @@ function installOriginalShellStyles() {
       background: #10b981;
     }
 
-    html[data-stixio-core-stage="refine"] #app:has(.mask-tool[data-mask-tool="magic"].bg-emerald-300) #refineBrushCursor::before {
-      content: '';
-      position: absolute;
-      left: 23px;
-      top: 10px;
-      width: 8px;
-      height: 2px;
+    #refineMagicLoupe {
+      position: fixed;
+      z-index: 90;
+      width: 74px;
+      height: 74px;
       border-radius: 999px;
-      background: #0f172a;
-      transform: rotate(45deg);
-      transform-origin: left center;
+      border: 2px solid #0f172a;
+      background: #ffffff;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.88);
+      pointer-events: none;
     }
 
-    html[data-stixio-core-stage="refine"] #app:has(.mask-tool[data-mask-tool="magic"].bg-emerald-300) #refineBrushCursor::after {
-      content: '';
-      position: absolute;
-      left: 10px;
-      top: -9px;
-      width: 17px;
-      height: 17px;
-      border: 2px solid #0f172a;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.74);
-      box-shadow: inset 0 0 0 3px rgba(14, 165, 233, 0.16), 0 2px 8px rgba(15, 23, 42, 0.18);
+    #refineMagicLoupe[hidden] {
+      display: none !important;
     }
 
     html[data-stixio-core-stage="review"] #stage-review {
@@ -391,6 +382,102 @@ function installOriginalShellStyles() {
     }
   `;
   document.head.appendChild(style);
+}
+
+function installMagicLoupe(root) {
+  if (!root || root.dataset.magicLoupeInstalled === 'true') return;
+  root.dataset.magicLoupeInstalled = 'true';
+  const loupePixels = 148;
+  const samplePixels = 26;
+
+  const getLoupe = () => {
+    let loupe = document.getElementById('refineMagicLoupe');
+    if (!loupe) {
+      loupe = document.createElement('canvas');
+      loupe.id = 'refineMagicLoupe';
+      loupe.width = loupePixels;
+      loupe.height = loupePixels;
+      loupe.hidden = true;
+      document.body.appendChild(loupe);
+    }
+    return loupe;
+  };
+
+  const hideLoupe = () => {
+    const loupe = document.getElementById('refineMagicLoupe');
+    if (loupe) loupe.hidden = true;
+  };
+
+  const isMagicActive = () => (
+    document.documentElement.dataset.stixioCoreStage === 'refine'
+    && root.querySelector('.mask-tool[data-mask-tool="magic"].bg-emerald-300')
+  );
+
+  root.addEventListener('pointermove', event => {
+    const viewport = root.querySelector('#refineViewport');
+    const canvas = root.querySelector('#refineCanvas');
+    if (!viewport || !canvas || !isMagicActive() || !viewport.contains(event.target)) {
+      hideLoupe();
+      return;
+    }
+
+    const canvasRect = canvas.getBoundingClientRect();
+    if (
+      event.clientX < canvasRect.left
+      || event.clientX > canvasRect.right
+      || event.clientY < canvasRect.top
+      || event.clientY > canvasRect.bottom
+    ) {
+      hideLoupe();
+      return;
+    }
+
+    const loupe = getLoupe();
+    const ctx = loupe.getContext('2d');
+    if (!ctx || !canvas.width || !canvas.height) return;
+
+    const canvasX = (event.clientX - canvasRect.left) * (canvas.width / canvasRect.width);
+    const canvasY = (event.clientY - canvasRect.top) * (canvas.height / canvasRect.height);
+    const sx = Math.max(0, Math.min(canvas.width - samplePixels, canvasX - samplePixels / 2));
+    const sy = Math.max(0, Math.min(canvas.height - samplePixels, canvasY - samplePixels / 2));
+
+    ctx.clearRect(0, 0, loupe.width, loupe.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(loupe.width / 2, loupe.height / 2, loupe.width / 2 - 3, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(canvas, sx, sy, samplePixels, samplePixels, 0, 0, loupe.width, loupe.height);
+    ctx.restore();
+
+    const center = loupe.width / 2;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.84)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(center - 12, center);
+    ctx.lineTo(center + 12, center);
+    ctx.moveTo(center, center - 12);
+    ctx.lineTo(center, center + 12);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(center, center, 5, 0, Math.PI * 2);
+    ctx.fillStyle = root.querySelector('.magic-action[data-magic-action="keep"].bg-emerald-300') ? '#10b981' : '#ef4444';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    loupe.style.left = `${event.clientX + 18}px`;
+    loupe.style.top = `${event.clientY - 86}px`;
+    loupe.hidden = false;
+  }, true);
+
+  root.addEventListener('pointerleave', hideLoupe, true);
+  root.addEventListener('pointerdown', () => {
+    if (!isMagicActive()) hideLoupe();
+  }, true);
 }
 
 function arrangeHeaderChrome(root) {
