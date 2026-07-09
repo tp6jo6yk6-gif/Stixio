@@ -15,13 +15,13 @@ const stageLabels = {
 };
 
 const coreWorkflowStages = [
-  { id: 'layout', number: '01', label: 'Layout', detail: 'Import and frame', target: 'stage-layout' },
-  { id: 'refine', number: '02', label: 'Refine', detail: 'Clean masks', target: 'stage-refine' },
-  { id: 'review', number: '03', label: 'Review', detail: 'Approve output', target: 'stage-review' },
-  { id: 'package', number: '04', label: 'Package', detail: 'Export files', target: 'stage-package' }
+  { id: 'layout', number: '01', label: 'Layout', detail: '匯入與裁切', target: 'stage-layout' },
+  { id: 'refine', number: '02', label: 'Refine', detail: '修補與預覽', target: 'stage-refine' },
+  { id: 'review', number: '03', label: 'Review', detail: '檢查與核准', target: 'stage-review' },
+  { id: 'package', number: '04', label: 'Package', detail: '輸出與封裝', target: 'stage-package' }
 ];
 
-const mainGridClass = 'mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-5 py-6';
+const mainGridClass = 'mx-auto grid w-full max-w-[2400px] grid-cols-1 gap-0 px-0 py-0';
 const threeColumnGrid = `${mainGridClass} xl:grid-cols-[360px_minmax(0,1fr)_340px]`;
 const focusedGrid = `${mainGridClass} xl:grid-cols-[340px_minmax(0,1fr)]`;
 const reviewGrid = `${mainGridClass} xl:grid-cols-[minmax(0,1fr)_340px]`;
@@ -36,7 +36,9 @@ const workflowPanels = {
   ],
   refine: [
     '#refine-settings-panel',
-    '#stage-refine'
+    '#stage-refine',
+    '#sourceList',
+    '#selectedInfo'
   ],
   review: [
     '#stage-review',
@@ -89,7 +91,7 @@ async function bootstrap() {
   try {
     await initStixioWorkshopProgressive(root, { onStage: setStage });
     setStage('ux');
-    installReviewGalleryLayoutStyles();
+    installOriginalShellStyles();
     alignCoreWorkflow(root);
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
@@ -110,65 +112,77 @@ async function bootstrap() {
   }
 }
 
-function installReviewGalleryLayoutStyles() {
-  if (document.getElementById('stixio-review-gallery-layout')) return;
+function installOriginalShellStyles() {
+  if (document.getElementById('stixio-original-shell-layout')) return;
   const style = document.createElement('style');
-  style.id = 'stixio-review-gallery-layout';
+  style.id = 'stixio-original-shell-layout';
   style.textContent = `
-    @media (min-width: 1280px) {
-      html[data-stixio-core-stage="review"] #stage-review {
-        display: grid;
-        grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-        grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-        gap: 1rem;
-        align-items: start;
-      }
+    html,
+    body,
+    #app,
+    #app > div {
+      min-height: 100vh;
+    }
 
-      html[data-stixio-core-stage="review"] #stage-review > div:first-child {
-        grid-column: 1 / -1;
-        grid-row: 1;
-      }
+    #app > div {
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+    }
 
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(2) {
-        grid-column: 1;
-        grid-row: 2;
-        grid-template-columns: 1fr !important;
-      }
+    #app header {
+      flex: 0 0 auto;
+      border-bottom-color: rgba(15, 23, 42, 0.12);
+      background: rgba(255, 255, 255, 0.96);
+    }
 
-      html[data-stixio-core-stage="review"] #stage-review > #reviewProgressBar {
-        grid-column: 1;
-        grid-row: 3;
-      }
+    #app main {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
 
-      html[data-stixio-core-stage="review"] #stage-review > #reviewGrid {
-        grid-column: 1;
-        grid-row: 4 / span 2;
-        align-content: start;
-        grid-template-columns: 1fr !important;
-        max-height: max(520px, calc(100vh - var(--stixio-workflow-offset, 150px) - 2rem));
+    #app main > aside,
+    #app main > section {
+      min-height: 0;
+      overflow: auto;
+      padding: 1.25rem;
+    }
+
+    #app main > section {
+      background: #f1f5f9;
+    }
+
+    #app main > aside {
+      background: #ffffff;
+      border-left: 1px solid rgba(15, 23, 42, 0.1);
+      border-right: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    #app section[id^="stage-"],
+    #app section.rounded-\[1\.75rem\],
+    #app div[id$="Root"] > section {
+      border-radius: 1rem !important;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+    }
+
+    html[data-stixio-core-stage="review"] #stage-review {
+      display: block;
+    }
+
+    html[data-stixio-core-stage="review"] #reviewGrid {
+      max-height: 55vh;
+      overflow: auto;
+    }
+
+    @media (max-width: 1279px) {
+      #app main {
         overflow: auto;
-        padding-right: 0.25rem;
       }
 
-      html[data-stixio-core-stage="review"] #stage-review > #reviewGrid [data-review-card="true"] {
-        border-radius: 1.25rem;
-      }
-
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(3) {
-        grid-column: 2;
-        grid-row: 2;
-        margin-top: 0;
-      }
-
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(4) {
-        grid-column: 2;
-        grid-row: 3 / span 2;
-        grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
-      }
-
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(5) {
-        grid-column: 2;
-        grid-row: 5;
+      #app main > aside,
+      #app main > section {
+        overflow: visible;
       }
     }
   `;
@@ -181,9 +195,9 @@ function alignCoreWorkflow(root) {
 
   if (nav.dataset.coreWorkflowTabs !== 'true') {
     nav.dataset.coreWorkflowTabs = 'true';
-    nav.className = 'mx-auto max-w-[1600px] px-5 pb-3';
-    nav.innerHTML = `<div class="rounded-2xl border border-slate-900/10 bg-white/90 p-2 shadow-sm backdrop-blur" role="tablist" aria-label="Stixio core workflow">
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    nav.className = 'mx-auto max-w-4xl px-5 pb-3';
+    nav.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-100 p-1.5 shadow-sm" role="tablist" aria-label="Stixio four-page workflow">
+      <div class="grid grid-cols-2 gap-1 md:grid-cols-4">
         ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
       </div>
     </div>`;
@@ -200,10 +214,9 @@ function alignCoreWorkflow(root) {
 }
 
 function coreWorkflowTab(stage) {
-  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition">
-    <span class="block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400">${stage.number}</span>
-    <span class="mt-0.5 block truncate text-sm font-black">${stage.label}</span>
-    <span class="block truncate text-[11px] font-bold opacity-70">${stage.detail}</span>
+  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-lg px-4 py-2 text-center text-sm font-black text-slate-500 transition">
+    <span class="block truncate">${stage.number} ${stage.label}</span>
+    <span class="mt-0.5 block truncate text-[10px] font-bold opacity-60">${stage.detail}</span>
   </button>`;
 }
 
@@ -219,12 +232,8 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
     const active = button.dataset.coreWorkflowTab === activeStage.id;
     button.setAttribute('aria-selected', String(active));
     button.className = active
-      ? 'min-w-0 rounded-xl bg-slate-950 px-3 py-2 text-left text-white shadow-sm transition'
-      : 'min-w-0 rounded-xl bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:bg-slate-100';
-    const number = button.querySelector('span');
-    if (number) number.className = active
-      ? 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-emerald-300'
-      : 'block truncate text-[10px] font-black uppercase tracking-[.14em] text-slate-400';
+      ? 'min-w-0 rounded-lg bg-white px-4 py-2 text-center text-sm font-black text-emerald-600 shadow-sm transition'
+      : 'min-w-0 rounded-lg px-4 py-2 text-center text-sm font-black text-slate-500 transition hover:text-slate-700';
   });
 
   applyFocusedWorkflowLayout(root, activeStage.id);
