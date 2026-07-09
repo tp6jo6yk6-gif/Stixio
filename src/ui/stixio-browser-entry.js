@@ -119,27 +119,32 @@ function installReviewGalleryLayoutStyles() {
       html[data-stixio-core-stage="review"] #stage-review {
         display: grid;
         grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+        grid-template-rows: auto auto auto minmax(0, 1fr) auto;
         gap: 1rem;
         align-items: start;
       }
 
-      html[data-stixio-core-stage="review"] #stage-review > div:first-child,
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(2) {
+      html[data-stixio-core-stage="review"] #stage-review > div:first-child {
         grid-column: 1 / -1;
+        grid-row: 1;
       }
 
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(3),
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(4),
-      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(5),
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(2) {
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: 1fr !important;
+      }
+
       html[data-stixio-core-stage="review"] #stage-review > #reviewProgressBar {
-        grid-column: 2;
+        grid-column: 1;
+        grid-row: 3;
       }
 
       html[data-stixio-core-stage="review"] #stage-review > #reviewGrid {
         grid-column: 1;
-        grid-row: 3 / span 5;
+        grid-row: 4 / span 2;
         align-content: start;
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
         max-height: max(520px, calc(100vh - var(--stixio-workflow-offset, 150px) - 2rem));
         overflow: auto;
         padding-right: 0.25rem;
@@ -149,8 +154,21 @@ function installReviewGalleryLayoutStyles() {
         border-radius: 1.25rem;
       }
 
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(3) {
+        grid-column: 2;
+        grid-row: 2;
+        margin-top: 0;
+      }
+
       html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(4) {
+        grid-column: 2;
+        grid-row: 3 / span 2;
         grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
+      }
+
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(5) {
+        grid-column: 2;
+        grid-row: 5;
       }
     }
   `;
