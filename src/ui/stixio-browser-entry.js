@@ -36,7 +36,9 @@ const workflowPanels = {
   ],
   refine: [
     '#refine-settings-panel',
-    '#stage-refine'
+    '#stage-refine',
+    '#sourceList',
+    '#selectedInfo'
   ],
   review: [
     '#stage-review',
@@ -52,7 +54,7 @@ const workflowPanels = {
 
 const workflowGridClasses = {
   layout: threeColumnGrid,
-  refine: focusedGrid,
+  refine: threeColumnGrid,
   review: reviewGrid,
   package: threeColumnGrid
 };
@@ -237,12 +239,23 @@ function installOriginalShellStyles() {
       width: min(720px, calc(100vw - 2.5rem));
     }
 
+    html[data-stixio-core-stage="refine"] #sourceList {
+      max-height: 54vh;
+      overflow: auto;
+    }
+
     html[data-stixio-core-stage="review"] #stage-review {
       display: block;
     }
 
+    html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(3),
+    html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(4) {
+      display: none;
+    }
+
     html[data-stixio-core-stage="review"] #reviewGrid {
-      max-height: 55vh;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      max-height: 68vh;
       overflow: auto;
     }
 
@@ -252,7 +265,9 @@ function installOriginalShellStyles() {
     }
 
     html[data-stixio-core-stage="review"] #reviewGrid [data-review-card="true"] {
-      padding-bottom: 0.75rem;
+      border-radius: 1.25rem;
+      padding: 0.75rem;
+      padding-bottom: 0.9rem;
     }
 
     html[data-stixio-core-stage="package"] #destinationRulesRoot,
