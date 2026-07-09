@@ -92,6 +92,7 @@ async function bootstrap() {
     await initStixioWorkshopProgressive(root, { onStage: setStage });
     setStage('ux');
     installOriginalShellStyles();
+    arrangeHeaderChrome(root);
     alignCoreWorkflow(root);
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
@@ -136,6 +137,12 @@ function installOriginalShellStyles() {
       background: rgba(255, 255, 255, 0.96);
     }
 
+    #app header > div:first-child {
+      max-width: 2400px;
+      padding-bottom: 0.75rem;
+      padding-top: 0.75rem;
+    }
+
     #app main {
       flex: 1 1 auto;
       min-height: 0;
@@ -166,6 +173,72 @@ function installOriginalShellStyles() {
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
     }
 
+    #app header nav[aria-label="Workshop workflow"] {
+      order: 2;
+      flex: 1 1 520px;
+      max-width: 720px;
+      min-width: 360px;
+      margin: 0 1rem;
+      padding: 0;
+    }
+
+    #app header > div:first-child > div:first-child {
+      order: 1;
+      flex: 0 0 auto;
+    }
+
+    #app header > div:first-child > div:last-child {
+      order: 3;
+      flex: 0 1 auto;
+      min-width: 0;
+      justify-content: flex-end;
+    }
+
+    #projectToolbarRoot {
+      display: flex;
+      min-width: 0;
+    }
+
+    #projectToolbarRoot > div {
+      max-width: none !important;
+      padding: 0 !important;
+    }
+
+    #projectToolbarRoot > div > div:first-child {
+      flex-wrap: nowrap;
+      gap: 0.35rem;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      box-shadow: none;
+    }
+
+    #projectToolbarRoot #projectNameInput {
+      width: 150px;
+      min-width: 110px;
+      flex: 0 1 150px;
+      padding: 0.5rem 0.65rem;
+    }
+
+    #projectToolbarRoot button,
+    #projectToolbarRoot label {
+      padding: 0.5rem 0.65rem;
+      white-space: nowrap;
+    }
+
+    #projectToolbarRoot #projectAutosaveStatus {
+      display: none;
+    }
+
+    #projectToolbarRoot #projectProgress,
+    #projectToolbarRoot #projectRecentPanel {
+      position: absolute;
+      right: 1.25rem;
+      top: calc(100% - 0.35rem);
+      z-index: 60;
+      width: min(720px, calc(100vw - 2.5rem));
+    }
+
     html[data-stixio-core-stage="review"] #stage-review {
       display: block;
     }
@@ -176,6 +249,22 @@ function installOriginalShellStyles() {
     }
 
     @media (max-width: 1279px) {
+      #app header > div:first-child {
+        flex-wrap: wrap;
+      }
+
+      #app header nav[aria-label="Workshop workflow"] {
+        order: 4;
+        flex-basis: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+      }
+
+      #projectToolbarRoot #projectNameInput {
+        display: none;
+      }
+
       #app main {
         overflow: auto;
       }
@@ -189,15 +278,29 @@ function installOriginalShellStyles() {
   document.head.appendChild(style);
 }
 
+function arrangeHeaderChrome(root) {
+  const header = root?.querySelector('header');
+  const bar = header?.firstElementChild;
+  const nav = header?.querySelector('nav[aria-label="Workshop workflow"]');
+  const projectToolbar = header?.querySelector('#projectToolbarRoot');
+  const actions = bar?.lastElementChild;
+
+  if (!header || !bar || !actions) return;
+  bar.className = 'mx-auto flex max-w-[2400px] items-center justify-between gap-3 px-5 py-3';
+
+  if (nav && !bar.contains(nav)) bar.insertBefore(nav, actions);
+  if (projectToolbar && !actions.contains(projectToolbar)) actions.insertBefore(projectToolbar, actions.firstChild);
+}
+
 function alignCoreWorkflow(root) {
   const nav = root?.querySelector('header nav[aria-label="Workshop workflow"]');
   if (!nav) return;
 
   if (nav.dataset.coreWorkflowTabs !== 'true') {
     nav.dataset.coreWorkflowTabs = 'true';
-    nav.className = 'mx-auto max-w-4xl px-5 pb-3';
+    nav.className = 'min-w-0 flex-1';
     nav.innerHTML = `<div class="rounded-xl border border-slate-200 bg-slate-100 p-1.5 shadow-sm" role="tablist" aria-label="Stixio four-page workflow">
-      <div class="grid grid-cols-2 gap-1 md:grid-cols-4">
+      <div class="grid grid-cols-4 gap-1">
         ${coreWorkflowStages.map(stage => coreWorkflowTab(stage)).join('')}
       </div>
     </div>`;
@@ -207,6 +310,7 @@ function alignCoreWorkflow(root) {
     });
   }
 
+  arrangeHeaderChrome(root);
   syncCoreWorkflowOffsets(root);
   activateCoreWorkflowTab(root, activeCoreWorkflowStage);
   installWorkflowMutationGuard(root);
@@ -214,7 +318,7 @@ function alignCoreWorkflow(root) {
 }
 
 function coreWorkflowTab(stage) {
-  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-lg px-4 py-2 text-center text-sm font-black text-slate-500 transition">
+  return `<button type="button" role="tab" aria-selected="false" aria-controls="${stage.target}" data-core-workflow-tab="${stage.id}" class="min-w-0 rounded-lg px-3 py-2 text-center text-xs font-black text-slate-500 transition">
     <span class="block truncate">${stage.number} ${stage.label}</span>
     <span class="mt-0.5 block truncate text-[10px] font-bold opacity-60">${stage.detail}</span>
   </button>`;
@@ -232,8 +336,8 @@ function activateCoreWorkflowTab(root, stageId, options = {}) {
     const active = button.dataset.coreWorkflowTab === activeStage.id;
     button.setAttribute('aria-selected', String(active));
     button.className = active
-      ? 'min-w-0 rounded-lg bg-white px-4 py-2 text-center text-sm font-black text-emerald-600 shadow-sm transition'
-      : 'min-w-0 rounded-lg px-4 py-2 text-center text-sm font-black text-slate-500 transition hover:text-slate-700';
+      ? 'min-w-0 rounded-lg bg-white px-3 py-2 text-center text-xs font-black text-emerald-600 shadow-sm transition'
+      : 'min-w-0 rounded-lg px-3 py-2 text-center text-xs font-black text-slate-500 transition hover:text-slate-700';
   });
 
   applyFocusedWorkflowLayout(root, activeStage.id);
@@ -313,6 +417,7 @@ function installWorkflowMutationGuard(root) {
         alignCoreWorkflow(root);
         return;
       }
+      arrangeHeaderChrome(root);
       activateCoreWorkflowTab(root, activeCoreWorkflowStage);
     });
   });
