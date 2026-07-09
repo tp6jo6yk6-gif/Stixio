@@ -89,6 +89,7 @@ async function bootstrap() {
   try {
     await initStixioWorkshopProgressive(root, { onStage: setStage });
     setStage('ux');
+    installReviewGalleryLayoutStyles();
     alignCoreWorkflow(root);
     enhanceWorkshopUx(root);
     bridgeWorkshopLegacyControls(root);
@@ -107,6 +108,53 @@ async function bootstrap() {
   } finally {
     clearTimeout(watchdog);
   }
+}
+
+function installReviewGalleryLayoutStyles() {
+  if (document.getElementById('stixio-review-gallery-layout')) return;
+  const style = document.createElement('style');
+  style.id = 'stixio-review-gallery-layout';
+  style.textContent = `
+    @media (min-width: 1280px) {
+      html[data-stixio-core-stage="review"] #stage-review {
+        display: grid;
+        grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
+      }
+
+      html[data-stixio-core-stage="review"] #stage-review > div:first-child,
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(2) {
+        grid-column: 1 / -1;
+      }
+
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(3),
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(4),
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(5),
+      html[data-stixio-core-stage="review"] #stage-review > #reviewProgressBar {
+        grid-column: 2;
+      }
+
+      html[data-stixio-core-stage="review"] #stage-review > #reviewGrid {
+        grid-column: 1;
+        grid-row: 3 / span 5;
+        align-content: start;
+        grid-template-columns: 1fr;
+        max-height: max(520px, calc(100vh - var(--stixio-workflow-offset, 150px) - 2rem));
+        overflow: auto;
+        padding-right: 0.25rem;
+      }
+
+      html[data-stixio-core-stage="review"] #stage-review > #reviewGrid [data-review-card="true"] {
+        border-radius: 1.25rem;
+      }
+
+      html[data-stixio-core-stage="review"] #stage-review > div:nth-of-type(4) {
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
+      }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 function alignCoreWorkflow(root) {
@@ -247,6 +295,7 @@ function installWorkflowMutationGuard(root) {
 function syncCoreWorkflowOffsets(root) {
   const header = root?.querySelector('header');
   const offset = Math.ceil((header?.getBoundingClientRect().height || 140) + 16);
+  document.documentElement.style.setProperty('--stixio-workflow-offset', `${offset}px`);
   coreWorkflowStages.forEach(stage => {
     const target = document.getElementById(stage.target);
     if (target) target.style.scrollMarginTop = `${offset}px`;
