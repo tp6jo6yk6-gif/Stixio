@@ -8,6 +8,7 @@
   const SAMPLE_SIZE = 26;
 
   installVisualLockStyles();
+  installFlowStabilityCleanup();
   installMagicLoupe();
 
   function installVisualLockStyles() {
@@ -28,6 +29,35 @@
       #stage-refine #refineCanvas,
       #stage-refine #refineOutputCanvas {
         image-rendering: auto;
+      }
+
+      #stage-refine [data-refine-view],
+      #stage-refine .stixio-hidden-by-stability,
+      #stage-review .stixio-hidden-by-stability,
+      #stage-package .stixio-hidden-by-stability {
+        display: none !important;
+      }
+
+      #stage-review #reviewHeroStage,
+      #stage-review #reviewHeroMeta,
+      #stage-review [data-review-bg],
+      #stage-review #reviewZoomOutBtn,
+      #stage-review #reviewZoomResetBtn,
+      #stage-review #reviewZoomInBtn,
+      #stage-review #reviewPrevBtn,
+      #stage-review #reviewNextBtn,
+      #stage-review #toggleSafeGuideBtn,
+      #stage-review #toggleContentBoundsBtn {
+        display: none !important;
+      }
+
+      #stage-review #reviewGrid {
+        grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)) !important;
+        align-items: start;
+      }
+
+      #stage-review #reviewGrid > * {
+        min-height: 156px;
       }
 
       #refineMagicLoupe {
@@ -53,6 +83,87 @@
       }
     `;
     document.head.appendChild(style);
+  }
+
+  function installFlowStabilityCleanup() {
+    const run = () => applyFlowStabilityCleanup();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', run, { once: true });
+    } else {
+      run();
+    }
+
+    const observer = new MutationObserver(run);
+    const startObserver = () => {
+      if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+    };
+    if (document.body) startObserver();
+    else document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+  }
+
+  function applyFlowStabilityCleanup() {
+    lockRefineVisualFlow();
+    simplifyReviewFlow();
+    quietPackageFlow();
+  }
+
+  function hideNode(node) {
+    if (!node) return;
+    node.classList.add('stixio-hidden-by-stability');
+    node.setAttribute('aria-hidden', 'true');
+  }
+
+  function hideClosestPanel(node) {
+    if (!node) return;
+    hideNode(node.closest('label') || node.closest('.grid') || node.closest('div') || node);
+  }
+
+  function lockRefineVisualFlow() {
+    const stage = document.getElementById('stage-refine');
+    if (!stage) return;
+
+    stage.querySelectorAll('[data-refine-view]').forEach(button => hideClosestPanel(button));
+
+    const heading = stage.querySelector('h2');
+    if (heading) heading.textContent = '單張遮罩修補與成品預覽';
+
+    const viewportHint = stage.querySelector('#refineViewport .absolute.bottom-3.left-3');
+    if (viewportHint) viewportHint.textContent = '淡紅＝將去背 · 其他保留原色';
+  }
+
+  function simplifyReviewFlow() {
+    const stage = document.getElementById('stage-review');
+    if (!stage) return;
+
+    const heading = stage.querySelector('h2');
+    if (heading) heading.textContent = '縮圖總覽、品質檢查與核准';
+
+    const description = stage.querySelector('h2 + p');
+    if (description) description.textContent = '集中檢查全部 Frame，保留搜尋、篩選、排序、核准與排除。';
+
+    const hero = document.getElementById('reviewHeroStage');
+    if (hero) hideNode(hero.closest('.grid') || hero);
+    hideNode(document.getElementById('reviewHeroMeta'));
+
+    ['reviewPrevBtn', 'reviewNextBtn', 'toggleSafeGuideBtn', 'toggleContentBoundsBtn', 'reviewZoomOutBtn', 'reviewZoomResetBtn', 'reviewZoomInBtn'].forEach(id => hideNode(document.getElementById(id)));
+    stage.querySelectorAll('[data-review-bg]').forEach(button => hideNode(button));
+  }
+
+  function quietPackageFlow() {
+    const stage = document.getElementById('stage-package');
+    if (!stage) return;
+
+    const heading = stage.querySelector('h2');
+    if (heading && /Manifest|完整性|封裝|交付/.test(heading.textContent || '')) {
+      heading.textContent = '角色規格、ZIP、Manifest 與專案輸出';
+    }
+
+    const advancedTerms = ['資料夾結構', '命名模式', '前綴', '後綴', '壓縮方式', '壓縮等級', 'CSV Manifest', '進階'];
+    stage.querySelectorAll('label, div, button').forEach(node => {
+      const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!text || text.length > 36) return;
+      if (advancedTerms.some(term => text.includes(term))) hideClosestPanel(node);
+    });
   }
 
   function isRefineSourceDraw(ctx, source) {
