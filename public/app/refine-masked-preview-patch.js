@@ -4,6 +4,56 @@
 
   const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
   const DELETE_MARK_STRENGTH = 0.34;
+  const LOUPE_SIZE = 148;
+  const SAMPLE_SIZE = 26;
+
+  installVisualLockStyles();
+  installMagicLoupe();
+
+  function installVisualLockStyles() {
+    if (document.getElementById('stixio-refine-visual-lock')) return;
+    const style = document.createElement('style');
+    style.id = 'stixio-refine-visual-lock';
+    style.textContent = `
+      #stage-refine #refineWorkspace {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+
+      #stage-refine #refineViewport,
+      #stage-refine #refineResultPane {
+        display: grid !important;
+        min-height: 430px !important;
+      }
+
+      #stage-refine #refineCanvas,
+      #stage-refine #refineOutputCanvas {
+        image-rendering: auto;
+      }
+
+      #refineMagicLoupe {
+        position: fixed;
+        z-index: 90;
+        width: 74px;
+        height: 74px;
+        border-radius: 999px;
+        border: 2px solid #0f172a;
+        background: #fff;
+        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.88);
+        pointer-events: none;
+      }
+
+      #refineMagicLoupe[hidden] {
+        display: none !important;
+      }
+
+      @media (max-width: 1023px) {
+        #stage-refine #refineWorkspace {
+          grid-template-columns: 1fr !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   function isRefineSourceDraw(ctx, source) {
     return ctx?.canvas?.id === 'refineCanvas'
@@ -102,4 +152,86 @@
     if (isRefineSourceDraw(this, source)) applyAutoDeleteMarks(this);
     return result;
   };
+
+  function getLoupe() {
+    let loupe = document.getElementById('refineMagicLoupe');
+    if (!loupe) {
+      loupe = document.createElement('canvas');
+      loupe.id = 'refineMagicLoupe';
+      loupe.width = LOUPE_SIZE;
+      loupe.height = LOUPE_SIZE;
+      loupe.hidden = true;
+      document.body.appendChild(loupe);
+    }
+    return loupe;
+  }
+
+  function hideLoupe() {
+    const loupe = document.getElementById('refineMagicLoupe');
+    if (loupe) loupe.hidden = true;
+  }
+
+  function isMagicActive() {
+    return Boolean(document.querySelector('#stage-refine .mask-tool[data-mask-tool="magic"].bg-emerald-300'));
+  }
+
+  function installMagicLoupe() {
+    document.addEventListener('pointermove', event => {
+      const viewport = document.getElementById('refineViewport');
+      const canvas = document.getElementById('refineCanvas');
+      if (!viewport || !canvas || !isMagicActive() || !viewport.contains(event.target)) {
+        hideLoupe();
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+        hideLoupe();
+        return;
+      }
+
+      const loupe = getLoupe();
+      const ctx = loupe.getContext('2d');
+      if (!ctx || !canvas.width || !canvas.height) return;
+
+      const canvasX = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const canvasY = (event.clientY - rect.top) * (canvas.height / rect.height);
+      const sx = Math.max(0, Math.min(canvas.width - SAMPLE_SIZE, canvasX - SAMPLE_SIZE / 2));
+      const sy = Math.max(0, Math.min(canvas.height - SAMPLE_SIZE, canvasY - SAMPLE_SIZE / 2));
+
+      ctx.clearRect(0, 0, loupe.width, loupe.height);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(loupe.width / 2, loupe.height / 2, loupe.width / 2 - 3, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(canvas, sx, sy, SAMPLE_SIZE, SAMPLE_SIZE, 0, 0, loupe.width, loupe.height);
+      ctx.restore();
+
+      const center = loupe.width / 2;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.84)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(center - 12, center);
+      ctx.lineTo(center + 12, center);
+      ctx.moveTo(center, center - 12);
+      ctx.lineTo(center, center + 12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(center, center, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#fca5a5';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+
+      loupe.style.left = `${event.clientX + 18}px`;
+      loupe.style.top = `${event.clientY - 86}px`;
+      loupe.hidden = false;
+    }, true);
+
+    document.addEventListener('pointerleave', hideLoupe, true);
+  }
 })();
