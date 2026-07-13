@@ -118,6 +118,17 @@
     hideNode(node.closest('label') || node.closest('.grid') || node.closest('div') || node);
   }
 
+  function hidePackageControl(node) {
+    if (!node) return;
+    if (node.matches('label, button')) {
+      hideNode(node);
+      return;
+    }
+
+    const field = node.closest('label') || node.closest('div');
+    hideNode(field || node);
+  }
+
   function lockRefineVisualFlow() {
     const stage = document.getElementById('stage-refine');
     if (!stage) return;
@@ -159,10 +170,10 @@
     }
 
     const advancedTerms = ['資料夾結構', '命名模式', '前綴', '後綴', '壓縮方式', '壓縮等級', 'CSV Manifest', '進階'];
-    stage.querySelectorAll('label, div, button').forEach(node => {
+    stage.querySelectorAll('label, button, div').forEach(node => {
       const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
       if (!text || text.length > 36) return;
-      if (advancedTerms.some(term => text.includes(term))) hideClosestPanel(node);
+      if (advancedTerms.some(term => text.includes(term))) hidePackageControl(node);
     });
   }
 
