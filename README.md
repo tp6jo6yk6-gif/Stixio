@@ -20,6 +20,16 @@ Package
 Export
 ```
 
+## 1.0.0 alignment decision
+
+The 1.0.0 release candidate uses one linear production path:
+
+```text
+Layout → Refine → Review → Package
+```
+
+Native Workspace tabs, hidden columns, alternate page modes, cloud workspace, login, billing, AI Detect, and collaboration are deferred. They should not appear as active release paths until the core workflow is stable and signed off.
+
 ## Current capabilities
 
 - Multi-image artwork import
@@ -100,6 +110,7 @@ Recommended Beta deployment:
 
 ```text
 Project name: stixio-beta
+Source branch: release/1.0.0
 Build command: npm run build
 Build output: dist
 Custom domain: beta.stixio.app
