@@ -1,13 +1,11 @@
 {
   "application": "Stixio Workshop",
   "deployment_triggered_at": "2026-07-13T00:00:00+08:00",
-  "release_version": "20260713-stability-1",
+  "release_version": "20260713-stability-3",
   "source_branch": "release/1.0.0",
   "stability_pass": [
     "cache-version",
-    "page-role-lock",
-    "refine-visual-lock",
-    "review-gallery-simplify",
-    "package-quiet-mode"
+    "safe-refine-restore",
+    "source-delete-preview-cleanup"
   ]
 }
