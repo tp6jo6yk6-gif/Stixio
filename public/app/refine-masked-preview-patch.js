@@ -80,11 +80,63 @@
     return Number.isFinite(value) ? Math.max(5, Math.min(160, value)) : 30;
   }
 
+  function isExteriorOnlyEnabled() {
+    return document.getElementById('exteriorInput')?.checked !== false;
+  }
+
   function tintDeletePixel(image, offset) {
     const strength = DELETE_MARK_STRENGTH;
     image.data[offset] = Math.min(255, Math.round(image.data[offset] * (1 - strength) + 255 * strength));
     image.data[offset + 1] = Math.round(image.data[offset + 1] * (1 - strength));
     image.data[offset + 2] = Math.round(image.data[offset + 2] * (1 - strength));
+  }
+
+  function matchesBackground(image, offset, target, tolerance) {
+    if (image.data[offset + 3] <= 8) return false;
+    const distance = Math.abs(image.data[offset] - target[0])
+      + Math.abs(image.data[offset + 1] - target[1])
+      + Math.abs(image.data[offset + 2] - target[2]);
+    return distance <= tolerance;
+  }
+
+  function markAllMatchingBackground(image, target, tolerance) {
+    for (let offset = 0; offset < image.data.length; offset += 4) {
+      if (matchesBackground(image, offset, target, tolerance)) tintDeletePixel(image, offset);
+    }
+  }
+
+  function markExteriorBackground(image, width, height, target, tolerance) {
+    const visited = new Uint8Array(width * height);
+    const queue = [];
+
+    const canMark = index => !visited[index] && matchesBackground(image, index * 4, target, tolerance);
+    const enqueue = index => {
+      if (!canMark(index)) return;
+      visited[index] = 1;
+      queue.push(index);
+    };
+
+    for (let x = 0; x < width; x += 1) {
+      enqueue(x);
+      enqueue((height - 1) * width + x);
+    }
+
+    for (let y = 1; y < height - 1; y += 1) {
+      enqueue(y * width);
+      enqueue(y * width + width - 1);
+    }
+
+    for (let head = 0; head < queue.length; head += 1) {
+      const index = queue[head];
+      tintDeletePixel(image, index * 4);
+
+      const x = index % width;
+      const y = Math.floor(index / width);
+      if (x > 0) enqueue(index - 1);
+      if (x < width - 1) enqueue(index + 1);
+      if (y > 0) enqueue(index - width);
+      if (y < height - 1) enqueue(index + width);
+    }
   }
 
   function applyAutoDeleteMarks(ctx) {
@@ -100,13 +152,10 @@
 
     const target = readBackgroundColor();
     const tolerance = readTolerance() * 3;
-
-    for (let offset = 0; offset < image.data.length; offset += 4) {
-      if (image.data[offset + 3] <= 8) continue;
-      const distance = Math.abs(image.data[offset] - target[0])
-        + Math.abs(image.data[offset + 1] - target[1])
-        + Math.abs(image.data[offset + 2] - target[2]);
-      if (distance <= tolerance) tintDeletePixel(image, offset);
+    if (isExteriorOnlyEnabled()) {
+      markExteriorBackground(image, canvas.width, canvas.height, target, tolerance);
+    } else {
+      markAllMatchingBackground(image, target, tolerance);
     }
 
     ctx.putImageData(image, 0, 0);
