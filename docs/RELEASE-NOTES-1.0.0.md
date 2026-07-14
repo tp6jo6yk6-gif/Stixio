@@ -1,12 +1,15 @@
 # Stixio 1.0.0 Release Notes
 
-Release status: **Prepared, not published**
+Version: `1.0.0`
+Release status: **prepared-not-published**
 
 Stixio 1.0.0 is the first production-ready release of the Workshop. Publication remains blocked until real-user Beta sign-off, all required checks, branch protection, and rollback rehearsal are complete.
 
 ## Highlights
 
 - Complete Layout, Refine, Review, Package, Project, and Destination workflows.
+- Review can apply LINE standard pack criteria, assign main/tab/01-style names by current order, and move excess stickers into backup.
+- Package uses simplified icon-led actions for PNG, ZIP, manifest, and copy handoff.
 - Legacy parity and stress coverage for 40 and 100 outputs, multi-source re-import, independent masks, reordering, and Destination Profile switching.
 - Local compiled Tailwind CSS and verified local JSZip; no public runtime CDN dependency.
 - Single production browser bundle instead of a large runtime ES-module request graph.

@@ -97,6 +97,17 @@ export function createProjectController(adapter, options = {}) {
         event.returnValue = '';
       });
     }
+    if (!globalThis.__stixioProjectClearWorkspaceBound) {
+      globalThis.__stixioProjectClearWorkspaceBound = true;
+      window.addEventListener('stixio:clear-workspace', event => {
+        event.preventDefault();
+        if (event.detail && typeof event.detail === 'object') {
+          event.detail.promise = clearWorkspace();
+        } else {
+          clearWorkspace();
+        }
+      });
+    }
   }
 
   async function newProject() {
@@ -108,6 +119,23 @@ export function createProjectController(adapter, options = {}) {
     local.lastSavedAt = null;
     local.lastFingerprint = await adapter.getProjectFingerprint();
     local.status = '新專案';
+    local.error = null;
+    closeRecent();
+    refresh();
+  }
+
+  async function clearWorkspace() {
+    clearTimeout(local.autosaveTimer);
+    await adapter.resetProject();
+    if (storage.clearAllAutosaves) await storage.clearAllAutosaves();
+    else {
+      const latest = await storage.getLatestAutosave?.();
+      if (latest?.id) await storage.clearAutosave(latest.id);
+    }
+    local.dirty = false;
+    local.lastSavedAt = null;
+    local.lastFingerprint = await adapter.getProjectFingerprint();
+    local.status = 'Workspace 已清除';
     local.error = null;
     closeRecent();
     refresh();
@@ -337,6 +365,7 @@ export function createProjectController(adapter, options = {}) {
     exportProject,
     openProjectFile,
     restoreSnapshot,
+    clearWorkspace,
     getStorage: () => storage,
     getState: () => ({ ...local })
   };

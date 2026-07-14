@@ -28,9 +28,9 @@ Export
 - Frame-based render pipeline
 - Background cleanup and mask tools
 - Custom canvas, safe area, alignment, and output offsets
-- Large Review preview and file-size warnings
+- Large Review preview, file-size warnings, and LINE pack criteria for main/tab/01 sequencing
 - Platform-neutral package roles and naming
-- PNG and ZIP export
+- New-user-friendly Package handoff with PNG and ZIP export
 - Wheel zoom, pan, keyboard shortcuts, workspace reset, and dark mode
 
 ## Clickable local preview
@@ -109,4 +109,8 @@ Beta should remain noindex and may be protected with Cloudflare Access.
 
 ## Version
 
-Current version: `1.0.0-rc.1`
+Current version: `1.0.0`
+
+Release status: `prepared-not-published`
+
+Stixio 1.0.0 is prepared for production release, but publication remains blocked until real-user Beta sign-off, required checks, branch protection, and rollback rehearsal are complete.

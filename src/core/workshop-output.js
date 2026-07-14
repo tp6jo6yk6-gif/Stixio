@@ -23,7 +23,8 @@ export function createSourceLayoutSettings(settings = {}) {
     marginY: clampNumber(settings.marginY, 0, 500, 0),
     gapX: clampNumber(settings.gapX, 0, 500, 0),
     gapY: clampNumber(settings.gapY, 0, 500, 0),
-    smartSnap: settings.smartSnap !== false
+    smartSnap: settings.smartSnap !== false,
+    manualLayoutOpen: Boolean(settings.manualLayoutOpen ?? (settings.layoutMode && settings.layoutMode !== 'auto'))
   };
 }
 

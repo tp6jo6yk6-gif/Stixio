@@ -88,23 +88,23 @@ export function createPackageController(adapter) {
     return `<section id="stage-package" class="scroll-mt-40 rounded-[1.75rem] border border-amber-200 bg-white p-5 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Delivery Engine</p>
-          <h2 class="text-xl font-black">封裝、Manifest 與完整性驗證</h2>
-          <p class="mt-1 text-xs font-bold text-slate-400">確認最終路徑、檔案大小與核准狀態，再產生可驗證的 ZIP 交付包。</p>
+          <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Arrange & Delivery</p>
+          <h2 class="text-xl font-black">整包編排與交付</h2>
+          <p class="mt-1 text-xs font-bold text-slate-400">確認整包角色、輸出路徑、檔案大小與核准狀態，再產生可驗證的 ZIP 交付包。</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button id="packageDownloadAllPngBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">下載全部 PNG</button>
-          <button id="packageManifestJsonBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">下載 Manifest</button>
-          <button id="packageCopyManifestBtn" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black">複製 Manifest</button>
-          <button id="packageExportBtn" class="rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-slate-950">產生 ZIP</button>
-          <button id="packageCancelBtn" class="hidden rounded-xl bg-rose-100 px-3 py-2 text-xs font-black text-rose-700">取消</button>
+          <button id="packageDownloadAllPngBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-950 px-4 text-xs font-black text-white">${iconMark('↓')}<span>下載 PNG</span></button>
+          <button id="packageExportBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-amber-400 px-4 text-xs font-black text-slate-950">${iconMark('ZIP')}<span>產生 ZIP</span></button>
+          <button id="packageManifestJsonBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700">${iconMark('DOC')}<span>清單</span></button>
+          <button id="packageCopyManifestBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700">${iconMark('COPY')}<span>複製</span></button>
+          <button id="packageCancelBtn" class="hidden inline-flex h-11 items-center gap-2 rounded-2xl bg-rose-100 px-3 text-xs font-black text-rose-700">${iconMark('×')}<span>取消</span></button>
         </div>
       </div>
       <div id="packagePreflight" class="mt-4"></div>
       <div id="packageProgress" class="mt-4"></div>
       <div class="mt-4 grid gap-4 xl:grid-cols-[1fr_280px]">
         <div>
-          <div class="mb-2 flex items-center justify-between"><h3 class="text-sm font-black">ZIP 內容</h3><span id="packageFileCount" class="text-xs font-black text-slate-400"></span></div>
+          <div class="mb-2 flex items-center justify-between"><h3 class="text-sm font-black">輸出清單</h3><span id="packageFileCount" class="text-xs font-black text-slate-400"></span></div>
           <div id="packageFileList" class="space-y-2"></div>
         </div>
         <div><h3 class="text-sm font-black">最近輸出</h3><div id="packageHistory" class="mt-2 space-y-2"></div></div>
@@ -116,14 +116,15 @@ export function createPackageController(adapter) {
     const naming = adapter.getNamingSettings();
     return `<section class="rounded-[1.75rem] border border-amber-300 bg-slate-950 p-5 text-white shadow-sm">
       <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-300">Package · Settings</p>
-      <h2 class="mt-1 text-lg font-black">交付內容設定</h2>
+      <h2 class="mt-1 text-lg font-black">整包設定</h2>
+      <p class="mt-1 text-xs font-bold text-slate-400">先用預設即可；需要客製交付時再調整這裡。</p>
       <label class="mt-4 block text-xs font-black text-slate-300">ZIP 檔名<input id="packageZipBaseNameInput" value="${escapeHtml(local.settings.zipBaseName)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label>
       <label class="mt-3 block text-xs font-black text-slate-300">ZIP 根目錄（可留空）<input id="packageRootFolderInput" value="${escapeHtml(local.settings.rootFolder)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label>
       <label class="mt-3 block text-xs font-black text-slate-300">資料夾結構<select id="packageFolderModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="flat">全部平放</option><option value="role">按角色分類</option><option value="source">按來源分類</option><option value="source-role">來源／角色雙層</option></select></label>
       <label class="mt-3 block text-xs font-black text-slate-300">命名模式<select id="packageNamingModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="package">角色命名</option><option value="sequential">自訂流水號</option></select></label>
       <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">前綴<input id="filenamePrefixInput" value="${escapeHtml(naming.prefix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">後綴<input id="filenameSuffixInput" value="${escapeHtml(naming.suffix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
       <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">壓縮方式<select id="packageCompressionInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="store">不重壓 PNG</option><option value="deflate">DEFLATE</option></select></label><label class="text-xs font-black text-slate-300">壓縮等級<input id="packageCompressionLevelInput" type="number" min="1" max="9" value="${local.settings.compressionLevel}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
-      <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-black text-slate-200"><label class="rounded-xl bg-white/10 p-2"><input id="packageManifestJsonInput" type="checkbox"> JSON Manifest</label><label class="rounded-xl bg-white/10 p-2"><input id="packageManifestCsvInput" type="checkbox"> CSV Manifest</label><label class="rounded-xl bg-white/10 p-2"><input id="packageChecksumsInput" type="checkbox"> SHA-256</label><label class="rounded-xl bg-white/10 p-2"><input id="packageReadmeInput" type="checkbox"> README</label></div>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-black text-slate-200">${toggleOption('packageManifestJsonInput','DOC','JSON 清單','給系統讀取')}${toggleOption('packageManifestCsvInput','CSV','CSV 表格','給人檢查')}${toggleOption('packageChecksumsInput','#','校驗碼','確認檔案未壞')}${toggleOption('packageReadmeInput','TXT','說明檔','附交付說明')}</div>
       <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">單檔警告 KB<input id="maxFileSizeKBInput" type="number" min="1" max="102400" value="${naming.maxFileSizeKB}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">總包警告 MB<input id="packageMaxTotalMBInput" type="number" min="1" max="4096" value="${Math.round(local.settings.maxPackageSizeBytes / 1024 / 1024)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
       <div class="mt-3 grid grid-cols-2 gap-2"><button id="packageAutoRolesBtn" class="rounded-xl bg-amber-400 px-2 py-2 text-xs font-black text-slate-950">按 Profile 快速分配</button><button id="packageAllStickerBtn" class="rounded-xl bg-white/10 px-2 py-2 text-xs font-black">全部設為 Sticker</button></div>
       <div id="reviewSummary" class="mt-4 space-y-2 text-sm"></div>
@@ -184,18 +185,18 @@ export function createPackageController(adapter) {
     const holder = document.querySelector('#packagePreflight');
     const summary = snapshot.preflight.summary;
     holder.innerHTML = `<div class="grid gap-2 sm:grid-cols-4">
-      ${metric(summary.imageCount, 'PNG files', 'bg-slate-950 text-white')}
-      ${metric(summary.totalSizeLabel, 'Estimated', 'bg-slate-100')}
-      ${metric(summary.errors, 'Errors', summary.errors ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800')}
-      ${metric(summary.warnings, 'Warnings', 'bg-amber-100 text-amber-800')}
-    </div><div class="mt-3 rounded-2xl ${snapshot.preflight.ready ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'} p-3 text-sm font-black">${snapshot.preflight.ready ? '✓ Package 已通過預檢，可產生 ZIP' : `Package 尚未就緒 · ${escapeHtml(snapshot.preflight.errors[0]?.message || '請完成 Review 與角色設定')}` }</div>`;
+      ${metric(summary.imageCount, '張 PNG', 'PIC', 'bg-slate-950 text-white')}
+      ${metric(summary.totalSizeLabel, '預估大小', 'KB', 'bg-slate-100')}
+      ${metric(summary.errors, '錯誤', '!', summary.errors ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800')}
+      ${metric(summary.warnings, '提醒', '?', 'bg-amber-100 text-amber-800')}
+    </div><div class="mt-3 rounded-2xl ${snapshot.preflight.ready ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'} p-3 text-sm font-black">${snapshot.preflight.ready ? '✓ 已可交付，可下載 PNG 或產生 ZIP' : `尚未可交付 · ${escapeHtml(snapshot.preflight.errors[0]?.message || '請完成 Review 與角色設定')}` }</div>`;
   }
 
   function renderEntries(snapshot) {
     const holder = document.querySelector('#packageFileList');
     document.querySelector('#packageFileCount').textContent = `${snapshot.preflight.summary.imageCount} files · ${snapshot.preflight.summary.totalSizeLabel}`;
     holder.innerHTML = snapshot.entries.length
-      ? snapshot.entries.map(entry => `<button data-package-frame="${entry.frameId}" class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left"><span class="rounded-xl ${entry.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} px-2 py-1 text-[10px] font-black">${entry.approved ? 'APPROVED' : 'PENDING'}</span><span class="min-w-0"><span class="block truncate text-xs font-black">${escapeHtml(entry.path)}</span><span class="block truncate text-[10px] text-slate-400">${escapeHtml(entry.name)} · ${escapeHtml(entry.sourceName)} · ${entry.width}×${entry.height}</span></span><span class="text-xs font-black">${formatBytes(entry.bytes)}</span></button>`).join('')
+      ? snapshot.entries.map(entry => `<button data-package-frame="${entry.frameId}" class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left"><span class="grid h-9 w-9 place-items-center rounded-xl ${entry.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} text-xs font-black">${entry.approved ? '✓' : '!'}</span><span class="min-w-0"><span class="block truncate text-xs font-black">${escapeHtml(entry.path)}</span><span class="block truncate text-[10px] text-slate-400">${entry.approved ? '已核准' : '待核准'} · ${escapeHtml(entry.sourceName)} · ${entry.width}×${entry.height}</span></span><span class="text-xs font-black">${formatBytes(entry.bytes)}</span></button>`).join('')
       : '<div class="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-400">沒有可封裝檔案</div>';
     holder.querySelectorAll('[data-package-frame]').forEach(button => button.addEventListener('click', () => adapter.openFrame(button.dataset.packageFrame)));
   }
@@ -293,7 +294,7 @@ export function createPackageController(adapter) {
       await navigator.clipboard.writeText(text);
       const button = document.querySelector('#packageCopyManifestBtn');
       button.textContent = '已複製';
-      setTimeout(() => { if (button.isConnected) button.textContent = '複製 Manifest'; }, 1200);
+      setTimeout(() => { if (button.isConnected) button.innerHTML = `${iconMark('COPY')}<span>複製</span>`; }, 1200);
     } catch {
       adapter.downloadText(text, `${snapshot.settings.manifestBaseName}.json`, 'application/json');
     }
@@ -325,8 +326,16 @@ export function createPackageController(adapter) {
   return { mount, refresh, exportPackage, cancelExport, getSnapshot: createSnapshot, exportState, importState };
 }
 
-function metric(value, label, className) {
-  return `<div class="rounded-2xl ${className} p-3"><div class="text-2xl font-black">${value}</div><div class="text-[10px] font-black uppercase tracking-widest opacity-70">${label}</div></div>`;
+function iconMark(label) {
+  return `<span aria-hidden="true" class="grid h-7 min-w-7 place-items-center rounded-xl bg-white/70 px-2 text-[10px] font-black text-slate-950 shadow-sm">${label}</span>`;
+}
+
+function toggleOption(id, icon, title, description) {
+  return `<label class="flex min-h-[64px] items-center gap-2 rounded-2xl bg-white/10 p-2"><input id="${id}" type="checkbox" class="h-4 w-4 accent-amber-400"><span class="grid h-9 min-w-9 place-items-center rounded-xl bg-white/15 px-2 text-[10px] font-black">${icon}</span><span class="min-w-0"><span class="block truncate">${title}</span><span class="block truncate text-[10px] text-slate-400">${description}</span></span></label>`;
+}
+
+function metric(value, label, icon, className) {
+  return `<div class="rounded-2xl ${className} p-3"><div class="flex items-center justify-between gap-2"><div class="text-2xl font-black">${value}</div><span class="grid h-8 min-w-8 place-items-center rounded-xl bg-white/60 px-2 text-[10px] font-black text-slate-950">${icon}</span></div><div class="mt-1 text-[10px] font-black uppercase tracking-widest opacity-70">${label}</div></div>`;
 }
 
 function stageLabel(stage) {

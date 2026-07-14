@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  AssetRoles,
   ReviewFilterModes,
   ReviewIssueSeverity,
   ReviewSortModes,
+  applyLineStickerReviewRule,
   analyzeRenderedCanvas,
   buildReviewItems,
   filterReviewItems,
@@ -187,4 +189,29 @@ test('duplicate filename detection is case-insensitive and ignores blanks', () =
   assert.equal(groups.length, 1);
   assert.equal(groups[0].fileName, 'sticker.png');
   assert.deepEqual(groups[0].items.map(item => item.artworkId), ['a', 'b']);
+});
+
+test('LINE sticker review rule assigns main, tab, numbered stickers and backups', () => {
+  const frames = Array.from({ length: 12 }, (_, index) => frame(`frame-${index + 1}`, {
+    state: { exportSelected: true, reviewApproved: true, packageRole: AssetRoles.STICKER },
+    custom: { outputRole: AssetRoles.STICKER }
+  }));
+
+  const arranged = applyLineStickerReviewRule(frames, { stickerCount: 8, includeMain: true, includeTab: true });
+  assert.deepEqual(arranged.slice(0, 10).map(item => item.state.packageRole), [
+    AssetRoles.MAIN,
+    AssetRoles.TAB,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER,
+    AssetRoles.STICKER
+  ]);
+  assert.equal(arranged.filter(item => item.state.exportSelected !== false).length, 10);
+  assert.deepEqual(arranged.slice(10).map(item => item.id), ['frame-11', 'frame-12']);
+  assert.ok(arranged.slice(10).every(item => item.state.exportSelected === false));
+  assert.ok(arranged.every(item => item.state.reviewApproved === false));
 });

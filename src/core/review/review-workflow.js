@@ -1,5 +1,6 @@
 import { createIssue, createReviewSummary, ReviewIssueSeverity, reviewFrames } from './review-engine.js';
 import { reviewRenderedPixels } from './pixel-review.js';
+import { AssetRoles } from '../sticker-presets.js';
 
 export const ReviewFilterModes = Object.freeze({
   ALL: 'all',
@@ -239,6 +240,47 @@ export function invertFramesExportSelection(frames = [], frameIds = null) {
       }
     };
   });
+}
+
+export function applyLineStickerReviewRule(frames = [], {
+  stickerCount = 8,
+  includeMain = true,
+  includeTab = true
+} = {}) {
+  const count = [8, 16, 24, 32, 40].includes(Number(stickerCount)) ? Number(stickerCount) : 8;
+  const mainEnd = includeMain ? 1 : 0;
+  const tabEnd = mainEnd + (includeTab ? 1 : 0);
+  const stickerEnd = tabEnd + count;
+  const assigned = [];
+  const backup = [];
+
+  frames.forEach((frame, index) => {
+    const role = includeMain && index < mainEnd
+      ? AssetRoles.MAIN
+      : includeTab && index >= mainEnd && index < tabEnd
+        ? AssetRoles.TAB
+        : index >= tabEnd && index < stickerEnd
+          ? AssetRoles.STICKER
+          : null;
+    const selected = Boolean(role);
+    const next = {
+      ...frame,
+      state: {
+        ...(frame.state || {}),
+        exportSelected: selected,
+        packageRole: role || AssetRoles.STICKER,
+        reviewApproved: false,
+        reviewApprovedAt: null
+      },
+      custom: {
+        ...(frame.custom || {}),
+        outputRole: role || AssetRoles.STICKER
+      }
+    };
+    (selected ? assigned : backup).push(next);
+  });
+
+  return [...assigned, ...backup];
 }
 
 export function nextReviewFrameId(items = [], currentFrameId = null, direction = 1) {

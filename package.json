@@ -1,6 +1,7 @@
 {
   "name": "stixio",
   "version": "1.0.0",
+  "releaseStatus": "prepared-not-published",
   "private": true,
   "description": "Stixio is a fast sticker production workspace for creators.",
   "type": "module",

@@ -171,7 +171,7 @@ export function enhanceWorkshopUx(root = document.getElementById('app')) {
   }
 
   function installViewports() {
-    for (const canvasId of ['sourceCanvas', 'refineCanvas']) {
+    for (const canvasId of ['sourceCanvas']) {
       const canvas = root.querySelector(`#${canvasId}`);
       if (!canvas) continue;
       ensureViewportLayer(canvas);
@@ -284,6 +284,15 @@ export function enhanceWorkshopUx(root = document.getElementById('app')) {
       ? '確定清除所有原圖、裁切框、遮罩、排序與輸出設定？此動作無法復原。'
       : '確定重設目前 Workspace？';
     if (!window.confirm(message)) return;
+    const detail = {};
+    const event = new CustomEvent('stixio:clear-workspace', { cancelable: true, detail });
+    const handled = !window.dispatchEvent(event);
+    if (handled) {
+      Promise.resolve(detail.promise)
+        .then(() => showToast('Workspace 已清除'))
+        .catch(error => showToast(error?.message || 'Workspace 清除失敗'));
+      return;
+    }
     sessionStorage.setItem(WORKSPACE_CLEARED_KEY, '1');
     window.location.reload();
   }

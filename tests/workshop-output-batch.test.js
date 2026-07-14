@@ -28,6 +28,16 @@ test('source layout settings remain independent per source', () => {
   assert.equal(second.rows, 4);
 });
 
+test('source layout settings keep manual controls collapsed by default', () => {
+  const automatic = createSourceLayoutSettings({});
+  const manual = createSourceLayoutSettings({ layoutMode: '2x2' });
+  const collapsedManual = createSourceLayoutSettings({ layoutMode: '2x2', manualLayoutOpen: false });
+  assert.equal(automatic.layoutMode, 'auto');
+  assert.equal(automatic.manualLayoutOpen, false);
+  assert.equal(manual.manualLayoutOpen, true);
+  assert.equal(collapsedManual.manualLayoutOpen, false);
+});
+
 test('safe margin is clamped to the custom canvas', () => {
   assert.equal(clampSafeMargin(999, 100, 80), 39);
   assert.equal(clampSafeMargin(-5, 100, 80), 0);

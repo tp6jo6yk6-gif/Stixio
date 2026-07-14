@@ -219,6 +219,10 @@ test('Memory project storage supports save, recent list, duplicate, autosave and
   assert.equal(autosave.name, 'Autosaved Project');
   await storage.clearAutosave('doc-1');
   assert.equal(await storage.loadAutosave('doc-1'), null);
+  await storage.saveAutosave({ ...workshopSnapshot(), id: 'autosave-1', name: 'Autosaved Project' });
+  await storage.saveAutosave({ ...workshopSnapshot(), id: 'autosave-2', name: 'Another Autosave' });
+  await storage.clearAllAutosaves();
+  assert.equal(await storage.getLatestAutosave(), null);
 
   await storage.deleteProject(duplicate.id);
   assert.equal((await storage.listProjects()).length, 1);

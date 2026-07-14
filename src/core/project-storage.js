@@ -66,6 +66,11 @@ export class MemoryProjectStorage {
     return this.autosaves.delete(id);
   }
 
+  async clearAllAutosaves() {
+    this.autosaves.clear();
+    return true;
+  }
+
   async clearAll() {
     this.projects.clear();
     this.autosaves.clear();
@@ -153,6 +158,12 @@ export class IndexedDbProjectStorage {
   async clearAutosave(id) {
     const db = await this.open();
     await requestTransaction(db, PROJECT_AUTOSAVE_STORE, 'readwrite', store => store.delete(id));
+    return true;
+  }
+
+  async clearAllAutosaves() {
+    const db = await this.open();
+    await requestTransaction(db, PROJECT_AUTOSAVE_STORE, 'readwrite', store => store.clear());
     return true;
   }
 

@@ -50,18 +50,20 @@ test('UX controller includes viewport, workspace and theme behavior', async () =
     'uxClearWorkspace',
     'uxGridReset',
     'uxThemeToggle',
+    'stixio:clear-workspace',
     'localStorage.setItem',
     'window.location.reload',
     'Space'
   ]) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+  assert.match(source, /for \(const canvasId of \['sourceCanvas'\]\)/);
 });
 
-test('production entry bundles Workshop, UX, bridge, and diagnostics', async () => {
+test('production entry loads current Workshop entry, UX, bridge, and diagnostics', async () => {
   const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const entry = await readFile(new URL('../src/ui/stixio-browser-entry.js', import.meta.url), 'utf8');
-  assert.match(index, /public\/app\/stixio-workshop-1\.0\.0\.js/);
+  assert.match(index, /src\/ui\/stixio-browser-entry\.js\?v=20260714-review-rules/);
   assert.doesNotMatch(index, /import\(['"]\.\/src\//);
   assert.match(entry, /initStixioWorkshop/);
   assert.match(entry, /enhanceWorkshopUx/);
