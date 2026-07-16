@@ -3,7 +3,8 @@ import { AssetRoles } from './sticker-presets.js';
 import { applyLineStickerReviewRule } from './review/review-workflow.js';
 
 export const PlatformSpecKeys = Object.freeze({
-  MESSAGING_STANDARD: 'messaging-standard'
+  MESSAGING_STANDARD: 'messaging-standard',
+  GENERIC_PNG_PACK: 'generic-png-pack'
 });
 
 export const PlatformSpecStatuses = Object.freeze({
@@ -20,6 +21,10 @@ export const PlatformSlotKeys = Object.freeze({
 
 function sequentialStickerName(index) {
   return `${String(index + 1).padStart(2, '0')}.png`;
+}
+
+function unavailableReviewRule() {
+  throw new Error('This platform spec is planned but not available yet.');
 }
 
 const MESSAGING_STANDARD_SPEC = Object.freeze({
@@ -91,8 +96,54 @@ const MESSAGING_STANDARD_SPEC = Object.freeze({
   }
 });
 
+const GENERIC_PNG_PACK_SPEC = Object.freeze({
+  key: PlatformSpecKeys.GENERIC_PNG_PACK,
+  label: '通用 PNG 貼圖包',
+  deliveryLabel: '通用 PNG 貼圖包',
+  platformLabel: '通用 PNG',
+  status: PlatformSpecStatuses.PLANNED,
+  statusLabel: '即將支援',
+  compatibilityLabel: '規格骨架已建立',
+  description: '預留給不含 main/tab 的一般 PNG 貼圖包；目前先顯示規格方向，完整套用流程之後再開放。',
+  destinationProfileKey: DestinationProfileKeys.FLEXIBLE,
+  destinationRole: AssetRoles.STICKER,
+  counts: Object.freeze([8, 16, 24, 32, 40]),
+  stickerCounts: Object.freeze([8, 16, 24, 32, 40]),
+  defaultStickerCount: 8,
+  supportsMain: false,
+  supportsTab: false,
+  slots: Object.freeze({
+    [PlatformSlotKeys.STICKER]: Object.freeze({
+      key: PlatformSlotKeys.STICKER,
+      label: 'PNG',
+      role: AssetRoles.STICKER,
+      required: true,
+      counts: Object.freeze([8, 16, 24, 32, 40]),
+      fileNamePattern: '01.png',
+      fileNameAt: sequentialStickerName
+    }),
+    [PlatformSlotKeys.BACKUP]: Object.freeze({
+      key: PlatformSlotKeys.BACKUP,
+      label: '備選',
+      role: AssetRoles.STICKER,
+      required: false,
+      exportSelected: false
+    })
+  }),
+  naming: Object.freeze({
+    stickerStart: '01.png',
+    stickerFileNameAt: sequentialStickerName,
+    backup: '備選'
+  }),
+  applyReviewRule: unavailableReviewRule,
+  summary({ stickerCount = 8 } = {}) {
+    return `即將支援：預計使用 ${stickerCount} 張 PNG，檔名從 01.png 開始；目前尚不能套用。`;
+  }
+});
+
 const PLATFORM_SPECS = Object.freeze([
-  MESSAGING_STANDARD_SPEC
+  MESSAGING_STANDARD_SPEC,
+  GENERIC_PNG_PACK_SPEC
 ]);
 
 export function getAvailablePlatformSpecs() {
@@ -101,6 +152,10 @@ export function getAvailablePlatformSpecs() {
 
 export function getPlatformSpec(key = PlatformSpecKeys.MESSAGING_STANDARD) {
   return PLATFORM_SPECS.find(spec => spec.key === key) || PLATFORM_SPECS[0];
+}
+
+export function isPlatformSpecAvailable(key) {
+  return getPlatformSpec(key).status === PlatformSpecStatuses.AVAILABLE;
 }
 
 export function getPlatformStickerCounts(key) {
@@ -122,5 +177,9 @@ export function normalizePlatformStickerCount(key, value) {
 }
 
 export function applyPlatformStickerReviewRule(frames, key, options = {}) {
-  return getPlatformSpec(key).applyReviewRule(frames, options);
+  const spec = getPlatformSpec(key);
+  if (!isPlatformSpecAvailable(spec.key)) {
+    throw new Error(`${spec.label} is not available yet.`);
+  }
+  return spec.applyReviewRule(frames, options);
 }
