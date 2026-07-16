@@ -1,4 +1,4 @@
-import {
+﻿import {
   AssetRoles,
   PackageCompressionModes,
   PackageFolderModes,
@@ -47,6 +47,7 @@ export function createPackageController(adapter) {
     const settingsRoot = document.querySelector('#packageSettingsRoot');
     if (!workspace || !settingsRoot) return;
     const snapshot = createSnapshot();
+    renderDeliverySummary(snapshot);
     renderPreflight(snapshot);
     renderEntries(snapshot);
     renderHistory();
@@ -56,6 +57,7 @@ export function createPackageController(adapter) {
 
   function createSnapshot() {
     const frames = adapter.getExportFrames();
+    const allFrames = adapter.getAllFrames?.() || frames;
     frames.forEach(frame => adapter.ensureRendered(frame));
     const packagePlan = adapter.getPackagePlan(frames);
     const entries = buildPackageEntries({
@@ -68,6 +70,7 @@ export function createPackageController(adapter) {
     const reviewReport = adapter.getReviewReport();
     const preflight = createPackagePreflight({ entries, packagePlan, reviewReport, settings: local.settings });
     const output = adapter.getOutputMetadata();
+    const platformSpec = adapter.getPlatformSpec?.() || null;
     const manifest = createPackageManifest({
       entries,
       settings: local.settings,
@@ -81,63 +84,108 @@ export function createPackageController(adapter) {
         destinationKey: packagePlan.destinationKey
       }
     });
-    return { frames, packagePlan, entries, reviewReport, preflight, manifest, output, settings: local.settings };
+    return { frames, allFrames, packagePlan, platformSpec, entries, reviewReport, preflight, manifest, output, settings: local.settings };
   }
 
+  function renderDeliverySummary(snapshot) {
+    const holder = document.querySelector('#packageDeliverySummary');
+    if (!holder) return;
+    const roleCounts = snapshot.entries.reduce((counts, entry) => {
+      const key = entry.role || AssetRoles.STICKER;
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {});
+    const selectedIds = new Set(snapshot.frames.map(frame => frame.id));
+    const backupCount = snapshot.allFrames.filter(frame => !selectedIds.has(frame.id) && frame.state?.visible !== false).length;
+    const stickers = roleCounts[AssetRoles.STICKER] || 0;
+    const hasMain = (roleCounts[AssetRoles.MAIN] || 0) > 0;
+    const hasTab = (roleCounts[AssetRoles.TAB] || 0) > 0;
+    const errors = snapshot.preflight.summary.errors;
+    const warnings = snapshot.preflight.summary.warnings;
+    const ready = snapshot.preflight.ready;
+    const statusLabel = ready ? '可交付' : '需回 Review';
+    const statusClass = ready ? 'bg-emerald-50 text-emerald-800 ring-emerald-100' : 'bg-rose-50 text-rose-800 ring-rose-100';
+    holder.innerHTML = `<div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Delivery Summary</p>
+          <h3 class="mt-1 text-lg font-black text-slate-950">交付摘要</h3>
+        </div>
+        <div class="rounded-2xl px-4 py-2 text-sm font-black ring-1 ${statusClass}">${statusLabel}</div>
+      </div>
+      <div class="mt-4 grid gap-2 md:grid-cols-4">
+        ${summaryTile('交付規格', snapshot.platformSpec?.deliveryLabel || snapshot.platformSpec?.label || snapshot.packagePlan?.destinationName || snapshot.packagePlan?.profileName || '目前交付規格', 'SPEC', 'bg-white text-slate-800 ring-slate-100')}
+        ${summaryTile('內容', `Main ${hasMain ? '1' : '0'} · Tab ${hasTab ? '1' : '0'} · ${stickers} 張`, 'SET', 'bg-white text-slate-800 ring-slate-100')}
+        ${summaryTile('備選', `${backupCount} 張`, 'ALT', 'bg-white text-sky-800 ring-sky-100')}
+        ${summaryTile('檢查', `${errors} 錯誤 · ${warnings} 警告`, 'QA', errors ? 'bg-rose-50 text-rose-800 ring-rose-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100')}
+      </div>
+    </div>`;
+  }
   function renderWorkspaceShell() {
     return `<section id="stage-package" class="scroll-mt-40 rounded-[1.75rem] border border-amber-200 bg-white p-5 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Arrange & Delivery</p>
-          <h2 class="text-xl font-black">整包編排與交付</h2>
-          <p class="mt-1 text-xs font-bold text-slate-400">確認整包角色、輸出路徑、檔案大小與核准狀態，再產生可驗證的 ZIP 交付包。</p>
+          <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-600">Package · Delivery Confirmation</p>
+          <h2 class="text-xl font-black">交付確認</h2>
+          <p class="mt-1 text-xs font-bold text-slate-400">Review 已完成編排與命名；這裡只確認內容、下載 PNG 或產生交付 ZIP。</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button id="packageDownloadAllPngBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-950 px-4 text-xs font-black text-white">${iconMark('↓')}<span>下載 PNG</span></button>
-          <button id="packageExportBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-amber-400 px-4 text-xs font-black text-slate-950">${iconMark('ZIP')}<span>產生 ZIP</span></button>
-          <button id="packageManifestJsonBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700">${iconMark('DOC')}<span>清單</span></button>
-          <button id="packageCopyManifestBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700">${iconMark('COPY')}<span>複製</span></button>
-          <button id="packageCancelBtn" class="hidden inline-flex h-11 items-center gap-2 rounded-2xl bg-rose-100 px-3 text-xs font-black text-rose-700">${iconMark('×')}<span>取消</span></button>
-        </div>
+        <button id="packageBackToReviewBtn" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-sky-50 px-4 text-xs font-black text-sky-700 ring-1 ring-sky-100">${iconMark('←')}<span>回 Review 調整編排</span></button>
       </div>
+      <div id="packageDeliverySummary" class="mt-4"></div>
       <div id="packagePreflight" class="mt-4"></div>
       <div id="packageProgress" class="mt-4"></div>
-      <div class="mt-4 grid gap-4 xl:grid-cols-[1fr_280px]">
-        <div>
-          <div class="mb-2 flex items-center justify-between"><h3 class="text-sm font-black">輸出清單</h3><span id="packageFileCount" class="text-xs font-black text-slate-400"></span></div>
-          <div id="packageFileList" class="space-y-2"></div>
-        </div>
-        <div><h3 class="text-sm font-black">最近輸出</h3><div id="packageHistory" class="mt-2 space-y-2"></div></div>
+      <div class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <button id="packageExportBtn" class="inline-flex min-h-[64px] items-center justify-center gap-3 rounded-3xl bg-amber-400 px-5 text-sm font-black text-slate-950 shadow-sm">${iconMark('ZIP')}<span>產生交付 ZIP</span></button>
+        <button id="packageDownloadAllPngBtn" class="inline-flex min-h-[64px] items-center justify-center gap-3 rounded-3xl bg-slate-950 px-5 text-sm font-black text-white shadow-sm">${iconMark('PNG')}<span>下載全部 PNG</span></button>
+        <button id="packageCancelBtn" class="hidden min-h-[64px] rounded-3xl bg-rose-100 px-5 text-sm font-black text-rose-700">取消輸出</button>
       </div>
+      <details id="packageFileDetails" class="mt-4 rounded-3xl border border-slate-200 bg-white p-4">
+        <summary class="cursor-pointer select-none text-sm font-black text-slate-700">查看交付明細 <span id="packageFileCount" class="ml-2 text-xs font-black text-slate-400"></span></summary>
+        <div class="mt-3 grid gap-4 xl:grid-cols-[1fr_280px]">
+          <div id="packageFileList" class="space-y-2"></div>
+          <div><h3 class="text-sm font-black">最近輸出</h3><div id="packageHistory" class="mt-2 space-y-2"></div></div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+          <button id="packageManifestJsonBtn" class="inline-flex h-10 items-center gap-2 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700">${iconMark('DOC')}<span>下載清單</span></button>
+          <button id="packageCopyManifestBtn" class="inline-flex h-10 items-center gap-2 rounded-2xl bg-slate-100 px-3 text-xs font-black text-slate-700">${iconMark('COPY')}<span>複製清單</span></button>
+        </div>
+      </details>
     </section>`;
   }
-
   function renderSettingsShell() {
     const naming = adapter.getNamingSettings();
     return `<section class="rounded-[1.75rem] border border-amber-300 bg-slate-950 p-5 text-white shadow-sm">
-      <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-300">Package · Settings</p>
-      <h2 class="mt-1 text-lg font-black">整包設定</h2>
-      <p class="mt-1 text-xs font-bold text-slate-400">先用預設即可；需要客製交付時再調整這裡。</p>
-      <label class="mt-4 block text-xs font-black text-slate-300">ZIP 檔名<input id="packageZipBaseNameInput" value="${escapeHtml(local.settings.zipBaseName)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label>
-      <label class="mt-3 block text-xs font-black text-slate-300">ZIP 根目錄（可留空）<input id="packageRootFolderInput" value="${escapeHtml(local.settings.rootFolder)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label>
-      <label class="mt-3 block text-xs font-black text-slate-300">資料夾結構<select id="packageFolderModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="flat">全部平放</option><option value="role">按角色分類</option><option value="source">按來源分類</option><option value="source-role">來源／角色雙層</option></select></label>
-      <label class="mt-3 block text-xs font-black text-slate-300">命名模式<select id="packageNamingModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="package">角色命名</option><option value="sequential">自訂流水號</option></select></label>
-      <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">前綴<input id="filenamePrefixInput" value="${escapeHtml(naming.prefix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">後綴<input id="filenameSuffixInput" value="${escapeHtml(naming.suffix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
-      <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">壓縮方式<select id="packageCompressionInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="store">不重壓 PNG</option><option value="deflate">DEFLATE</option></select></label><label class="text-xs font-black text-slate-300">壓縮等級<input id="packageCompressionLevelInput" type="number" min="1" max="9" value="${local.settings.compressionLevel}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
-      <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-black text-slate-200">${toggleOption('packageManifestJsonInput','DOC','JSON 清單','給系統讀取')}${toggleOption('packageManifestCsvInput','CSV','CSV 表格','給人檢查')}${toggleOption('packageChecksumsInput','#','校驗碼','確認檔案未壞')}${toggleOption('packageReadmeInput','TXT','說明檔','附交付說明')}</div>
-      <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">單檔警告 KB<input id="maxFileSizeKBInput" type="number" min="1" max="102400" value="${naming.maxFileSizeKB}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">總包警告 MB<input id="packageMaxTotalMBInput" type="number" min="1" max="4096" value="${Math.round(local.settings.maxPackageSizeBytes / 1024 / 1024)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
-      <div class="mt-3 grid grid-cols-2 gap-2"><button id="packageAutoRolesBtn" class="rounded-xl bg-amber-400 px-2 py-2 text-xs font-black text-slate-950">按 Profile 快速分配</button><button id="packageAllStickerBtn" class="rounded-xl bg-white/10 px-2 py-2 text-xs font-black">全部設為 Sticker</button></div>
+      <p class="text-[10px] font-black uppercase tracking-[.2em] text-amber-300">Delivery · Confirm</p>
+      <h2 class="mt-1 text-lg font-black">交付確認</h2>
+      <p class="mt-1 text-xs font-bold text-slate-400">主流程只需要確認與輸出；需要改順序、數量、Main 或 Tab 時請回 Review。</p>
       <div id="reviewSummary" class="mt-4 space-y-2 text-sm"></div>
-      <button id="downloadSelectedBtn" class="mt-4 w-full rounded-2xl bg-emerald-300 py-3 text-sm font-black text-slate-950">下載目前 PNG</button>
+      <button id="downloadSelectedBtn" class="mt-4 w-full rounded-2xl bg-emerald-300 py-3 text-sm font-black text-slate-950">下載目前選取 PNG</button>
+      <details id="packageAdvancedSettings" class="mt-4 rounded-2xl bg-white/5 p-3">
+        <summary class="cursor-pointer select-none text-xs font-black text-slate-300">進階交付設定</summary>
+        <div class="mt-3">
+          <label class="block text-xs font-black text-slate-300">ZIP 檔名<input id="packageZipBaseNameInput" value="${escapeHtml(local.settings.zipBaseName)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label>
+          <label class="mt-3 block text-xs font-black text-slate-300">ZIP 根資料夾<input id="packageRootFolderInput" value="${escapeHtml(local.settings.rootFolder)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label>
+          <label class="mt-3 block text-xs font-black text-slate-300">資料夾模式<select id="packageFolderModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="flat">全部同層</option><option value="role">依角色分層</option><option value="source">依來源分層</option><option value="source-role">來源與角色分層</option></select></label>
+          <label class="mt-3 block text-xs font-black text-slate-300">命名模式<select id="packageNamingModeInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="package">貼圖準則命名</option><option value="sequential">連號命名</option></select></label>
+          <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">前綴<input id="filenamePrefixInput" value="${escapeHtml(naming.prefix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">後綴<input id="filenameSuffixInput" value="${escapeHtml(naming.suffix)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
+          <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">壓縮方式<select id="packageCompressionInput" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"><option value="store">不壓縮 PNG</option><option value="deflate">DEFLATE</option></select></label><label class="text-xs font-black text-slate-300">壓縮等級<input id="packageCompressionLevelInput" type="number" min="1" max="9" value="${local.settings.compressionLevel}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
+          <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-black text-slate-200">${toggleOption('packageManifestJsonInput','DOC','JSON 清單','包含交付明細')}${toggleOption('packageManifestCsvInput','CSV','CSV 清單','給表格檢查')}${toggleOption('packageChecksumsInput','#','校驗碼','確認檔案完整')}${toggleOption('packageReadmeInput','TXT','說明檔','包含交付摘要')}</div>
+          <div class="mt-3 grid grid-cols-2 gap-2"><label class="text-xs font-black text-slate-300">單檔警示 KB<input id="maxFileSizeKBInput" type="number" min="1" max="102400" value="${naming.maxFileSizeKB}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label><label class="text-xs font-black text-slate-300">整包警示 MB<input id="packageMaxTotalMBInput" type="number" min="1" max="4096" value="${Math.round(local.settings.maxPackageSizeBytes / 1024 / 1024)}" class="mt-1 w-full rounded-xl bg-white/10 px-3 py-2 text-white"></label></div>
+          <div class="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 opacity-60">
+            <div class="text-[10px] font-black uppercase tracking-widest text-slate-500">進階角色工具</div>
+            <div class="mt-2 grid grid-cols-2 gap-2"><button id="packageAutoRolesBtn" class="rounded-xl bg-white/10 px-2 py-2 text-xs font-black text-slate-300">按 Profile 分配</button><button id="packageAllStickerBtn" class="rounded-xl bg-white/10 px-2 py-2 text-xs font-black text-slate-300">全部設為 Sticker</button></div>
+          </div>
+        </div>
+      </details>
     </section>`;
   }
-
   function bindEvents(workspace, settingsRoot) {
-    workspace.querySelector('#packageDownloadAllPngBtn').addEventListener('click', downloadAllPngs);
-    workspace.querySelector('#packageManifestJsonBtn').addEventListener('click', () => downloadManifest('json'));
-    workspace.querySelector('#packageCopyManifestBtn').addEventListener('click', copyManifest);
-    workspace.querySelector('#packageExportBtn').addEventListener('click', exportPackage);
-    workspace.querySelector('#packageCancelBtn').addEventListener('click', cancelExport);
+    workspace.querySelector('#packageBackToReviewBtn')?.addEventListener('click', () => adapter.openReview?.());
+    workspace.querySelector('#packageDownloadAllPngBtn')?.addEventListener('click', downloadAllPngs);
+    workspace.querySelector('#packageManifestJsonBtn')?.addEventListener('click', () => downloadManifest('json'));
+    workspace.querySelector('#packageCopyManifestBtn')?.addEventListener('click', copyManifest);
+    workspace.querySelector('#packageExportBtn')?.addEventListener('click', exportPackage);
+    workspace.querySelector('#packageCancelBtn')?.addEventListener('click', cancelExport);
     settingsRoot.querySelector('#packageZipBaseNameInput').addEventListener('input', event => setDeliverySetting('zipBaseName', event.target.value));
     settingsRoot.querySelector('#packageRootFolderInput').addEventListener('input', event => setDeliverySetting('rootFolder', event.target.value));
     settingsRoot.querySelector('#packageFolderModeInput').addEventListener('change', event => setDeliverySetting('folderMode', event.target.value));
@@ -184,30 +232,37 @@ export function createPackageController(adapter) {
   function renderPreflight(snapshot) {
     const holder = document.querySelector('#packagePreflight');
     const summary = snapshot.preflight.summary;
-    holder.innerHTML = `<div class="grid gap-2 sm:grid-cols-4">
-      ${metric(summary.imageCount, '張 PNG', 'PIC', 'bg-slate-950 text-white')}
-      ${metric(summary.totalSizeLabel, '預估大小', 'KB', 'bg-slate-100')}
-      ${metric(summary.errors, '錯誤', '!', summary.errors ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800')}
-      ${metric(summary.warnings, '提醒', '?', 'bg-amber-100 text-amber-800')}
-    </div><div class="mt-3 rounded-2xl ${snapshot.preflight.ready ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'} p-3 text-sm font-black">${snapshot.preflight.ready ? '✓ 已可交付，可下載 PNG 或產生 ZIP' : `尚未可交付 · ${escapeHtml(snapshot.preflight.errors[0]?.message || '請完成 Review 與角色設定')}` }</div>`;
+    const readyMessage = snapshot.preflight.ready
+      ? '檢查通過，可以下載 PNG 或產生交付 ZIP。'
+      : `需要回 Review 修正：${escapeHtml(snapshot.preflight.errors[0]?.message || '尚有交付問題')}`;
+    holder.innerHTML = `<div class="rounded-3xl border border-slate-200 bg-white p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h3 class="text-sm font-black text-slate-950">內容檢查</h3>
+        <div class="rounded-2xl ${snapshot.preflight.ready ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'} px-3 py-2 text-xs font-black">${readyMessage}</div>
+      </div>
+      <div class="mt-3 grid gap-2 sm:grid-cols-4">
+        ${metric(summary.imageCount, 'PNG 張數', 'PIC', 'bg-slate-950 text-white')}
+        ${metric(summary.totalSizeLabel, '總大小', 'KB', 'bg-slate-100')}
+        ${metric(summary.errors, '錯誤', '!', summary.errors ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800')}
+        ${metric(summary.warnings, '警告', '?', 'bg-amber-100 text-amber-800')}
+      </div>
+    </div>`;
   }
-
   function renderEntries(snapshot) {
     const holder = document.querySelector('#packageFileList');
-    document.querySelector('#packageFileCount').textContent = `${snapshot.preflight.summary.imageCount} files · ${snapshot.preflight.summary.totalSizeLabel}`;
+    const count = document.querySelector('#packageFileCount');
+    if (count) count.textContent = `${snapshot.preflight.summary.imageCount} files · ${snapshot.preflight.summary.totalSizeLabel}`;
     holder.innerHTML = snapshot.entries.length
-      ? snapshot.entries.map(entry => `<button data-package-frame="${entry.frameId}" class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left"><span class="grid h-9 w-9 place-items-center rounded-xl ${entry.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} text-xs font-black">${entry.approved ? '✓' : '!'}</span><span class="min-w-0"><span class="block truncate text-xs font-black">${escapeHtml(entry.path)}</span><span class="block truncate text-[10px] text-slate-400">${entry.approved ? '已核准' : '待核准'} · ${escapeHtml(entry.sourceName)} · ${entry.width}×${entry.height}</span></span><span class="text-xs font-black">${formatBytes(entry.bytes)}</span></button>`).join('')
-      : '<div class="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-400">沒有可封裝檔案</div>';
+      ? snapshot.entries.map(entry => `<button data-package-frame="${entry.frameId}" class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left"><span class="grid h-9 w-9 place-items-center rounded-xl ${entry.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} text-xs font-black">${entry.approved ? 'OK' : '!'}</span><span class="min-w-0"><span class="block truncate text-xs font-black">${escapeHtml(entry.path)}</span><span class="block truncate text-[10px] text-slate-400">${entry.approved ? '已核准' : '未核准'} · ${escapeHtml(entry.sourceName)} · ${entry.width}x${entry.height}</span></span><span class="text-xs font-black">${formatBytes(entry.bytes)}</span></button>`).join('')
+      : '<div class="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-400">尚未選取可交付圖片</div>';
     holder.querySelectorAll('[data-package-frame]').forEach(button => button.addEventListener('click', () => adapter.openFrame(button.dataset.packageFrame)));
   }
-
   function renderHistory() {
     const holder = document.querySelector('#packageHistory');
     holder.innerHTML = local.history.length
-      ? local.history.map(item => `<div class="rounded-2xl bg-slate-50 p-3 text-xs"><div class="font-black">${escapeHtml(item.fileName)}</div><div class="mt-1 text-slate-400">${item.fileCount} files · ${item.sizeLabel}</div><div class="mt-1 font-black ${item.verified ? 'text-emerald-600' : 'text-rose-600'}">${item.verified ? '✓ ZIP verified' : 'Verification failed'}</div></div>`).join('')
-      : '<div class="rounded-2xl bg-slate-50 p-3 text-xs text-slate-400">尚無輸出紀錄</div>';
+      ? local.history.map(item => `<div class="rounded-2xl bg-slate-50 p-3 text-xs"><div class="font-black">${escapeHtml(item.fileName)}</div><div class="mt-1 text-slate-400">${item.fileCount} files · ${item.sizeLabel}</div><div class="mt-1 font-black ${item.verified ? 'text-emerald-600' : 'text-rose-600'}">${item.verified ? 'ZIP 已驗證' : '驗證失敗'}</div></div>`).join('')
+      : '<div class="rounded-2xl bg-slate-50 p-3 text-xs text-slate-400">尚未輸出任何檔案</div>';
   }
-
   function renderJob(snapshot = createSnapshot()) {
     const holder = document.querySelector('#packageProgress');
     const running = isRunning();
@@ -230,7 +285,7 @@ export function createPackageController(adapter) {
     if (!snapshot.preflight.ready) {
       const issue = snapshot.preflight.errors[0];
       if (issue?.frameId) adapter.openFrame(issue.frameId);
-      adapter.alert(issue?.message || 'Package 尚未通過預檢。');
+      adapter.alert(issue?.message || 'Package 尚未通過交付檢查');
       return;
     }
     const controller = new AbortController();
@@ -265,7 +320,7 @@ export function createPackageController(adapter) {
       const cancelled = error.name === 'AbortError';
       local.job = { ...local.job, status: cancelled ? PackageJobStatuses.CANCELLED : PackageJobStatuses.FAILED, stage: cancelled ? PackageJobStatuses.CANCELLED : PackageJobStatuses.FAILED, progress: local.job.progress, controller: null, error: cancelled ? null : String(error.message || error) };
       refresh();
-      if (!cancelled) adapter.alert(error.message || 'ZIP 匯出失敗');
+      if (!cancelled) adapter.alert(error.message || 'ZIP 產生失敗');
     }
   }
 
@@ -275,13 +330,13 @@ export function createPackageController(adapter) {
 
   function downloadAllPngs() {
     const snapshot = createSnapshot();
-    if (!snapshot.preflight.ready) return adapter.alert(snapshot.preflight.errors[0]?.message || 'Package 尚未就緒。');
+    if (!snapshot.preflight.ready) return adapter.alert(snapshot.preflight.errors[0]?.message || 'Package 尚未通過交付檢查');
     snapshot.entries.forEach((entry, index) => setTimeout(() => adapter.downloadDataUrl(entry.canvas.toDataURL('image/png'), entry.fileName), index * 80));
   }
 
   function downloadManifest(format = 'json') {
     const snapshot = createSnapshot();
-    if (!snapshot.entries.length) return adapter.alert('沒有可輸出的檔案。');
+    if (!snapshot.entries.length) return adapter.alert('尚未選取可交付圖片');
     const text = format === 'csv' ? createPackageManifestCsv(snapshot.entries) : JSON.stringify(snapshot.manifest, null, 2);
     adapter.downloadText(text, `${snapshot.settings.manifestBaseName}.${format}`, format === 'csv' ? 'text/csv' : 'application/json');
   }
@@ -294,7 +349,7 @@ export function createPackageController(adapter) {
       await navigator.clipboard.writeText(text);
       const button = document.querySelector('#packageCopyManifestBtn');
       button.textContent = '已複製';
-      setTimeout(() => { if (button.isConnected) button.innerHTML = `${iconMark('COPY')}<span>複製</span>`; }, 1200);
+      setTimeout(() => { if (button.isConnected) button.innerHTML = `${iconMark('COPY')}<span>複製清單</span>`; }, 1200);
     } catch {
       adapter.downloadText(text, `${snapshot.settings.manifestBaseName}.json`, 'application/json');
     }
@@ -334,12 +389,25 @@ function toggleOption(id, icon, title, description) {
   return `<label class="flex min-h-[64px] items-center gap-2 rounded-2xl bg-white/10 p-2"><input id="${id}" type="checkbox" class="h-4 w-4 accent-amber-400"><span class="grid h-9 min-w-9 place-items-center rounded-xl bg-white/15 px-2 text-[10px] font-black">${icon}</span><span class="min-w-0"><span class="block truncate">${title}</span><span class="block truncate text-[10px] text-slate-400">${description}</span></span></label>`;
 }
 
+function summaryTile(label, value, icon, className) {
+  return `<div class="rounded-2xl p-3 ring-1 ${className}"><div class="flex items-center justify-between gap-2"><div class="min-w-0 text-sm font-black">${value}</div><span class="grid h-8 min-w-8 place-items-center rounded-xl bg-white/70 px-2 text-[10px] font-black text-slate-950">${icon}</span></div><div class="mt-1 text-[10px] font-black uppercase tracking-widest opacity-70">${label}</div></div>`;
+}
+
 function metric(value, label, icon, className) {
   return `<div class="rounded-2xl ${className} p-3"><div class="flex items-center justify-between gap-2"><div class="text-2xl font-black">${value}</div><span class="grid h-8 min-w-8 place-items-center rounded-xl bg-white/60 px-2 text-[10px] font-black text-slate-950">${icon}</span></div><div class="mt-1 text-[10px] font-black uppercase tracking-widest opacity-70">${label}</div></div>`;
 }
 
 function stageLabel(stage) {
-  return ({ idle: '等待封裝', preparing: '準備檔案', hashing: '計算 SHA-256', compressing: '產生 ZIP', verifying: '驗證 ZIP', complete: '封裝完成', cancelled: '已取消', failed: '封裝失敗' })[stage] || stage;
+  return ({
+    idle: '待命',
+    preparing: '準備檔案',
+    hashing: '計算 SHA-256',
+    compressing: '產生 ZIP',
+    verifying: '驗證 ZIP',
+    complete: '完成',
+    cancelled: '已取消',
+    failed: '失敗'
+  })[stage] || stage;
 }
 
 function setControlValue(id, value) {
@@ -355,7 +423,6 @@ function setControlChecked(id, value) {
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 }
-
 
 function cloneProjectValue(value) {
   if (typeof structuredClone === 'function') return structuredClone(value);

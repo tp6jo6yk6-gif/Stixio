@@ -1,6 +1,4 @@
-import { initStixioWorkshopProgressive } from './stixio-workshop-app-v2.js';
-import { enhanceWorkshopUx } from './workshop-ux.js';
-import { bridgeWorkshopLegacyControls } from './workshop-ux-bridge.js';
+import { initStixioWorkshop } from './stixio-workshop-app-v2.js';
 import { installBetaHardening } from './beta-hardening.js';
 
 const stageLabels = {
@@ -88,14 +86,12 @@ async function bootstrap() {
   }, 15_000);
 
   try {
-    await initStixioWorkshopProgressive(root, { onStage: setStage });
+    setStage('shell');
+    initStixioWorkshop(root);
     setStage('ux');
     installOriginalShellStyles();
     arrangeHeaderChrome(root);
     alignCoreWorkflow(root);
-    enhanceWorkshopUx(root);
-    bridgeWorkshopLegacyControls(root);
-    installMagicLoupe(root);
     if (html.dataset.stixioBootError === 'true') throw new Error('Stixio bootstrap did not finish.');
     html.dataset.stixioReady = 'true';
     html.dataset.stixioBootStage = 'ready';
@@ -623,8 +619,11 @@ function resolveWorkflowPanels(root, stageId = null) {
 }
 
 function installWorkflowMutationGuard(root) {
-  if (!root || root.dataset.coreWorkflowMutationGuard === 'true' || !('MutationObserver' in window)) return;
+  if (!root || root.dataset.coreWorkflowMutationGuard === 'true') return;
   root.dataset.coreWorkflowMutationGuard = 'true';
+  // The shell is stable after bootstrap; continuous subtree observation can
+  // retrigger layout work during large UI refreshes and lock the page.
+  return;
   const observer = new MutationObserver(() => {
     if (workflowMutationFrame) return;
     workflowMutationFrame = requestAnimationFrame(() => {

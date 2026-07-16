@@ -7,6 +7,7 @@ export * from './operations.js';
 export * from './rules.js';
 export * from './destination-profiles.js';
 export * from './sticker-presets.js';
+export * from './platform-specs.js';
 export * from './workshop-output.js';
 export * from './package-workflow.js';
 export * from './layout-recovery.js';
