@@ -81,7 +81,7 @@ test('Platform specs are the Review and Package source of truth', async () => {
   assert.match(app, /PlatformSpecStatuses\.AVAILABLE/);
   assert.match(app, /即將支援，尚不能套用/);
   assert.match(app, /getPlatformSpec:\(\)=>getPlatformSpec\(state\.settings\.reviewPackCriterion\)/);
-  assert.match(pkg, /snapshot\.platformSpec\?\.deliveryLabel/);
+  assert.match(pkg, /formatPlatformTitle/);
 });
 
 test("Workshop Package UI presents delivery confirmation controls", async () => {
@@ -92,6 +92,12 @@ test("Workshop Package UI presents delivery confirmation controls", async () => 
   assert.match(source, /下載全部 PNG/);
   assert.doesNotMatch(source, /LINE ZIP/);
   assert.match(source, /交付規格/);
+  assert.match(source, /命名規則/);
+  assert.match(source, /內容結構/);
+  assert.match(source, /此規格尚未開放輸出/);
+  assert.match(source, /formatNamingRule/);
+  assert.match(source, /formatContentStructure/);
+  assert.match(source, /PlatformSpecStatuses\.PLANNED/);
   assert.match(source, /platformSpec/);
   assert.match(source, /packageDeliverySummary/);
   assert.match(source, /packageBackToReviewBtn/);

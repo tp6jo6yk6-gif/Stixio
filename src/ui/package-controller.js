@@ -3,6 +3,7 @@
   PackageCompressionModes,
   PackageFolderModes,
   PackageJobStatuses,
+  PlatformSpecStatuses,
   buildPackageEntries,
   createCompletePackageArchive,
   createPackageDeliverySettings,
@@ -102,9 +103,13 @@ export function createPackageController(adapter) {
     const hasTab = (roleCounts[AssetRoles.TAB] || 0) > 0;
     const errors = snapshot.preflight.summary.errors;
     const warnings = snapshot.preflight.summary.warnings;
-    const ready = snapshot.preflight.ready;
-    const statusLabel = ready ? '可交付' : '需回 Review';
-    const statusClass = ready ? 'bg-emerald-50 text-emerald-800 ring-emerald-100' : 'bg-rose-50 text-rose-800 ring-rose-100';
+    const planned = isPlannedPlatform(snapshot);
+    const ready = snapshot.preflight.ready && !planned;
+    const statusLabel = planned ? `${snapshot.platformSpec.statusLabel || '即將支援'} · 此規格尚未開放輸出` : ready ? '可交付' : '需回 Review';
+    const statusClass = planned ? 'bg-amber-50 text-amber-800 ring-amber-100' : ready ? 'bg-emerald-50 text-emerald-800 ring-emerald-100' : 'bg-rose-50 text-rose-800 ring-rose-100';
+    const specTitle = formatPlatformTitle(snapshot.platformSpec, snapshot.packagePlan);
+    const namingRule = formatNamingRule(snapshot.platformSpec);
+    const contentStructure = formatContentStructure({ main: hasMain, tab: hasTab, stickers, backupCount });
     holder.innerHTML = `<div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -114,9 +119,12 @@ export function createPackageController(adapter) {
         <div class="rounded-2xl px-4 py-2 text-sm font-black ring-1 ${statusClass}">${statusLabel}</div>
       </div>
       <div class="mt-4 grid gap-2 md:grid-cols-4">
-        ${summaryTile('交付規格', snapshot.platformSpec?.deliveryLabel || snapshot.platformSpec?.label || snapshot.packagePlan?.destinationName || snapshot.packagePlan?.profileName || '目前交付規格', 'SPEC', 'bg-white text-slate-800 ring-slate-100')}
-        ${summaryTile('內容', `Main ${hasMain ? '1' : '0'} · Tab ${hasTab ? '1' : '0'} · ${stickers} 張`, 'SET', 'bg-white text-slate-800 ring-slate-100')}
+        ${summaryTile('交付規格', specTitle, 'SPEC', planned ? 'bg-amber-50 text-amber-800 ring-amber-100' : 'bg-white text-slate-800 ring-slate-100')}
+        ${summaryTile('命名規則', namingRule, 'NAME', 'bg-white text-slate-800 ring-slate-100')}
+        ${summaryTile('內容結構', contentStructure, 'SET', 'bg-white text-slate-800 ring-slate-100')}
         ${summaryTile('備選', `${backupCount} 張`, 'ALT', 'bg-white text-sky-800 ring-sky-100')}
+      </div>
+      <div class="mt-2 grid gap-2 md:grid-cols-1">
         ${summaryTile('檢查', `${errors} 錯誤 · ${warnings} 警告`, 'QA', errors ? 'bg-rose-50 text-rose-800 ring-rose-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100')}
       </div>
     </div>`;
@@ -269,12 +277,14 @@ export function createPackageController(adapter) {
     holder.innerHTML = running || [PackageJobStatuses.COMPLETE, PackageJobStatuses.FAILED, PackageJobStatuses.CANCELLED].includes(local.job.status)
       ? `<div class="rounded-2xl bg-slate-950 p-3 text-white"><div class="flex justify-between text-xs font-black"><span>${stageLabel(local.job.stage)}</span><span>${local.job.progress}%</span></div><div class="mt-2 h-2 overflow-hidden rounded-full bg-white/20"><div class="h-full bg-amber-400" style="width:${local.job.progress}%"></div></div>${local.job.current ? `<div class="mt-2 truncate text-[10px] text-slate-400">${escapeHtml(local.job.current)}</div>` : ''}${local.job.error ? `<div class="mt-2 text-xs text-rose-300">${escapeHtml(local.job.error)}</div>` : ''}</div>`
       : '';
-    const disabled = running || !snapshot.preflight.ready;
-    ['packageExportBtn', 'exportZipBtn'].forEach(id => {
+    const planned = isPlannedPlatform(snapshot);
+    const disabled = running || !snapshot.preflight.ready || planned;
+    ['packageExportBtn', 'packageDownloadAllPngBtn', 'exportZipBtn'].forEach(id => {
       const button = document.getElementById(id);
       if (!button) return;
       button.disabled = disabled;
       button.classList.toggle('opacity-40', disabled);
+      button.title = planned ? '此規格尚未開放輸出' : '';
     });
     document.querySelector('#packageCancelBtn')?.classList.toggle('hidden', !running);
   }
@@ -282,6 +292,10 @@ export function createPackageController(adapter) {
   async function exportPackage() {
     if (isRunning()) return;
     const snapshot = createSnapshot();
+    if (isPlannedPlatform(snapshot)) {
+      adapter.alert('此規格尚未開放輸出');
+      return;
+    }
     if (!snapshot.preflight.ready) {
       const issue = snapshot.preflight.errors[0];
       if (issue?.frameId) adapter.openFrame(issue.frameId);
@@ -330,6 +344,7 @@ export function createPackageController(adapter) {
 
   function downloadAllPngs() {
     const snapshot = createSnapshot();
+    if (isPlannedPlatform(snapshot)) return adapter.alert('此規格尚未開放輸出');
     if (!snapshot.preflight.ready) return adapter.alert(snapshot.preflight.errors[0]?.message || 'Package 尚未通過交付檢查');
     snapshot.entries.forEach((entry, index) => setTimeout(() => adapter.downloadDataUrl(entry.canvas.toDataURL('image/png'), entry.fileName), index * 80));
   }
@@ -379,6 +394,27 @@ export function createPackageController(adapter) {
   }
 
   return { mount, refresh, exportPackage, cancelExport, getSnapshot: createSnapshot, exportState, importState };
+}
+
+function isPlannedPlatform(snapshot) {
+  return snapshot.platformSpec?.status === PlatformSpecStatuses.PLANNED;
+}
+
+function formatPlatformTitle(platformSpec, packagePlan) {
+  const label = platformSpec?.deliveryLabel || platformSpec?.label || packagePlan?.destinationName || packagePlan?.profileName || '目前交付規格';
+  return platformSpec?.statusLabel ? `${label} · ${platformSpec.statusLabel}` : label;
+}
+
+function formatNamingRule(platformSpec) {
+  const naming = platformSpec?.naming || {};
+  if (naming.main || naming.tab) {
+    return [naming.main, naming.tab, naming.stickerStart].filter(Boolean).join(' / ');
+  }
+  return naming.stickerStart ? `${naming.stickerStart}, 02.png...` : '依目前檔名規則';
+}
+
+function formatContentStructure({ main = false, tab = false, stickers = 0, backupCount = 0 } = {}) {
+  return `Main ${main ? '1' : '0'} · Tab ${tab ? '1' : '0'} · 貼圖 ${stickers} · 備選 ${backupCount}`;
 }
 
 function iconMark(label) {
