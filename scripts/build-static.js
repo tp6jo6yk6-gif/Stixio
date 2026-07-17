@@ -25,7 +25,11 @@ for (const entry of entries) {
 
 const indexPath = `${dist}/index.html`;
 const buildSha = process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA || 'development';
-const indexHtml = (await readFile(indexPath, 'utf8')).replaceAll('__STIXIO_BUILD_SHA__', buildSha);
+let indexHtml = (await readFile(indexPath, 'utf8')).replaceAll('__STIXIO_BUILD_SHA__', buildSha);
+indexHtml = indexHtml.replace(
+  /<script type="module" src="\.\/src\/ui\/stixio-browser-entry\.js\?v=[^"]+"><\/script>/,
+  '<script defer src="./public/app/stixio-workshop-1.0.0.js?v=20260716-review-led"></script>'
+);
 if (/https:\/\/(cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com)/i.test(indexHtml)) {
   throw new Error('Runtime CDN dependency detected in dist/index.html.');
 }
